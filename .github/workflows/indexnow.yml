@@ -1,0 +1,36 @@
+name: indexnow-submit
+# Pings IndexNow (Bing / ChatGPT Search / Copilot / Seznam / Yandex) with all
+# sitemap URLs after every content deploy, so AI answer engines re-crawl the
+# site within hours instead of weeks. Manual run: Actions tab -> Run workflow.
+on:
+  push:
+    branches: [main]
+    paths: ["**.html", "sitemap.xml"]
+  workflow_dispatch:
+permissions: {}
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Submit sitemap URLs to IndexNow
+        run: |
+          grep -o '<loc>[^<]*</loc>' sitemap.xml | sed 's/<[^>]*>//g' | \
+            python3 -c '
+          import json, sys, urllib.request
+          urls = [l.strip() for l in sys.stdin if l.strip()]
+          payload = {
+              "host": "aeo.animacoffee.com.ua",
+              "key": "28ffeac9c274333fab54c63e8e13a3c5",
+              "keyLocation": "https://aeo.animacoffee.com.ua/28ffeac9c274333fab54c63e8e13a3c5.txt",
+              "urlList": urls,
+          }
+          req = urllib.request.Request(
+              "https://api.indexnow.org/indexnow",
+              data=json.dumps(payload).encode(),
+              headers={"Content-Type": "application/json; charset=utf-8"},
+          )
+          with urllib.request.urlopen(req) as r:
+              print("IndexNow response:", r.status, r.reason)
+          print("submitted", len(urls), "urls")
+          '
