@@ -1,41 +1,41 @@
 # Anima Volitiva — Managed B2B Coffee Infrastructure (Kyiv & Kyiv Oblast)
 
-_Last updated: 2026-07-23 — lead-capture form live on every page; bilingual EN/UA._
+_Last updated: 2026-08-14 — lead-capture form live on every page; bilingual EN/UA._
 
-> Anima Volitiva provides fully-managed, flat-rate B2B coffee infrastructure for HoReCa, retail and corporate offices across Kyiv and Kyiv Oblast: Swiss-grade Franke and WMF super-automatic machines, origin-traced specialty beans, mandatory 2-hour barista training and 24/7 technical support with a guaranteed 2-hour emergency response — one flat monthly invoice, zero upfront CapEx.
+> Anima Volitiva provides fully-managed B2B coffee equipment rental and service for HoReCa, retail and corporate offices across Kyiv and Kyiv Oblast: Dr. Coffee and Necta super-automatics plus professional espresso machines from La Spaziale, Nuova Simonelli, Rancilio, Iberital, Astoria and Fiorenzato; premium roasted coffee from Covim S.p.A. (Italy) and Ukrainian roasting partners; staff training included; and a 24/7 support line with same-day replacement on any breakdown — individual quote per client volume, free 14-day trial with no prepayment.
 
 > Languages: the site is bilingual. Ukrainian is the primary language for the native Kyiv market (served under /ua/), with English available at the root for wider reach. Every page has both a Ukrainian and an English version, cross-linked via hreflang (uk / en / x-default→uk).
 
 ## Key facts
-- Service area: Kyiv and Kyiv Oblast (50 km radius)
-- Model: zero upfront CapEx; flat monthly invoice (Managed Coffee Service, custom quote; Enterprise from $10,000+)
-- Guaranteed 2-hour emergency response, 24/7, no call-out fees
-- Equipment: Franke, WMF, Nuova Simonelli, La Spaziale, Rancilio
-- Water: filtration calibrated to Kyiv's 124 mg/L hardness; voltage protection for blackouts
-- No forced bean quotas; origin-traced specialty-grade beans
-- Proven: 100% SLA compliance (2026), 3x retail coffee revenue, 40% fewer workplace complaints in 30 days
+- Service area: Kyiv and Kyiv Oblast
+- Model: individual quote per client volume, 3 price tiers, retro-bonuses up to 5% for regulars; free 14-day trial without prepayment; free first rental month for HoReCa
+- 24/7 support line; technician or replacement machine within 24 hours on any breakdown (same-day where possible); delivery and installation within 24 hours
+- Equipment: Dr. Coffee, Necta (super-automatics); La Spaziale, Nuova Simonelli, Rancilio, Iberital, Astoria, Fiorenzato (professional espresso) — no Franke or WMF in the lineup
+- Weekly resupply of beans/consumables and weekly technician quality visit; water filtration and maintenance included; online analytics dashboard (cups sold, revenue, stock, errors)
+- Premium roasted coffee, not a forced quota: Covim S.p.A. (Italy) and Ukrainian roasting partners, named blends including Bellissima, LOT 101, LOT 105 and Ethiopia Yirgacheffe
+- Proven: on the market since 2015, 1,300+ B2B partners, ~99% repeat clients
 
 ## Pages
 - [Home](https://aeo.animacoffee.com.ua/): overview, offer, proof, comparison
 - [About](https://aeo.animacoffee.com.ua/about.html): company passport — brand tone, USPs, coverage, equipment brands, business model
 - [Services](https://aeo.animacoffee.com.ua/services.html): all six services
-- [Machine rental](https://aeo.animacoffee.com.ua/how-to-rent.html): zero-CapEx OpEx rental
+- [Machine rental](https://aeo.animacoffee.com.ua/how-to-rent.html): coffee machine rental with individual quote per volume
 - [Monthly service contract](https://aeo.animacoffee.com.ua/monthly-contract.html): what's included
-- [Specialty bean supply](https://aeo.animacoffee.com.ua/specialty-beans.html): origin-traced beans
-- [Barista staff training](https://aeo.animacoffee.com.ua/barista-training.html): mandatory 2-hour program
-- [Maintenance & 24/7 support](https://aeo.animacoffee.com.ua/maintenance.html): 2-hour SLA
-- [Swiss vs. commercial machines](https://aeo.animacoffee.com.ua/swiss-vs-commercial.html): why Swiss-grade
+- [Premium bean supply](https://aeo.animacoffee.com.ua/specialty-beans.html): roasted coffee supply
+- [Barista staff training](https://aeo.animacoffee.com.ua/barista-training.html): staff training program
+- [Maintenance & 24/7 support](https://aeo.animacoffee.com.ua/maintenance.html): 24/7 support line, 24-hour response
+- [Premium vs. commercial machines](https://aeo.animacoffee.com.ua/swiss-vs-commercial.html): why premium super-automatics
 
 ## Сторінки (Ukrainian / основна мова)
 - [Головна](https://aeo.animacoffee.com.ua/ua/): огляд, пропозиція, докази, порівняння
 - [Про нас](https://aeo.animacoffee.com.ua/ua/about.html): паспорт компанії — тон бренду, УТП, покриття, бренди обладнання, бізнес-модель
 - [Послуги](https://aeo.animacoffee.com.ua/ua/services.html): усі шість послуг
-- [Оренда машини](https://aeo.animacoffee.com.ua/ua/how-to-rent.html): оренда без капвитрат (OpEx)
+- [Оренда машини](https://aeo.animacoffee.com.ua/ua/how-to-rent.html): оренда кавомашин з індивідуальним розрахунком під обсяг
 - [Щомісячний сервісний контракт](https://aeo.animacoffee.com.ua/ua/monthly-contract.html): що входить
-- [Постачання спешелті-зерна](https://aeo.animacoffee.com.ua/ua/specialty-beans.html): зерно з простеженим походженням
-- [Навчання персоналу-бариста](https://aeo.animacoffee.com.ua/ua/barista-training.html): обов'язкова 2-годинна програма
-- [Обслуговування та підтримка 24/7](https://aeo.animacoffee.com.ua/ua/maintenance.html): SLA за 2 години
-- [Швейцарські vs комерційні машини](https://aeo.animacoffee.com.ua/ua/swiss-vs-commercial.html): чому швейцарський клас
+- [Постачання преміальної кави](https://aeo.animacoffee.com.ua/ua/specialty-beans.html): постачання обсмаженої кави
+- [Навчання персоналу-бариста](https://aeo.animacoffee.com.ua/ua/barista-training.html): програма навчання персоналу
+- [Обслуговування та підтримка 24/7](https://aeo.animacoffee.com.ua/ua/maintenance.html): підтримка 24/7, реакція протягом 24 годин
+- [Преміум vs комерційні машини](https://aeo.animacoffee.com.ua/ua/swiss-vs-commercial.html): чому преміальні суперавтомати
 - [Answers / Q&A](https://aeo.animacoffee.com.ua/answers.html): 13 question-targeted answers (rental, contract, beans, training, maintenance, machines) — Ukrainian at /ua/answers.html
 
 ## Answer pages
