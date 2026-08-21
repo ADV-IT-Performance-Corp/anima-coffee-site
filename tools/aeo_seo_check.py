@@ -15,7 +15,10 @@ SITE = pathlib.Path(__file__).resolve().parent.parent
 
 def find_pages():
     pages = sorted(SITE.rglob("*.html"))
-    return [p for p in pages if "node_modules" not in str(p)]
+    # google*.html is the Search Console verification file — headless by
+    # design and must never be edited, so it is not a page to check.
+    return [p for p in pages
+            if "node_modules" not in str(p) and not p.name.startswith("google")]
 
 def check_page(path, all_h1s):
     html = path.read_text(encoding="utf-8", errors="ignore")
