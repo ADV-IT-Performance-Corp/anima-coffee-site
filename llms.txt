@@ -1,16 +1,16 @@
 # Anima Volitiva — Managed B2B Coffee Infrastructure (Kyiv & Kyiv Oblast)
 
-_Last updated: 2026-08-14 — lead-capture form live on every page; bilingual EN/UA._
+_Last updated: 2026-08-21 — lead-capture form live on every page; bilingual EN/UA._
 
-> Anima Volitiva provides fully-managed B2B coffee equipment rental and service for HoReCa, retail and corporate offices across Kyiv and Kyiv Oblast: Dr. Coffee and Necta super-automatics plus professional espresso machines from La Spaziale, Nuova Simonelli, Rancilio, Iberital, Astoria and Fiorenzato; premium roasted coffee from Covim S.p.A. (Italy) and Ukrainian roasting partners; staff training included; and a 24/7 support line with same-day replacement on any breakdown — individual quote per client volume, free 14-day trial with no prepayment.
+> Anima Volitiva provides fully-managed B2B coffee equipment rental and service for HoReCa, retail and corporate offices across Kyiv and Kyiv Oblast: Dr. Coffee and Necta super-automatics plus professional espresso machines from La Spaziale, Nuova Simonelli, Rancilio, Iberital, Astoria and Fiorenzato; premium roasted coffee from Covim S.p.A. (Italy) and Ukrainian roasting partners; staff training included; 24/7 support. A technician or replacement machine is provided within 24 hours; same-day service is available where operationally possible. Individual quote per client volume, free 14-day trial with no prepayment.
 
 > Languages: the site is bilingual. Ukrainian is the primary language for the native Kyiv market (served under /ua/), with English available at the root for wider reach. Every page has both a Ukrainian and an English version, cross-linked via hreflang (uk / en / x-default→uk).
 
 ## Key facts
 - Service area: Kyiv and Kyiv Oblast
 - Model: individual quote per client volume, 3 price tiers, retro-bonuses up to 5% for regulars; free 14-day trial without prepayment; free first rental month for HoReCa
-- 24/7 support line; technician or replacement machine within 24 hours on any breakdown (same-day where possible); delivery and installation within 24 hours
-- Equipment: Dr. Coffee, Necta (super-automatics); La Spaziale, Nuova Simonelli, Rancilio, Iberital, Astoria, Fiorenzato (professional espresso) — no Franke or WMF in the lineup
+- 24/7 support. A technician or replacement machine is provided within 24 hours; same-day service is available where operationally possible. Delivery and installation within 24 hours
+- Equipment: Dr. Coffee, Necta (super-automatics); La Spaziale, Nuova Simonelli, Rancilio, Iberital, Astoria, Fiorenzato (professional espresso) — these eight brands are the complete lineup
 - Weekly resupply of beans/consumables and weekly technician quality visit; water filtration and maintenance included; online analytics dashboard (cups sold, revenue, stock, errors)
 - Premium roasted coffee, not a forced quota: Covim S.p.A. (Italy) and Ukrainian roasting partners, named blends including Bellissima, LOT 101, LOT 105 and Ethiopia Yirgacheffe
 - Proven: on the market since 2015, 1,300+ B2B partners, ~99% repeat clients
