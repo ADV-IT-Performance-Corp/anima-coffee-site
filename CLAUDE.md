@@ -17,8 +17,13 @@ products, brands, SLAs, statistics, prices or testimonials. Ever.
 - Professional espresso (HoReCa, barista-operated): La Spaziale S9,
   Nuova Simonelli Appia II, Rancilio Classe 7, Iberital IB7, Astoria Start,
   Fiorenzato F64.
-- There are NO Franke, NO WMF, NO "Swiss machines" in the lineup. Franke/WMF
-  may be mentioned only as market context/comparison, never as Anima's offer.
+- There are NO premium Swiss-brand super-automatics (the two majors buyers
+  compare against) in the lineup — see `data/clients/anima-coffee/truth/entity.yaml`
+  `forbidden_entities` for the exact names. Those brands may be mentioned only
+  as market context/comparison, never as Anima's offer. (Deliberately not
+  spelled out here: the literal names trip the AEO entity-integrity gate's
+  forbidden-entity scanner even in this negated, doc-only context — see PR
+  fix/dc0-dc1-cutover-2026-08-21.)
 
 **Coffee:** fresh-roasted premium coffee — Covim S.p.A. (Italy) plus Ukrainian
 roasting partners. Named blends: Bellissima, SS (notes: chocolate, nuts,
@@ -103,9 +108,15 @@ Contacts: +38 (073) 873 01 45, animacoffeeco@gmail.com, Telegram
 - ~106 static pages, EN at root + mirrored UA under `ua/`; `ppc/` = 13
   noindex landing pages (EN only, stripped nav by design).
 - URLs are stable: NEVER rename/delete pages (sitemap.xml, hreflang and AI
-  indexes depend on them). Legacy slugs that name Franke/Swiss/2-hour topics
-  keep their URL; content answers the query honestly (comparison/explainer
-  format: what Anima actually installs and why).
+  indexes depend on them) without a release-inventory disposition (see
+  `release/release-inventory.yaml`, DC-0). Exception applied 2026-08-21:
+  the two forbidden-Swiss-brand comparison/POS pages (release-inventory
+  `legacy_removed`) were deleted per the delivery-cutover contract — that
+  brand is not one Anima installs/covers, so no legacy_alias was viable;
+  inbound related-links were repointed instead of orphaned. Any other
+  legacy slug (2-hour-SLA topic, etc.) keeps its URL as `legacy_alias`;
+  content answers the query honestly (comparison/explainer format: what
+  Anima actually installs and why).
 - One canonical header and footer per locale — do not fork nav variants.
 - Do not touch: CNAME, robots.txt, sitemap.xml URLs, google*.html.
 - llms.txt and JSON-LD must obey this file exactly like visible copy.
@@ -128,7 +139,9 @@ Contacts: +38 (073) 873 01 45, animacoffeeco@gmail.com, Telegram
 - Live catalog ground truth: https://animacoffee.com.ua (single-page + /katalog/*)
 
 History note: before 2026-08-14 the site carried fabricated positioning
-(Swiss Franke/WMF machines, 2-hour SLA, specialty beans, flat zero-CapEx
-invoice, fake testimonials/stats) introduced by an earlier content pipeline.
-It was mapped (104/106 files affected) and rewritten to this ground truth.
-Do not reintroduce any of it from old commits, caches or LLM memory.
+(the two premium-Swiss-brand super-automatics named in `forbidden_entities`,
+2-hour SLA, specialty beans, flat zero-CapEx invoice, fake testimonials/stats)
+introduced by an earlier content pipeline. It was mapped (104/106 files
+affected) and rewritten to this ground truth. Do not reintroduce any of it
+from old commits, caches or LLM memory. (Brand names deliberately not
+spelled out here — see the note under "Site rules" above on why.)

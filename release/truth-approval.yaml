@@ -1,0 +1,141 @@
+# Release truth-approval TEMPLATE — Anima AEO delivery cutover (DC-0)
+# Spec: ADV-Strategy-Core docs/specs/spec-anima-aeo-client-delivery-cutover-2026-08-21.md section 6
+#
+# THIS FILE CONTAINS NO DECISIONS. Every claim below is status: PENDING_OWNER.
+# Approval/omission of each claim is the founder's call, not this PR's. Do not
+# flip any status here without the founder (or named client representative)
+# explicitly approving it — see spec section 15 "Human inputs that may block
+# acceptance".
+#
+# Once approved, the founder (or whoever they delegate) fills in `status`,
+# `approved_by`, `approved_at` and any required definition fields per claim,
+# and this becomes the real truth-approval.yaml gating the release.
+
+version: '1'
+release_id: anima-aeo-v1
+status: TEMPLATE_NOT_YET_APPROVED
+strategy_core_truth_sha256: d31629bbe8e8af1069072636773ee5172b54aa5af0375b0e288252181450a38b
+approved_by: null
+approved_at: null
+
+claims:
+  # --- Already-approved conservative SLA (for reference / already propagated
+  # site-wide as of this PR — NOT pending, included here only so the file is
+  # a complete picture of every claim the spec calls out in section 2.2/6.1) ---
+  service_sla:
+    status: approved
+    canonical_en: >-
+      24/7 support. A technician or replacement machine is provided within 24
+      hours; same-day service is available where operationally possible.
+    canonical_uk: >-
+      Підтримка 24/7. Технік або підмінна машина надається протягом 24 годин;
+      того ж дня — коли це операційно можливо.
+    note: >-
+      Propagated site-wide in this PR (62 UA + 17 EN unconditional
+      "same-day"/"день у день" occurrences rewritten to this formula or an
+      already-approved shorter in-sentence variant). See PR body for exact
+      counts.
+
+  # --- Pending high-risk claims (spec section 2.2 / B-04) ---
+  partner_count:
+    status: PENDING_OWNER
+    value: 1300
+    comparator: gte
+    definition_required:
+      - "Active accounts, historical customers, locations, or contracts — which?"
+      - "As of what date?"
+    current_site_wording: "1,300+ B2B partners"
+    where_used: "site-wide stat badges, hero sections, JSON-LD Organization/Service descriptions, llms.txt"
+
+  repeat_rate:
+    status: PENDING_OWNER
+    value: 99
+    unit: '%'
+    comparator: approx
+    definition_required:
+      - "Measurement period (trailing 12mo? since 2015? annual?)"
+      - "Population (all clients ever, or clients active in the period?)"
+      - "Methodology (renewal rate, still-active rate, something else?)"
+    current_site_wording: "~99% repeat clients / ~99% repeat rate"
+    where_used: "site-wide stat badges, hero sections, JSON-LD, llms.txt"
+
+  founding_year:
+    status: PENDING_OWNER
+    value: 2015
+    definition_required:
+      - "Confirm 2015 is the correct founding/market-entry year to state publicly."
+    current_site_wording: "On the market since 2015 / founded 2015"
+    where_used: "about.html, JSON-LD foundingDate (site-wide, injected this PR), stat badges"
+
+  free_14_day_trial:
+    status: PENDING_OWNER
+    definition_required:
+      - "Confirm trial length, no-prepayment condition, and any eligibility limits still hold."
+    current_site_wording: "Free 14-day trial with no prepayment"
+    where_used: "site-wide CTAs, hero sections, FAQ answers"
+
+  free_first_month_horeca:
+    status: PENDING_OWNER
+    definition_required:
+      - "Confirm HoReCa-only scope and that it still applies (any expiry/limit?)."
+    current_site_wording: "Free first rental month for HoReCa clients"
+    where_used: "hero sections, terms blocks, llms.txt key facts"
+
+  free_install_first_week_retail:
+    status: PENDING_OWNER
+    definition_required:
+      - "Confirm 'free installation and first product week' still applies for shops/kiosks and define scope."
+    current_site_wording: "Free installation and first product week for shops/kiosks"
+    where_used: "CLAUDE.md source-of-truth notes; verify actual page wording matches before shipping"
+
+  price_tiers:
+    status: PENDING_OWNER
+    value: 3
+    definition_required:
+      - "Confirm 3 tiers is still current, and whether tier boundaries/names are safe to publish."
+    current_site_wording: "Three price tiers"
+    where_used: "hero sections, FAQ, terms blocks"
+
+  retro_bonus:
+    status: PENDING_OWNER
+    value: 5
+    unit: '%'
+    definition_required:
+      - "Confirm 'up to 5%' retro-bonus for regulars is current and the qualifying condition is accurate."
+    current_site_wording: "Retro-bonuses up to 5% for regulars"
+    where_used: "hero sections, FAQ, terms blocks"
+
+  service_geography:
+    status: PENDING_OWNER
+    definition_required:
+      - "Exact service geography — is Cherkasy Oblast in public scope, or Kyiv + Kyiv Oblast only?"
+    current_site_wording: "Kyiv and Kyiv Oblast"
+    where_used: "site-wide areaServed JSON-LD, hero copy, footer"
+
+  canonical_sales_contact:
+    status: PENDING_OWNER
+    definition_required:
+      - >-
+        Two different addresses are live on the site right now — pick ONE
+        canonical sales email (and confirm the phone number) before this
+        release ships:
+      - >-
+        (a) animacoffeeco@gmail.com — used in visible contact blocks,
+        JSON-LD Organization.email, and mailto: links on all 135 content
+        pages (source: inject_contacts.py fix-pack run in this PR, keyed
+        off client-supplied contact data).
+      - >-
+        (b) hello@animacoffee.com.ua — used as the AmoCRM/inbox destination
+        inside assets/lead.js (INBOX constant), i.e. what actually receives
+        a submitted lead form today.
+      - >-
+        These are DIFFERENT addresses controlled by (presumably) different
+        mailboxes. Until resolved, a form submission and the "call us"
+        contact block point a prospect/lead to two different inboxes. This
+        PR intentionally does NOT touch assets/lead.js or any form endpoint
+        (DC-2 scope, per delivery-cutover contract's "do not expand scope"
+        rule) — resolving this conflict is a release-blocking decision for
+        DC-2/DC-3, not a DC-0/DC-1 mechanical fix.
+      - "Response-time wording to publish alongside the chosen contact, if any."
+    current_site_wording: "animacoffeeco@gmail.com (visible copy) vs hello@animacoffee.com.ua (form backend)"
+    where_used: "site-wide (visible) / assets/lead.js:10 (backend)"
