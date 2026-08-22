@@ -1,0 +1,26 @@
+name: tag-release
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag name to create
+        required: true
+      sha:
+        description: Commit SHA to tag
+        required: true
+permissions:
+  contents: write
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create tag ref
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: `refs/tags/${{ github.event.inputs.tag }}`,
+              sha: '${{ github.event.inputs.sha }}',
+            });
