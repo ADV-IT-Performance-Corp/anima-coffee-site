@@ -17,8 +17,14 @@ def find_pages():
     pages = sorted(SITE.rglob("*.html"))
     # google*.html is the Search Console verification file — headless by
     # design and must never be edited, so it is not a page to check.
+    # 404.html is the GitHub Pages custom error page: noindex by design,
+    # served for arbitrary unmatched URLs, so canonical/hreflang/JSON-LD
+    # (which all assert "this URL is the authoritative version of X") do
+    # not apply to it — same exemption class as the verification file.
     return [p for p in pages
-            if "node_modules" not in str(p) and not p.name.startswith("google")]
+            if "node_modules" not in str(p)
+            and not p.name.startswith("google")
+            and p.name != "404.html"]
 
 def check_page(path, all_h1s):
     html = path.read_text(encoding="utf-8", errors="ignore")
