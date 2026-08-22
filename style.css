@@ -39,6 +39,14 @@ nav .wrap{display:flex;align-items:center;justify-content:space-between;height:7
 .nav-cta{background:var(--accent);color:#1a120b!important;padding:10px 18px;border-radius:2px;font-weight:600;font-size:14px}
 .nav-cta:hover{background:var(--accent-deep)}
 @media(max-width:900px){nav .wrap{flex-wrap:wrap;height:auto;padding-top:14px;padding-bottom:14px}.nav-links{order:3;width:100%;margin-top:12px;gap:14px 18px;flex-wrap:wrap;justify-content:center;border-top:1px solid rgba(201,188,172,.15);padding-top:14px}.nav-links a:not(.nav-cta){display:inline-block;font-size:13px}}
+/* mobile: the wrapped nav (measured ~214px tall at 390px, vs. 70px desktop)
+   is `position:sticky`, so any scroll that lands a target flush to the
+   viewport top — a `#cta`/in-page anchor, or the field.scrollIntoView()
+   in assets/lead.js's validation-error highlight — puts it straight under
+   the nav. DC-5 audit: the "BUSINESS" field label on Home @390px. */
+@media(max-width:480px){
+  .lead-form label,.lead-form input,.lead-form textarea,#cta,section[id]{scroll-margin-top:228px}
+}
 
 .hero{background:linear-gradient(105deg,rgba(20,13,9,.94) 0%,rgba(20,13,9,.86) 42%,rgba(20,13,9,.55) 100%),url('assets/hero.jpg') center/cover no-repeat,#17100c;color:var(--cream);position:relative;overflow:hidden}
 .hero .wrap{display:grid;grid-template-columns:1.15fr .85fr;gap:60px;align-items:center;padding:92px 32px 100px}
@@ -71,7 +79,7 @@ nav .wrap{display:flex;align-items:center;justify-content:space-between;height:7
 .stat{padding:38px 20px;border-right:1px solid rgba(28,19,11,.14)}
 .stat:last-child{border-right:none}
 .stat .n{font-family:var(--serif);font-size:36px;font-weight:700;line-height:1}
-.stat .l{font-size:12.5px;margin-top:9px;line-height:1.4;font-weight:600;color:#3d2a17}
+.stat .l{font-size:12.5px;margin-top:9px;line-height:1.4;font-weight:600;color:#1c130b} /* was #3d2a17 (~4.2:1 on --accent, under AA 4.5:1 for small bold text); matches .n's already-AA color */
 @media(max-width:900px){.stats .wrap{grid-template-columns:repeat(3,1fr)}.stat{border-bottom:1px solid rgba(28,19,11,.14)}}
 @media(max-width:520px){.stats .wrap{grid-template-columns:repeat(2,1fr)}}
 
@@ -124,7 +132,7 @@ section.block{padding:96px 0}
 .badge b{color:var(--accent-deep)}
 @media(max-width:760px){.quotes{grid-template-columns:1fr}}
 
-.cmp{overflow-x:auto}
+.cmp,div[style*="overflow-x:auto"]{overflow-x:auto;-webkit-overflow-scrolling:touch;position:relative}
 table{border-collapse:collapse;width:100%;min-width:640px;font-size:15px}
 thead th{text-align:left;padding:20px;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-soft);font-weight:700;border-bottom:1px solid var(--line)}
 thead th.anima{color:#1c130b;background:var(--accent);border-radius:6px 6px 0 0}
@@ -132,6 +140,22 @@ tbody td{padding:18px 20px;border-bottom:1px solid var(--line);color:var(--ink-s
 tbody td:first-child{color:var(--ink);font-weight:600}
 tbody td.anima{background:rgba(194,128,60,.10);color:var(--ink);font-weight:600}
 tbody tr:last-child td.anima{border-radius:0 0 6px 6px}
+/* mobile: a horizontally-scrollable comparison table with no affordance
+   reads as "broken/clipped" at a glance (DC-5 audit, swiss-vs-commercial
+   at 390px) — tighten sizing so more fits per screen, and add a visible
+   scroll hint so the cut-off edge reads as "swipe", not "missing". */
+@media(max-width:600px){
+  table{min-width:560px;font-size:13.5px}
+  thead th{padding:12px 12px}
+  tbody td{padding:12px 12px}
+  .cmp::after,div[style*="overflow-x:auto"]::after{
+    content:"⇄ swipe to see more";
+    position:absolute;right:6px;bottom:6px;
+    font-size:11px;font-weight:600;color:var(--ink-soft);
+    background:var(--cream);border:1px solid var(--line);border-radius:100px;
+    padding:3px 10px;pointer-events:none;box-shadow:0 2px 8px rgba(40,25,12,.14)
+  }
+}
 
 .faq{max-width:820px;margin:0 auto}
 details{border-bottom:1px solid var(--line)}
@@ -289,23 +313,15 @@ footer .fcta:hover{background:var(--accent-deep)}
 .ppc-band .wrap{padding:26px 32px;display:flex;flex-wrap:wrap;gap:14px 34px;justify-content:center;align-items:center;font-size:14.5px;color:var(--ink-soft)}
 .ppc-band b{color:var(--ink)}
 
+/* NOTE: a duplicate `.aio` rule used to live here (dark-theme tokens
+   --bg-surface/--border-subtle from a separate design pass) and set the
+   callout's background to near-black while `.aio p` (defined above, line
+   ~211) kept its near-black `--ink` text color — the "Direct Answer" box
+   was unreadable on Services + Answers-detail pages. The canonical `.aio`
+   rule at line ~209 (light --cream-2 background, dark --ink text, verified
+   AA contrast) already owns this component; removed the conflicting
+   duplicate instead of patching two divergent rule sets. */
 
-.aio {
-  background: var(--bg-surface);
-  border-left: 4px solid var(--accent);
-  padding: 1.25rem;
-  margin: 1.5rem 0;
-  border-radius: 0 0.5rem 0.5rem 0;
-  box-shadow: 0 0 0 1px var(--border-subtle);
-}
-.aio .lab {
-  color: var(--accent);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-size: 0.75rem;
-  margin-bottom: 0.5rem;
-}
 .comparison-matrix {
   width: 100%;
   border-collapse: collapse;
