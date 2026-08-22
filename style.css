@@ -233,6 +233,11 @@ footer .brand{font-size:18px}
 .lead-form .lf-status{margin-top:12px;font-size:14.5px;font-weight:600;text-align:center;min-height:0}
 .lead-form .lf-status.ok{color:var(--accent-deep)}
 .lead-form .lf-status.err{color:#9a5b4b}
+.lead-form .lf-status a{color:inherit;text-decoration:underline}
+.lead-form .lf-consent{margin-top:12px;font-size:12px;line-height:1.5;color:var(--ink-soft);text-align:center}
+.lead-form .lf-consent a{color:var(--accent)}
+.lf-hp{position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;overflow:hidden}
+.lf-highlight{outline:2px solid var(--accent);outline-offset:5px;border-radius:6px;transition:outline-color .25s}
 @media(max-width:520px){.lead-form .lf-row{grid-template-columns:1fr}}
 
 /* --- rich metric explainer cards (renders FULL lake stat descriptions, not just a tile) --- */

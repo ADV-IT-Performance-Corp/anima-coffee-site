@@ -5,7 +5,11 @@
  *   GA4      — replace G-XXXXXXXXXX below  (Google Analytics 4 Measurement ID)
  *   Metrica  — replace XXXXXXXX  below     (Yandex Metrica counter number)
  *
- * The generate_lead conversion is fired from assets/lead.js via window.animaTrackLead().
+ * The lead_accepted conversion is fired from assets/lead.js via
+ * window.animaTrackLead() — ONLY after the first-party lead API has
+ * durably accepted the lead and returned a lead_id (DC-3). It carries no
+ * currency/value (a non-revenue event) and no PII — source_page and
+ * lead_id only.
  */
 (function () {
   // ==== THE TWO SECRETS — paste real IDs on these two lines to activate ==========
@@ -40,10 +44,13 @@
     ym(METRICA_ID, "init", { clickmap: true, trackLinks: true, accurateTrackBounce: true });
   }
 
-  // --- Conversion hook, called by lead.js on a successful lead submit ---
-  window.animaTrackLead = function (sourcePage) {
+  // --- Conversion hook, called by lead.js ONLY after the first-party lead
+  // API returns HTTP 200 with a lead_id (never on mailto: open, never
+  // speculatively). No currency/value — this is a non-revenue event — and
+  // no PII: source_page + lead_id only.
+  window.animaTrackLead = function (sourcePage, leadId) {
     var sp = sourcePage || location.pathname;
-    try { if (GA4_LIVE) gtag("event", "generate_lead", { source_page: sp, currency: "USD" }); } catch (e) {}
-    try { if (METRICA_LIVE && window.ym) ym(METRICA_ID, "reachGoal", "generate_lead"); } catch (e) {}
+    try { if (GA4_LIVE) gtag("event", "lead_accepted", { source_page: sp, lead_id: leadId || "" }); } catch (e) {}
+    try { if (METRICA_LIVE && window.ym) ym(METRICA_ID, "reachGoal", "lead_accepted"); } catch (e) {}
   };
 })();
