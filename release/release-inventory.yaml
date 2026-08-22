@@ -6,8 +6,10 @@
 #
 version: '1'
 release_id: anima-aeo-v1
-generated_at: '2026-08-21'
-generated_by: fix/dc0-dc1-cutover-2026-08-21 (DC-0 release inventory)
+generated_at: '2026-08-22'
+generated_by: fix/release-truth-corrections-2026-08-22 (corrective release slice — added 404.html,
+  privacy.html, ua/privacy.html, which existed on disk but were never classified; prior classes for
+  all 136 previously-classified routes are unchanged)
 truth_source:
   repository: ADV-IT-Performance-Corp/ADV-Strategy-Core
   commit: 0e49453117a0dab44a0bf9f6c3465e6d52294684
@@ -20,11 +22,21 @@ entity_integrity_gate:
   composite_score: 96
   checked_at: '2026-08-21'
 summary:
-  total_routes: 136
+  total_routes: 139
   index: 54
-  noindex_follow: 81
-  omit: 1
+  noindex_follow: 83
+  omit: 2
 routes:
+- path: /404.html
+  locale: en
+  page_type: utility
+  index_policy: omit
+  canonical: https://aeo.animacoffee.com.ua/404.html
+  note: GitHub Pages custom error page, served for any unmatched URL. noindex by design (its own meta
+    robots tag is noindex) and omitted from sitemap/llms.txt/nav — same exemption class as the Search
+    Console verification file, and excluded from tools/aeo_seo_check.py for the same reason
+    (canonical/hreflang/JSON-LD all assert this URL is the authoritative version of one page, which
+    does not apply to a catch-all error page).
 - path: /2-hour-emergency-sla.html
   locale: en
   page_type: legacy_alias
@@ -336,6 +348,14 @@ routes:
   page_type: orphan_solution_page
   index_policy: noindex_follow
   canonical: https://aeo.animacoffee.com.ua/preventive-maintenance-super-automatics.html
+- path: /privacy.html
+  locale: en
+  page_type: privacy
+  index_policy: noindex_follow
+  canonical: https://aeo.animacoffee.com.ua/privacy.html
+  note: Noindex utility page (own meta robots is noindex,follow) — real, linked-from-footer content
+    (how the site handles data submitted via the assessment form), deliberately excluded from
+    sitemap/llms.txt since it answers no buyer question an AI engine or searcher would query for.
 - path: /self-service-tech-office-coffee.html
   locale: en
   page_type: orphan_solution_page
@@ -627,6 +647,12 @@ routes:
   page_type: orphan_solution_page
   index_policy: noindex_follow
   canonical: https://aeo.animacoffee.com.ua/ua/preventive-maintenance-super-automatics.html
+- path: /ua/privacy.html
+  locale: uk
+  page_type: privacy
+  index_policy: noindex_follow
+  canonical: https://aeo.animacoffee.com.ua/ua/privacy.html
+  note: UA twin of /privacy.html — same disposition and rationale.
 - path: /ua/self-service-tech-office-coffee.html
   locale: uk
   page_type: orphan_solution_page

@@ -1,0 +1,13 @@
+{
+  "release_tag": "client-anima-aeo-v1",
+  "site_repo": "ADV-IT-Performance-Corp/anima-coffee-site",
+  "strategy_core_release": "108b6a0d",
+  "built_at": "2026-08-22T03:49:27Z",
+  "built_at_note": "Placeholder timestamp from this PR's authoring session. The tag client-anima-aeo-v1 is created on the merge commit of this corrective PR, not on this timestamp -- the tag's own commit metadata is the authoritative build time.",
+  "inventory_sha256": "65718dad8f98369e7647ea68818db4b4d39b0de460b33b939ad7863a30b24f72",
+  "inventory_path": "release/release-inventory.yaml",
+  "gate": {
+    "entity_integrity": "passed/0/96 (checked 2026-08-21, per release-inventory.yaml entity_integrity_gate -- unchanged by this PR)",
+    "aeo_seo_check": "137/137 PASS (tools/aeo_seo_check.py, re-run 2026-08-22 against this branch's tree)"
+  }
+}

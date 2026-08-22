@@ -1,6 +1,6 @@
 # Anima Volitiva — Managed B2B Coffee Infrastructure (Kyiv & Kyiv Oblast)
 
-_Last updated: 2026-08-21 — lead-capture form live on every page; bilingual EN/UA._
+_Last updated: 2026-08-22 — lead form UI available; direct-contact fallback active until backend connection; bilingual EN/UA._
 
 > Anima Volitiva provides fully-managed B2B coffee equipment rental and service for HoReCa, retail and corporate offices across Kyiv and Kyiv Oblast: Dr. Coffee and Necta super-automatics plus professional espresso machines from La Spaziale, Nuova Simonelli, Rancilio, Iberital, Astoria and Fiorenzato; premium roasted coffee from Covim S.p.A. (Italy) and Ukrainian roasting partners; staff training included; 24/7 support. A technician or replacement machine is provided within 24 hours; same-day service is available where operationally possible. Individual quote per client volume, free 14-day trial with no prepayment.
 
