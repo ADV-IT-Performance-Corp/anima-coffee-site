@@ -1,7 +1,7 @@
 # Client Acceptance — Anima Volitiva AEO Site
 
 Reference: `delivery/CLIENT_HANDOFF.md` / `delivery/CLIENT_HANDOFF.ua.md`
-Release SHA: `69dc97658e5439de6678278fd2924308d7473cad`
+Site release: tag `client-anima-aeo-v1` (created on the merge commit of this corrective PR)
 Live URL: https://aeo.animacoffee.com.ua/
 
 By signing below, the client confirms they have reviewed the linked handoff
@@ -22,7 +22,7 @@ separately, not blocking acceptance).
 # Приймання клієнтом — AEO-сайт Anima Volitiva
 
 Довідка: `delivery/CLIENT_HANDOFF.md` / `delivery/CLIENT_HANDOFF.ua.md`
-SHA релізу: `69dc97658e5439de6678278fd2924308d7473cad`
+Реліз сайту: тег `client-anima-aeo-v1` (створений на коміті мерджу цього коригувального PR)
 Дійсний URL: https://aeo.animacoffee.com.ua/
 
 Підписуючи цей документ, клієнт підтверджує, що ознайомився з доданим

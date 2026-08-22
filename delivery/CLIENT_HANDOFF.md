@@ -1,8 +1,8 @@
 # Anima Volitiva — AEO Site Handoff
 
 **Live site:** https://aeo.animacoffee.com.ua/
-**Release SHA:** `69dc97658e5439de6678278fd2924308d7473cad`
-**Release date:** 2026-08-21 (deployed 2026-08-22, 02:42 UTC)
+**Site release:** tag `client-anima-aeo-v1` (created on the merge commit of this corrective PR)
+**Handoff package:** same tag
 **Prepared:** 2026-08-22
 
 This document summarizes what has been delivered, what is verified, and what
@@ -22,13 +22,13 @@ around the questions a B2B buyer actually asks before renting managed coffee
 equipment: pricing model, SLA, service area, machine types, contract terms.
 
 Per the repository's release inventory (`release/release-inventory.yaml`),
-the site currently ships **136 routes**, broken down as:
+the site currently ships **139 routes**, broken down as:
 
 | Class | Count | What it means |
 |---|---|---|
 | **Indexed** | 54 | In the sitemap and `llms.txt`, discoverable by search engines and AI crawlers — home, about, services, answer pages, blog, comparisons, contracts |
-| **Served, not indexed** (`noindex,follow`) | 81 | Real, working pages (PPC landing pages, orphaned solution pages, internal AEO test cases, one legacy-URL alias) — live and linkable but deliberately excluded from the sitemap/AI-crawl surface so they don't compete with the indexed set |
-| **Omitted** | 1 | The Google Search Console ownership-verification file — not content |
+| **Served, not indexed** (`noindex,follow`) | 83 | Real, working pages (PPC landing pages, orphaned solution pages, internal AEO test cases, one legacy-URL alias, the privacy/data-notice pages) — live and linkable but deliberately excluded from the sitemap/AI-crawl surface so they don't compete with the indexed set |
+| **Omitted** | 2 | The Google Search Console ownership-verification file and the GitHub Pages 404 error page — neither is content |
 
 54 indexed URLs is also the exact count confirmed live: `curl
 https://aeo.animacoffee.com.ua/sitemap.xml` returns 54 `<loc>` entries today.

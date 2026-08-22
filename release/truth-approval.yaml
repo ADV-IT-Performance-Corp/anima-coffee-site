@@ -125,17 +125,42 @@ claims:
         pages (source: inject_contacts.py fix-pack run in this PR, keyed
         off client-supplied contact data).
       - >-
-        (b) hello@animacoffee.com.ua — used as the AmoCRM/inbox destination
-        inside assets/lead.js (INBOX constant), i.e. what actually receives
-        a submitted lead form today.
+        (b) UPDATE 2026-08-22 (DC-3, PR #21 merged): assets/lead.js no
+        longer hardcodes any inbox address. It POSTs JSON to whatever URL
+        is set on the form's data-endpoint attribute (empty by default —
+        no endpoint is ever hardcoded); the lead_accepted conversion fires
+        only after the backend answers HTTP 200 with a real lead_id, never
+        speculatively. With data-endpoint empty, as it is on every page
+        today, the form does not fabricate success and does not silently
+        drop the submission — it shows a "not connected yet" message and
+        highlights the page's own visible phone/email contact block
+        (animacoffeeco@gmail.com) as the fallback. So there is no longer a
+        second, hidden backend inbox address in the code to reconcile
+        against (a) — the open decision is now which of the two documented
+        activation paths (Roistat, or the first-party ADV-Strategy-Core
+        lead backend) to wire data-endpoint to, and what inbox/CRM
+        destination that path's owner-supplied configuration should use.
       - >-
-        These are DIFFERENT addresses controlled by (presumably) different
-        mailboxes. Until resolved, a form submission and the "call us"
-        contact block point a prospect/lead to two different inboxes. This
-        PR intentionally does NOT touch assets/lead.js or any form endpoint
-        (DC-2 scope, per delivery-cutover contract's "do not expand scope"
-        rule) — resolving this conflict is a release-blocking decision for
-        DC-2/DC-3, not a DC-0/DC-1 mechanical fix.
+        These remain a release-blocking decision for whoever activates the
+        form (DC-2/DC-3+ scope, not a DC-0/DC-1 mechanical fix): pick ONE
+        canonical sales/notification address before wiring data-endpoint,
+        so a submitted lead and a "call us" contact click don't point to
+        two different inboxes once the form goes live.
       - "Response-time wording to publish alongside the chosen contact, if any."
-    current_site_wording: "animacoffeeco@gmail.com (visible copy) vs hello@animacoffee.com.ua (form backend)"
-    where_used: "site-wide (visible) / assets/lead.js:10 (backend)"
+    current_site_wording: "animacoffeeco@gmail.com (visible copy); no backend inbox is hardcoded anywhere in the site's own code as of DC-3"
+    where_used: "site-wide (visible) / assets/lead.js data-endpoint (currently empty everywhere — see delivery/CLIENT_HANDOFF.md §4)"
+
+  legal_entity_registration:
+    status: PENDING_OWNER
+    definition_required:
+      - "Registered legal entity name (as it should appear in a public privacy notice)."
+      - "Registration number (EDRPOU or equivalent) to publish alongside it, if the owner wants one published."
+    current_site_wording: >-
+      privacy.html / ua/privacy.html identify the operator by brand name only
+      ("This site is operated by Anima Volitiva...") and published contacts
+      (animacoffeeco@gmail.com, +380738730145) — the earlier visible
+      "[PENDING_OWNER — legal entity name and registration number]" marker
+      was removed from both pages in this PR (2026-08-22) since a raw
+      placeholder string is not acceptable on a live client-facing legal
+      page. The underlying fact is still unresolved, tracked here instead.
+    where_used: "privacy.html, ua/privacy.html — \"Who this is\" / \"Хто ми\" section"
