@@ -47,15 +47,27 @@ tiers Bronze/Silver/Gold.
   (The only 15-minute figure in the docs is an internal sales-lead KPI, not
   an equipment SLA — never publish it.)
 
-**Commercial terms:** individual quote per client volume; 3 price tiers;
-retro-bonuses up to 5% for regulars; free 14-day trial without prepayment;
-free first rental month for HoReCa clients; free installation + first week
-of product for shops/kiosks. NOT a published "flat monthly invoice /
+**Commercial terms (owner questionnaire 2026-09-01, applied in PR #28 —
+supersedes the "3 price tiers" / retro-bonus / free-first-month language this
+line used to carry):** individual quote per venue; three equipment
+packages — Start, Pro, Max — matched to the venue format; pricing is quoted
+per venue only. Never publish package contents or price figures for
+Start/Pro/Max — those are quote-time details the owner gives per client, not
+site copy. Free 14-day trial without prepayment and free installation +
+first week of product for shops/kiosks remain valid (the 2026-09-01
+questionnaire did not touch them). NOT a published "flat monthly invoice /
 zero-CapEx subscription" — never present pricing as a fixed monthly fee, and
 never quote USD/EUR price figures.
 
+**MUST NOT appear (offers retracted by the owner, 2026-09-01, PR #28):**
+- "retro-bonus" / "retro-bonuses up to 5%" (or any loyalty-rebate
+  percentage) — retracted, do not offer or imply one.
+- "free first rental month for HoReCa" / any HoReCa-specific free-month
+  offer — retracted, do not reintroduce under any wording.
+
 **Proof points that are true and allowed:** on the market since 2015;
-1,300+ B2B partners (client's own public figure), ~99% repeat; serves
+1,700+ active B2B clients (owner questionnaire 2026-09-01, applied in PR
+#28 — supersedes the prior "1,300+ B2B partners" figure), ~99% repeat; serves
 HoReCa, offices, retail across Kyiv & Kyiv Oblast; free 14-day trial.
 FORBIDDEN invented stats: "40% fewer complaints", "100% SLA compliance",
 "3x revenue", "12% growth", "0 downtime", "94% retention", "15-30% revenue
@@ -80,8 +92,25 @@ Real interviews exist internally but have no publication consent yet.
 
 **Brand voice (client's own):** "Оренда та повний сервіс кавомашин у
 Київській області", "Кавове обладнання, що працює на ваш прибуток".
-Contacts: +38 (073) 873 01 45, animacoffeeco@gmail.com, Telegram
-@animavolitiva, Instagram @animacoffeeco.
+
+**Contacts & business info (owner questionnaire 2026-09-01, applied in PR
+#28 — this block is the canonical source; supersedes any older
+phone/handle-only contacts line):**
+- Phone: +38 (073) 873 01 45. Email: animacoffeeco@gmail.com.
+- Address: Kyiv Oblast, Bila Tserkva, 29a Pavlichenko St. /
+  Київська обл., Біла Церква, вул. Павліченко 29а.
+- Hours: Mon–Sat 09:00–17:00 (closed Sunday).
+- Socials: Facebook facebook.com/anima.volitiva, Instagram
+  @animacoffeeco, TikTok @animacoffeeco, Telegram @Animavolitiva. Primary
+  domain animacoffee.com.ua belongs in `sameAs` alongside these socials.
+- Viber is NOT published — do not add a Viber contact/link anywhere on
+  the site.
+- Legal entity: "Anima Volitiva" is a brand name only — do not invent or
+  publish a registered legal-entity name (TOV/FOP/ФОП) unless the owner
+  supplies one.
+- SLA is unchanged by this questionnaire — see "Service promises" above
+  (24/7 support; technician or replacement machine within 24 hours). Still
+  no "2-hour SLA" anywhere.
 
 ## Canonical replacement language (use these, EN/UA)
 
@@ -145,3 +174,14 @@ introduced by an earlier content pipeline. It was mapped (104/106 files
 affected) and rewritten to this ground truth. Do not reintroduce any of it
 from old commits, caches or LLM memory. (Brand names deliberately not
 spelled out here — see the note under "Site rules" above on why.)
+
+On 2026-09-01 the owner completed a follow-up questionnaire (applied in PR
+#28), updating client count to 1,700+ active B2B clients, retracting the
+"retro-bonus up to 5%" and "free first rental month for HoReCa" offers,
+replacing the old "3 price tiers" framing with three named equipment
+packages (Start, Pro, Max, pricing per venue — no prices or package
+contents published), and confirming the address, hours, canonical email,
+and full social/sameAs set now in the "Contacts & business info" block
+above. Machine brand list and Covim origin remain undecided — do not
+change any rule about them from this note. Everything in this file except
+the specific lines cited above is unchanged and still binding.
