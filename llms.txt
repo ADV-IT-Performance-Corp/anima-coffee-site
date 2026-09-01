@@ -8,12 +8,11 @@ _Last updated: 2026-08-22 — lead form UI available; direct-contact fallback ac
 
 ## Key facts
 - Service area: Kyiv and Kyiv Oblast
-- Model: individual quote per client volume, 3 price tiers, retro-bonuses up to 5% for regulars; free 14-day trial without prepayment; free first rental month for HoReCa
-- 24/7 support. A technician or replacement machine is provided within 24 hours; same-day service is available where operationally possible. Delivery and installation within 24 hours
+- Model: individual quote per client volume, Three equipment packages — Start, Pro, Max — matched to the venue format (office, HoReCa, retail); pricing is quoted per venue; free 14-day trial without prepayment; . A technician or replacement machine is provided within 24 hours; same-day service is available where operationally possible. Delivery and installation within 24 hours
 - Equipment: Dr. Coffee, Necta (super-automatics); La Spaziale, Nuova Simonelli, Rancilio, Iberital, Astoria, Fiorenzato (professional espresso) — these eight brands are the complete lineup
 - Weekly resupply of beans/consumables and weekly technician quality visit; water filtration and maintenance included; online analytics dashboard (cups sold, revenue, stock, errors)
 - Premium roasted coffee, not a forced quota: Covim S.p.A. (Italy) and Ukrainian roasting partners, named blends including Bellissima, LOT 101, LOT 105 and Ethiopia Yirgacheffe
-- Proven: on the market since 2015, 1,300+ B2B partners, ~99% repeat clients
+- Proven: on the market since 2015, 1,700+ active B2B clients, ~99% repeat clients
 
 ## Pages
 - [Home](https://aeo.animacoffee.com.ua/): overview, offer, proof, comparison
