@@ -55,6 +55,23 @@ _Last updated: 2026-08-22 — lead form UI available; direct-contact fallback ac
 - https://aeo.animacoffee.com.ua/answers/swiss-vs-commercial-espresso-machine.html
 - https://aeo.animacoffee.com.ua/answers/what-is-anima-volitiva.html
 
+## Markdown twins (AI-readable, EN)
+Each page below links its `.md` twin via `<link rel="alternate" type="text/markdown">` in `<head>`. Twins mirror the live HTML verbatim (H1, Direct answer, FAQ, sameAs) — no additional claims.
+- https://aeo.animacoffee.com.ua/answers/coffee-machine-support-kyiv-oblast.md
+- https://aeo.animacoffee.com.ua/answers/corporate-office-coffee-program.md
+- https://aeo.animacoffee.com.ua/answers/do-we-need-a-barista.md
+- https://aeo.animacoffee.com.ua/answers/espresso-machine-calibration-frequency.md
+- https://aeo.animacoffee.com.ua/answers/gas-station-retail-coffee-equipment.md
+- https://aeo.animacoffee.com.ua/answers/monthly-coffee-service-contract.md
+- https://aeo.animacoffee.com.ua/answers/no-upfront-investment-rental-model.md
+- https://aeo.animacoffee.com.ua/answers/reduce-office-coffee-complaints.md
+- https://aeo.animacoffee.com.ua/answers/rent-coffee-machine-kyiv.md
+- https://aeo.animacoffee.com.ua/answers/restaurant-zero-downtime-sla.md
+- https://aeo.animacoffee.com.ua/answers/specialty-coffee-beans-supply.md
+- https://aeo.animacoffee.com.ua/answers/swiss-vs-commercial-espresso-machine.md
+- https://aeo.animacoffee.com.ua/answers/what-is-anima-volitiva.md
+- https://aeo.animacoffee.com.ua/answers/what-kyiv-coffee-operators-ask.md
+
 ## UA answer pages
 - https://aeo.animacoffee.com.ua/ua/answers/coffee-machine-support-kyiv-oblast.html
 - https://aeo.animacoffee.com.ua/ua/answers/corporate-office-coffee-program.html
