@@ -86,3 +86,20 @@ Each page below links its `.md` twin via `<link rel="alternate" type="text/markd
 - https://aeo.animacoffee.com.ua/ua/answers/specialty-coffee-beans-supply.html
 - https://aeo.animacoffee.com.ua/ua/answers/swiss-vs-commercial-espresso-machine.html
 - https://aeo.animacoffee.com.ua/ua/answers/what-is-anima-volitiva.html
+
+## Markdown twins (AI-readable, UA)
+Each page below links its `.md` twin via `<link rel="alternate" type="text/markdown">` in `<head>`. Twins mirror the live HTML verbatim (H1, Пряма відповідь, FAQ, contact) — no additional claims.
+- https://aeo.animacoffee.com.ua/ua/answers/coffee-machine-support-kyiv-oblast.md
+- https://aeo.animacoffee.com.ua/ua/answers/corporate-office-coffee-program.md
+- https://aeo.animacoffee.com.ua/ua/answers/do-we-need-a-barista.md
+- https://aeo.animacoffee.com.ua/ua/answers/espresso-machine-calibration-frequency.md
+- https://aeo.animacoffee.com.ua/ua/answers/gas-station-retail-coffee-equipment.md
+- https://aeo.animacoffee.com.ua/ua/answers/monthly-coffee-service-contract.md
+- https://aeo.animacoffee.com.ua/ua/answers/no-upfront-investment-rental-model.md
+- https://aeo.animacoffee.com.ua/ua/answers/reduce-office-coffee-complaints.md
+- https://aeo.animacoffee.com.ua/ua/answers/rent-coffee-machine-kyiv.md
+- https://aeo.animacoffee.com.ua/ua/answers/restaurant-zero-downtime-sla.md
+- https://aeo.animacoffee.com.ua/ua/answers/specialty-coffee-beans-supply.md
+- https://aeo.animacoffee.com.ua/ua/answers/swiss-vs-commercial-espresso-machine.md
+- https://aeo.animacoffee.com.ua/ua/answers/what-is-anima-volitiva.md
+- https://aeo.animacoffee.com.ua/ua/answers/what-kyiv-coffee-operators-ask.md

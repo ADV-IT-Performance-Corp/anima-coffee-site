@@ -10,6 +10,10 @@ own elements, not paraphrased or summarised. No added intros, no metadata
 lines that are not on the page, except a final "Source: <page URL>" line,
 which is exempt.
 
+Slice 2 (UA corpus enrichment) parametrised this over both EN and UA
+answer directories: `answers/*.md` (EN) and `ua/answers/*.md` (UA) are
+each checked against their own directory's HTML twin.
+
 stdlib only. Usage: python3 tools/check_md_twin_subset.py
 Exit 0 if every twin's every sentence is a substring of the page's
 normalised visible text (the exempt Source: line aside), else 1.
@@ -20,7 +24,7 @@ import re
 import sys
 
 SITE = pathlib.Path(__file__).resolve().parent.parent
-ANSWERS = SITE / "answers"
+ANSWERS_DIRS = [SITE / "answers", SITE / "ua" / "answers"]
 
 
 def normalise(s):
@@ -66,9 +70,9 @@ def md_sentences(md_src):
     return units
 
 
-def check_twin(slug):
-    html_path = ANSWERS / f"{slug}.html"
-    md_path = ANSWERS / f"{slug}.md"
+def check_twin(answers_dir, slug):
+    html_path = answers_dir / f"{slug}.html"
+    md_path = answers_dir / f"{slug}.md"
     page_text = normalise(page_visible_text(html_path.read_text(encoding="utf-8")))
     md_text = md_path.read_text(encoding="utf-8")
 
@@ -94,17 +98,20 @@ def check_twin(slug):
 
 
 def main():
-    slugs = sorted(p.stem for p in ANSWERS.glob("*.md"))
-    total = len(slugs)
+    total = 0
     passed = 0
-    for slug in slugs:
-        failures = check_twin(slug)
-        if failures:
-            print(f"FAIL {slug}:")
-            for f in failures:
-                print(f"    - {f[:100]!r}")
-        else:
-            passed += 1
+    for answers_dir in ANSWERS_DIRS:
+        label = answers_dir.relative_to(SITE)
+        slugs = sorted(p.stem for p in answers_dir.glob("*.md"))
+        total += len(slugs)
+        for slug in slugs:
+            failures = check_twin(answers_dir, slug)
+            if failures:
+                print(f"FAIL {label}/{slug}:")
+                for f in failures:
+                    print(f"    - {f[:100]!r}")
+            else:
+                passed += 1
     print(f"\nMarkdown twin subset check: {passed}/{total} PASS")
     sys.exit(0 if passed == total else 1)
 
