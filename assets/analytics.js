@@ -5,9 +5,11 @@
  *   GA4      — replace G-XXXXXXXXXX below  (Google Analytics 4 Measurement ID)
  *   Metrica  — replace XXXXXXXX  below     (Yandex Metrica counter number)
  *   GTM      — container GTM-MQQNGFTV is loaded inline in every page's <head>
- *              (installed 2026-09-04). Configure GA4 INSIDE GTM; keep GA4_ID a
- *              placeholder here, or page views double-count. lead_accepted is
- *              also pushed to dataLayer so a GTM trigger can consume it.
+ *              (installed 2026-09-04). GA4 is NOT loaded by this file: leave
+ *              GA4_ID a placeholder and add the GA4 tag inside the GTM
+ *              container when it is wanted (otherwise page views double-count).
+ *              Metrica still loads directly from this file, not via GTM.
+ *              lead_accepted is also pushed to dataLayer for GTM triggers.
  *
  * The lead_accepted conversion is fired from assets/lead.js via
  * window.animaTrackLead() — ONLY after the first-party lead API has
