@@ -128,7 +128,16 @@
     form.dataset.lfSending = sending ? "1" : "";
   }
 
+  // roistatGoal.reach() is a fire-and-forget beacon call with no delivery
+  // confirmation (same as GA4/Metrica elsewhere in this codebase) — a
+  // network failure AFTER this check still can't be detected client-side,
+  // which is inherent to the no-backend design this slice implements
+  // (Codex round-1 review: known, accepted residual risk). The
+  // navigator.onLine check below catches the one failure mode that IS
+  // detectable up front — an offline device — so at least that case falls
+  // through to the honest contact-fallback instead of a false "accepted".
   function roistatReady() {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return false;
     return !!(window.roistatGoal && typeof window.roistatGoal.reach === "function");
   }
 
@@ -141,8 +150,11 @@
 
   // Roistat has no test mode for goals (see spec) — a "ТЕСТ"/"TEST" marker
   // in the name or details is the owner's own convention for spotting and
-  // deleting test deals in the CRM.
-  var TEST_MARKER_RE = /ТЕСТ|TEST/i;
+  // deleting test deals in the CRM. Bounded by non-letter/start/end on both
+  // sides (Codex round-1 fix) so ordinary words that merely CONTAIN the
+  // substring — "latest", "contest", "testimonial" — never false-positive;
+  // \b is not used because it only recognises ASCII \w, not Cyrillic.
+  var TEST_MARKER_RE = /(^|[^a-zа-яіїєґ'])(?:тест|test)(?:[^a-zа-яіїєґ']|$)/i;
   function isTestLead(data) {
     return TEST_MARKER_RE.test(data.name) || TEST_MARKER_RE.test(data.details);
   }
