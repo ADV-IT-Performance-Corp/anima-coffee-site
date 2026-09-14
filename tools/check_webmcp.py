@@ -17,6 +17,12 @@ Site-wide:
     prohibited_claims.yaml in the ADV-Strategy-Core monorepo) appears in any
     toolname/tooldescription/toolparamdescription attribute value, nor in any
     literal answer string inside assets/webmcp.js.
+  - no `toolparam*` attribute exists anywhere outside a
+    `<form ... toolname=...>...</form>` span (W2.6 — a stray attribute on an
+    unrelated form, e.g. `form.ppc-form`, is a regression).
+  - W2: assets/analytics.js defines `ROISTAT_PROJECT_ID` exactly once and
+    loads the Roistat counter snippet exactly once; no other file in the
+    site redefines that constant.
 
 stdlib only. Usage: python3 tools/check_webmcp.py
 Exit 0 if everything passes, else 1 (prints every failure found).
@@ -56,6 +62,8 @@ FIELD_RE = re.compile(r'<(?:input|textarea)\b[^>]*>', re.S)
 NAME_ATTR_RE = re.compile(r'\bname="([^"]+)"')
 TYPE_ATTR_RE = re.compile(r'\btype="([^"]+)"')
 CYRILLIC_RE = re.compile(r"[Ѐ-ӿ]")
+TOOLNAME_FORM_RE = re.compile(r'<form\b[^>]*>.*?</form>', re.S)
+TOOLPARAM_ATTR_RE = re.compile(r'\btoolparam\w*=')
 
 HONEYPOT_NAME = "company_url"
 
@@ -137,6 +145,29 @@ def check_page(path: pathlib.Path):
     return errors
 
 
+def check_toolparam_scope(path: pathlib.Path):
+    """W2.6 — no toolparam* attribute may exist outside a form that itself
+    carries toolname (catches the class of bug where an unrelated form on
+    the same page, e.g. form.ppc-form, picked up a stray attribute)."""
+    rel = path.relative_to(ROOT).as_posix()
+    text = path.read_text(encoding="utf-8")
+    if "toolparam" not in text:
+        return []
+
+    tool_spans = []
+    for m in TOOLNAME_FORM_RE.finditer(text):
+        open_tag_end = text.find(">", m.start())
+        if open_tag_end != -1 and "toolname=" in text[m.start():open_tag_end]:
+            tool_spans.append((m.start(), m.end()))
+
+    errors = []
+    for m in TOOLPARAM_ATTR_RE.finditer(text):
+        pos = m.start()
+        if not any(start <= pos < end for start, end in tool_spans):
+            errors.append(f"{rel}: toolparam* attribute at offset {pos} found outside a toolname-bearing form")
+    return errors
+
+
 def check_webmcp_js():
     path = ROOT / "assets" / "webmcp.js"
     errors = []
@@ -157,6 +188,42 @@ def check_webmcp_js():
     return errors
 
 
+ROISTAT_CONST_RE = re.compile(r'\bROISTAT_PROJECT_ID\s*=')
+
+
+def check_roistat_wiring():
+    """W2.1 — the Roistat counter is defined exactly once, in
+    assets/analytics.js, driven by one ROISTAT_PROJECT_ID constant; no
+    other file in the site redefines it."""
+    errors = []
+    analytics_path = ROOT / "assets" / "analytics.js"
+    if not analytics_path.exists():
+        return ["assets/analytics.js: missing"]
+    analytics_text = analytics_path.read_text(encoding="utf-8")
+
+    const_hits = len(ROISTAT_CONST_RE.findall(analytics_text))
+    if const_hits != 1:
+        errors.append(f"assets/analytics.js: ROISTAT_PROJECT_ID must be defined exactly once, found {const_hits}")
+    if "roistatHost" not in analytics_text or "roistatProjectId" not in analytics_text:
+        errors.append("assets/analytics.js: missing the Roistat counter snippet (roistatProjectId/roistatHost)")
+    if analytics_text.count("roistatProjectId = id") > 1:
+        errors.append("assets/analytics.js: Roistat counter snippet appears more than once")
+
+    for path in sorted(ROOT.rglob("*")):
+        if path == analytics_path or ".git" in path.parts:
+            continue
+        if path.suffix not in (".js", ".html"):
+            continue
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        if ROISTAT_CONST_RE.search(text):
+            rel = path.relative_to(ROOT).as_posix()
+            errors.append(f"{rel}: redefines ROISTAT_PROJECT_ID outside assets/analytics.js")
+
+    return errors
+
+
 def main():
     errors = []
     pages_checked = 0
@@ -167,8 +234,10 @@ def main():
         if 'class="lead-form"' in path.read_text(encoding="utf-8"):
             pages_checked += 1
         errors.extend(page_errors)
+        errors.extend(check_toolparam_scope(path))
 
     errors.extend(check_webmcp_js())
+    errors.extend(check_roistat_wiring())
 
     for e in errors:
         print(f"FAIL {e}")

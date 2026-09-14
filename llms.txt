@@ -1,6 +1,6 @@
 # Anima Volitiva — Managed B2B Coffee Infrastructure (Kyiv & Kyiv Oblast)
 
-_Last updated: 2026-08-22 — lead form UI available; direct-contact fallback active until backend connection; bilingual EN/UA._
+_Last updated: 2026-09-14 — lead form UI available; submissions delivered to the CRM via Roistat; direct-contact fallback active if Roistat and the backend are both unavailable; bilingual EN/UA._
 
 > Anima Volitiva provides fully-managed B2B coffee equipment rental and service for HoReCa, retail and corporate offices across Kyiv and Kyiv Oblast: Dr. Coffee and Necta super-automatics plus professional espresso machines from La Spaziale, Nuova Simonelli, Rancilio, Iberital, Astoria and Fiorenzato; premium roasted coffee from Covim S.p.A. (Italy) and Ukrainian roasting partners; staff training included; 24/7 support. A technician or replacement machine is provided within 24 hours; same-day service is available where operationally possible. Individual quote per client volume, free 14-day trial with no prepayment.
 
@@ -18,10 +18,13 @@ client count, contacts/hours) from facts already published on this site —
 anything not published (e.g. the exact machine brand list, water hardness,
 liability, contract length, multi-location billing, POS/cashless, exact
 maintenance cadence, staff-training duration) is answered as "not published"
-rather than invented. Submissions are not yet connected to the CRM
-(`data-endpoint` is empty pending the owner's backend); until it is, both a
-human and an agent submission get the same phone/email/Telegram fallback
-instead of a fabricated confirmation.
+rather than invented. Submissions are delivered to the company's CRM: with
+no backend endpoint configured (`data-endpoint` empty), the form sends a
+Roistat goal (`roistatGoal.reach()`) and Roistat's own AmoCRM integration
+opens the deal — both a human and an agent submission use this same path,
+and `animaTrackLead`'s `lead_accepted` conversion fires only after that
+call. The phone/email/Telegram fallback (`not_connected` for agents) is
+shown only if neither a backend endpoint nor Roistat is available.
 
 ## Key facts
 - Service area: Kyiv and Kyiv Oblast
