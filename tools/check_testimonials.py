@@ -108,7 +108,10 @@ def load_custdev_names(path=None):
     Returns None if the file doesn't exist (caller must print SKIP and treat
     the name check as passed), else a list of non-empty, non-comment lines.
     """
-    names_path = pathlib.Path(os.environ.get("ANIMA_CUSTDEV_NAMES_FILE", str(path or DEFAULT_NAMES_FILE))).expanduser()
+    if path is not None:
+        names_path = pathlib.Path(path).expanduser()
+    else:
+        names_path = pathlib.Path(os.environ.get("ANIMA_CUSTDEV_NAMES_FILE", str(DEFAULT_NAMES_FILE))).expanduser()
     if not names_path.exists():
         return None
     lines = []
