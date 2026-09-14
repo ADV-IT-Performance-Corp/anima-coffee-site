@@ -58,13 +58,22 @@
       en: "24/7 support line. On breakdown, a technician or a replacement machine is provided within 24 hours.",
       uk: "Лінія підтримки 24/7. У разі поломки технік або підмінний апарат надається протягом 24 годин."
     },
+    // Checked BEFORE the coverage matcher below: "hours"/"contact"/"address"
+    // are more specific asks than a bare region mention, and a question like
+    // "What are your opening hours in Kyiv Oblast?" must resolve to contact
+    // info, not to the coverage-area fact (Codex #2 review, W1 round 2).
     {
-      re: /kyiv oblast|coverage|service area|where do you operate|which (city|cities|region)|київськ|область|де ви (працюєте|обслуговуєте)|обслуговуєте/i,
+      re: /phone number|contact (info|details|you)|email address|\baddress\b|opening hours|business hours|what (time|hours)|call you|reach you|телефон|адреса|пошта|години роботи|график роботи|зв'?язатися/i,
+      en: "Phone: +38 (073) 873 01 45. Email: animacoffeeco@gmail.com. Address: Kyiv Oblast, Bila Tserkva, 29a Pavlichenko St. Hours: Mon–Sat 09:00–17:00.",
+      uk: "Телефон: +38 (073) 873 01 45. Email: animacoffeeco@gmail.com. Адреса: Київська обл., Біла Церква, вул. Павліченко 29а. Години роботи: Пн–Сб 09:00–17:00."
+    },
+    {
+      re: /coverage|service area|where do you operate|which (city|cities|region)|do you (cover|serve|operate in)|де ви (працюєте|обслуговуєте)|обслуговуєте|яку територію/i,
       en: "Service area is Kyiv city and Kyiv Oblast.",
       uk: "Зона обслуговування — місто Київ та Київська область."
     },
     {
-      re: /since when|how long have you (been|existed)|founded|established|history|з якого року|скільки років на ринку/i,
+      re: /since when|how long have you (been|existed)|founded|established|(company|business) history|з якого року|скільки років на ринку/i,
       en: "Anima Volitiva has been on the market since 2015.",
       uk: "Anima Volitiva на ринку з 2015 року."
     },
@@ -82,11 +91,6 @@
       re: /water filtration|maintenance included|weekly (visit|resupply|service)|фільтрація води|щотижнев/i,
       en: "Water filtration and maintenance are included with every machine, plus weekly resupply of beans/consumables and a weekly technician quality visit.",
       uk: "Фільтрація води та обслуговування входять у кожен апарат, а також щотижневе поповнення кави/витратних матеріалів і щотижневий технічний візит."
-    },
-    {
-      re: /phone|contact|email|address|hours|opening hours|call you|reach you|телефон|адреса|пошта|години роботи|зв'?язатися/i,
-      en: "Phone: +38 (073) 873 01 45. Email: animacoffeeco@gmail.com. Address: Kyiv Oblast, Bila Tserkva, 29a Pavlichenko St. Hours: Mon–Sat 09:00–17:00.",
-      uk: "Телефон: +38 (073) 873 01 45. Email: animacoffeeco@gmail.com. Адреса: Київська обл., Біла Церква, вул. Павліченко 29а. Години роботи: Пн–Сб 09:00–17:00."
     }
   ];
 

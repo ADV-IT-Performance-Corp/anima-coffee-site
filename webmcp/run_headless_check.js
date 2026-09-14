@@ -131,6 +131,18 @@ function check(label, cond, detail) {
     JSON.stringify(breaksDownResult)
   );
 
+  // 1e. Codex round-2 fix: a more specific ask (hours) must win over a
+  // broader one (coverage area) mentioned in the same sentence.
+  const hoursVsCoverageResult = await callTool("get_anima_service_info", {
+    question: "What are your opening hours in Kyiv Oblast?",
+    language: "en"
+  });
+  check(
+    "get_anima_service_info resolves 'opening hours in Kyiv Oblast' to contact info, not coverage",
+    hoursVsCoverageResult && hoursVsCoverageResult.published === true && /09:00|17:00/.test(hoursVsCoverageResult.answer || ""),
+    JSON.stringify(hoursVsCoverageResult)
+  );
+
   // 2. Agent form submission via the declarative tool, endpoint empty.
   // toolautosubmit is deliberately OFF (D1: human confirms submit), so the
   // polyfill fills the fields and focuses the submit button but does NOT
