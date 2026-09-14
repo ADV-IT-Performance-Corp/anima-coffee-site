@@ -30,11 +30,23 @@
  * function, set by assets/analytics.js once its counter script has
  * loaded) -> one roistatGoal.reach() call, whose Roistat->AmoCRM
  * integration opens the CRM deal, no POST, and a client-generated lead_id
- * is used for animaTrackLead/respondWith; (3) else -> today's fallback
- * contact block / not_connected. If the counter is configured but blocked
- * (ad blocker, network failure) window.roistatGoal never appears, so this
- * falls through to (3) on its own — no explicit "blocked" detection is
- * needed, and success is never claimed without an actual reach() call.
+ * is used for animaTrackLead/respondWith; (2b) configured
+ * (window.roistatProjectId set) but not ready yet -> wait up to ~4s
+ * (polling every 100ms) for the async counter script to define
+ * roistatGoal, keeping the button disabled / the respondWith promise
+ * pending for agents, then deliver via (2) or fall through; (3) else ->
+ * today's fallback contact block / not_connected. If the counter is
+ * configured but blocked (ad blocker, network failure) window.roistatGoal
+ * never appears, so the (2b) wait times out and this falls through to (3)
+ * on its own — no explicit "blocked" detection is needed, and success is
+ * never claimed without an actual reach() call.
+ *
+ * Fast-follows (2026-09-14, same day): the agent-path sending guard now
+ * stays held until the deferred form.reset() actually runs, so a second
+ * executeTool() racing that window can't fire a second reach() for the
+ * same submit; and assets/analytics.js wraps the Roistat counter IIFE in
+ * try/catch so a failure there can never prevent window.animaTrackLead
+ * from being defined.
  */
 (function () {
   var uk = (document.documentElement.lang || "en").toLowerCase().indexOf("uk") === 0;
@@ -139,6 +151,90 @@
   function roistatReady() {
     if (typeof navigator !== "undefined" && navigator.onLine === false) return false;
     return !!(window.roistatGoal && typeof window.roistatGoal.reach === "function");
+  }
+
+  // Fast-agent / slow-connection race (Codex fast-follow, 2026-09-14):
+  // ROISTAT_PROJECT_ID is set but the counter script (loaded async by
+  // assets/analytics.js) hasn't defined window.roistatGoal yet at submit
+  // time. Poll briefly instead of falling straight through to (3) so a
+  // submit that arrives a beat before the counter finishes loading still
+  // gets delivered. ~4s cap, 100ms interval == ~40 checks.
+  // window.__ROISTAT_TEST_WAIT_MS lets the headless test harness shrink
+  // the cap so timeout-path tests don't have to burn a real 4s; read once
+  // at load (never set outside webmcp/run_headless_check.js).
+  var ROISTAT_WAIT_MS = (typeof window !== "undefined" && window.__ROISTAT_TEST_WAIT_MS) || 4000;
+  var ROISTAT_POLL_MS = 100;
+  function waitForRoistat() {
+    if (roistatReady()) return Promise.resolve(true);
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return Promise.resolve(false);
+    return new Promise(function (resolve) {
+      var waited = 0;
+      var timer = setInterval(function () {
+        waited += ROISTAT_POLL_MS;
+        if (roistatReady()) {
+          clearInterval(timer);
+          resolve(true);
+        } else if (waited >= ROISTAT_WAIT_MS) {
+          clearInterval(timer);
+          resolve(false);
+        }
+      }, ROISTAT_POLL_MS);
+    });
+  }
+
+  // window.roistatProjectId is set synchronously by assets/analytics.js's
+  // counter-init IIFE as soon as ROISTAT_PROJECT_ID is non-empty — before
+  // the counter script itself has finished loading async. That makes it a
+  // reliable "Roistat is configured" signal independent of whether
+  // window.roistatGoal exists yet, which is what tells waitForRoistat()
+  // apart from "never configured, go straight to fallback".
+  function roistatConfigured() {
+    return typeof window.roistatProjectId !== "undefined" && !!window.roistatProjectId;
+  }
+
+  // window.__LEAD_RESET_DELAY_MS lets the headless test harness widen the
+  // deferred-reset window below so the duplicate-submit race is reliably
+  // exercisable instead of depending on real event-loop timing; read once
+  // at load (never set outside webmcp/run_headless_check.js).
+  var LEAD_RESET_DELAY_MS = (typeof window !== "undefined" && window.__LEAD_RESET_DELAY_MS) || 0;
+
+  // Agent delivery: calls reach() once and resolves the respondWith result.
+  // Keeps the sending guard held until the deferred form.reset() actually
+  // runs (Codex fast-follow, 2026-09-14) — releasing it right after
+  // respondWith() let a second executeTool() call in that same window fire
+  // a second reach() for the same submit (double AmoCRM deal).
+  function deliverRoistatAgent(form, data, origin) {
+    var leadId = reachRoistat(data, origin);
+    if (leadId) {
+      fireAccepted(data.source_page, leadId, origin);
+      // Deferred to the next tick: resetting the form synchronously, in the
+      // same turn as respondWith(), was observed to break the WebMCP
+      // polyfill's resolution of the returned promise (it never delivered
+      // the result back to the caller) — see W2 spec. setSending(false)
+      // moves here too so the double-submit guard covers this whole window.
+      setTimeout(function () {
+        form.reset();
+        setSending(form, false);
+      }, LEAD_RESET_DELAY_MS);
+      return { status: "accepted", leadId: leadId };
+    }
+    // reach() threw (e.g. blocked mid-call) -> never claim success.
+    setSending(form, false);
+    return notConnectedResult();
+  }
+
+  // Human delivery: calls reach() once and updates the DOM synchronously
+  // (no deferred reset needed — there's no respondWith() promise to race).
+  function deliverRoistatHuman(form, status, data, origin) {
+    var leadId = reachRoistat(data, origin);
+    setSending(form, false);
+    if (leadId) {
+      fireAccepted(data.source_page, leadId, origin);
+      form.reset();
+      setStatus(status, T.sent, "ok");
+      return;
+    }
+    showFallbackContact(status);
   }
 
   // No phone-vs-email validation exists elsewhere in this file (the
@@ -331,29 +427,44 @@
         return;
       }
 
-      // (2) else Roistat ready -> one reach() call, no POST.
+      var origin = isAgent ? "agent" : "human";
+
+      // (2) Roistat ready right now -> one reach() call, no POST.
       if (roistatReady()) {
         setSending(form, true);
-        var origin = isAgent ? "agent" : "human";
-        var leadId = reachRoistat(data, origin);
-        setSending(form, false);
-        if (leadId) {
-          fireAccepted(data.source_page, leadId, origin);
-          if (isAgent) {
-            e.respondWith(Promise.resolve({ status: "accepted", leadId: leadId }));
-            // Deferred to the next tick: resetting the form synchronously,
-            // in the same turn as respondWith(), was observed to break the
-            // WebMCP polyfill's resolution of the returned promise (it
-            // never delivered the result back to the caller) — see W2 spec.
-            setTimeout(function () { form.reset(); }, 0);
-            return;
-          }
-          form.reset();
-          setStatus(status, T.sent, "ok");
-          return;
+        if (isAgent) {
+          e.respondWith(Promise.resolve(deliverRoistatAgent(form, data, origin)));
+        } else {
+          deliverRoistatHuman(form, status, data, origin);
         }
-        // reach() threw (e.g. blocked mid-call) -> fall through to (3),
-        // never claim success without a real reach call.
+        return;
+      }
+
+      // (2b) Configured but the async counter hasn't defined
+      // window.roistatGoal yet (fast agent / slow connection racing the
+      // script load) -> wait briefly instead of dropping straight to the
+      // fallback. Never wait when Roistat was never configured at all.
+      if (roistatConfigured()) {
+        setSending(form, true);
+        if (isAgent) {
+          e.respondWith(
+            waitForRoistat().then(function (ready) {
+              if (ready) return deliverRoistatAgent(form, data, origin);
+              setSending(form, false);
+              return notConnectedResult();
+            })
+          );
+        } else {
+          waitForRoistat().then(function (ready) {
+            if (ready) {
+              deliverRoistatHuman(form, status, data, origin);
+            } else {
+              setSending(form, false);
+              showFallbackContact(status);
+            }
+          });
+        }
+        return;
       }
 
       // (3) fallback — today's behaviour.

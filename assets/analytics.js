@@ -75,20 +75,27 @@
   // --- Roistat (visit analytics + client-side lead delivery via
   // roistatGoal.reach(), called from assets/lead.js) ---
   if (ROISTAT_LIVE) {
-    (function (w, d, s, h, id) {
-      w.roistatProjectId = id;
-      w.roistatHost = h;
-      var p = d.location.protocol === "https:" ? "https://" : "http://";
-      var u = /^.*roistat_visit=[^;]+(.*)?$/.test(d.cookie)
-        ? "/dist/module.js"
-        : "/api/site/1.0/" + id + "/init?referrer=" + encodeURIComponent(d.location.href);
-      var js = d.createElement(s);
-      js.charset = "UTF-8";
-      js.async = 1;
-      js.src = p + h + u;
-      var js2 = d.getElementsByTagName(s)[0];
-      js2.parentNode.insertBefore(js, js2);
-    })(window, document, "script", ROISTAT_HOST, ROISTAT_PROJECT_ID);
+    // Wrapped in try/catch (Codex fast-follow, 2026-09-14): this IIFE must
+    // never be able to throw its way out before window.animaTrackLead is
+    // defined below — a Roistat-side failure (malformed cookie, missing
+    // <script> anchor, etc.) would otherwise silently take GA4/Metrica
+    // conversion tracking down with it.
+    try {
+      (function (w, d, s, h, id) {
+        w.roistatProjectId = id;
+        w.roistatHost = h;
+        var p = d.location.protocol === "https:" ? "https://" : "http://";
+        var u = /^.*roistat_visit=[^;]+(.*)?$/.test(d.cookie)
+          ? "/dist/module.js"
+          : "/api/site/1.0/" + id + "/init?referrer=" + encodeURIComponent(d.location.href);
+        var js = d.createElement(s);
+        js.charset = "UTF-8";
+        js.async = 1;
+        js.src = p + h + u;
+        var js2 = d.getElementsByTagName(s)[0];
+        js2.parentNode.insertBefore(js, js2);
+      })(window, document, "script", ROISTAT_HOST, ROISTAT_PROJECT_ID);
+    } catch (e) {}
   }
 
   // --- Conversion hook, called by lead.js ONLY after the first-party lead
