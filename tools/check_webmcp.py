@@ -83,11 +83,12 @@ def check_page(path: pathlib.Path):
     errors = []
     uk = is_uk(rel)
 
-    forms = FORM_RE.findall(text)
-    if not forms:
+    form_matches = list(FORM_RE.finditer(text))
+    if not form_matches:
         return [f"{rel}: has a lead-form marker but no <form class=\"lead-form\"> tag matched"]
 
-    for form_tag in forms:
+    for form_match in form_matches:
+        form_tag = form_match.group(0)
         toolname = attr(form_tag, "toolname")
         tooldesc = attr(form_tag, "tooldescription")
         if not toolname:
@@ -106,7 +107,7 @@ def check_page(path: pathlib.Path):
             if hits:
                 errors.append(f"{rel}: tooldescription contains forbidden claim(s) {hits}")
 
-        start = text.find(form_tag)
+        start = form_match.end()
         end = text.find("</form>", start)
         body = text[start:end] if end != -1 else text[start:]
 

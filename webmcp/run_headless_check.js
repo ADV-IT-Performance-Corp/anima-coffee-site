@@ -109,6 +109,28 @@ function check(label, cond, detail) {
     JSON.stringify(brandResult)
   );
 
+  // 1c. Codex round-1 fix: Ukrainian-language question about a published fact
+  const ukCoverageResult = await callTool("get_anima_service_info", {
+    question: "Ви обслуговуєте Київську область?",
+    language: "uk"
+  });
+  check(
+    "get_anima_service_info (uk question) answers the published coverage fact",
+    ukCoverageResult && ukCoverageResult.published === true && /Київ/i.test(ukCoverageResult.answer || ""),
+    JSON.stringify(ukCoverageResult)
+  );
+
+  // 1d. Codex round-1 fix: "breaks down" phrasing (not just "breakdown")
+  const breaksDownResult = await callTool("get_anima_service_info", {
+    question: "What happens if a machine breaks down over a weekend?",
+    language: "en"
+  });
+  check(
+    "get_anima_service_info matches 'breaks down' phrasing, not just 'breakdown'",
+    breaksDownResult && breaksDownResult.published === true && /24 hours/i.test(breaksDownResult.answer || ""),
+    JSON.stringify(breaksDownResult)
+  );
+
   // 2. Agent form submission via the declarative tool, endpoint empty.
   // toolautosubmit is deliberately OFF (D1: human confirms submit), so the
   // polyfill fills the fields and focuses the submit button but does NOT

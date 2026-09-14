@@ -115,28 +115,61 @@ def add_form_attrs(text: str, rel_path: str) -> tuple[str, bool]:
     return FORM_OPEN_RE.sub(sub, text), changed
 
 
+# A handful of PPC pages repurpose the `name="machines"` input for a
+# different question entirely (Codex #1 review, W1) — same field name, a
+# visibly different <label> just before it. Checked against the preceding
+# ~40 chars of the page's own text, in order, before falling back to the
+# generic "number of coffee machines" description.
+MACHINES_FIELD_OVERRIDES = [
+    ("Team size", (
+        "Approximate headcount at the venue, if known (optional) — not a machine count on this page.",
+        "Приблизна кількість співробітників на об'єкті, якщо відомо (необов'язково) — не кількість апаратів на цій сторінці.",
+    )),
+    ("Sites", (
+        "Number of sites/locations needing coverage, if known (optional) — not a machine count on this page.",
+        "Кількість об'єктів/локацій, які потрібно охопити, якщо відомо (необов'язково) — не кількість апаратів на цій сторінці.",
+    )),
+]
+
+
+def field_description(name: str, preceding_text: str):
+    if name == "machines":
+        for label_marker, pair in MACHINES_FIELD_OVERRIDES:
+            if preceding_text.endswith(label_marker):
+                return pair
+    return FIELD_DESCRIPTIONS.get(name)
+
+
 def add_field_attrs(text: str, rel_path: str) -> tuple[str, bool]:
     changed = False
-
-    def sub(m: re.Match) -> str:
-        nonlocal changed
+    out = []
+    pos = 0
+    for m in FIELD_RE.finditer(text):
         tag = m.group(0)
+        out.append(text[pos:m.start()])
+        pos = m.end()
+
         if "toolparamdescription=" in tag:
-            return tag
+            out.append(tag)
+            continue
         name_m = NAME_ATTR_RE.search(tag)
         if not name_m or name_m.group(1) == HONEYPOT_NAME:
-            return tag
+            out.append(tag)
+            continue
         type_m = TYPE_ATTR_RE.search(tag)
         if type_m and type_m.group(1) == "hidden":
-            return tag
-        pair = FIELD_DESCRIPTIONS.get(name_m.group(1))
+            out.append(tag)
+            continue
+        preceding = text[max(0, m.start() - 40):m.start()]
+        pair = field_description(name_m.group(1), preceding)
         if not pair:
-            return tag
+            out.append(tag)
+            continue
         desc = pair[1] if is_uk(rel_path) else pair[0]
         changed = True
-        return tag[:-1] + f' toolparamdescription="{desc}"' + ">"
-
-    return FIELD_RE.sub(sub, text), changed
+        out.append(tag[:-1] + f' toolparamdescription="{desc}"' + ">")
+    out.append(text[pos:])
+    return "".join(out), changed
 
 
 def webmcp_script_path(rel_path: str) -> str:

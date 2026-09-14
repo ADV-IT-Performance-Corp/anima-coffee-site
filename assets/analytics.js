@@ -18,12 +18,14 @@
  * lead_id only.
  *
  * WebMCP (W1, 2026-09-14): animaTrackLead() takes an optional third
- * argument, `origin` ("human" | "agent"), pushed to dataLayer as
+ * argument, `origin` ("human" | "agent"), pushed to dataLayer/GA4 as
  * `lead_origin` so an agent-submitted lead is distinguishable from a
- * human-submitted one in GTM/Metrica without changing the POST payload
- * (the DC-2 backend contract is untouched). Defaults to "human" when
- * omitted, so any caller written before this change keeps behaving exactly
- * as before.
+ * human-submitted one in GTM segmentation, without changing the POST
+ * payload (the DC-2 backend contract is untouched). Defaults to "human"
+ * when omitted. The Yandex Metrica `reachGoal("lead_accepted")` call keeps
+ * its existing goal name for BOTH origins — renaming/splitting it would
+ * silently stop reporting conversions against the goal already configured
+ * in Metrica; `lead_origin` segmentation lives in dataLayer/GA4 only.
  */
 (function () {
   // ==== THE TWO SECRETS — paste real IDs on these two lines to activate ==========
@@ -67,6 +69,6 @@
     var leadOrigin = origin === "agent" ? "agent" : "human";
     try { window.dataLayer = window.dataLayer || []; window.dataLayer.push({ event: "lead_accepted", source_page: sp, lead_id: leadId || "", lead_origin: leadOrigin }); } catch (e) {}
     try { if (GA4_LIVE) gtag("event", "lead_accepted", { source_page: sp, lead_id: leadId || "", lead_origin: leadOrigin }); } catch (e) {}
-    try { if (METRICA_LIVE && window.ym) ym(METRICA_ID, "reachGoal", "lead_accepted_" + leadOrigin); } catch (e) {}
+    try { if (METRICA_LIVE && window.ym) ym(METRICA_ID, "reachGoal", "lead_accepted"); } catch (e) {}
   };
 })();
