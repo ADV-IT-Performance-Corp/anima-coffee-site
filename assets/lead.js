@@ -310,7 +310,12 @@
       // Double-submit guard: a submit already in flight (button disabled by
       // a prior submit of THIS form) is ignored outright — covers a
       // keyboard Enter re-submit racing a disabled-but-still-focused button.
-      if (form.dataset.lfSending === "1") { return; }
+      // An agent's tool call still needs a resolution (Codex round-2 fix):
+      // leaving executeTool()'s promise unresolved would hang the caller.
+      if (form.dataset.lfSending === "1") {
+        if (isAgent) { e.respondWith(Promise.resolve({ status: "error", message: T.err })); }
+        return;
+      }
 
       var data = collectData(form);
       var endpoint = (form.getAttribute("data-endpoint") || "").trim();
