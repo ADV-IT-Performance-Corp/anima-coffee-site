@@ -211,6 +211,98 @@ function check(label, cond, detail) {
   );
   check("human submit made no network POST either", networkRequests.length === 0, JSON.stringify(networkRequests));
 
+  // 4. Round-4 fix: navigator.modelContext-only fallback. Some early Chrome
+  // preview builds / older explainer drafts exposed the API on navigator
+  // instead of Document (spec: `partial interface Document { readonly
+  // attribute ModelContext modelContext; }`). A separate page/context is
+  // used so this doesn't disturb the document.modelContext assertions
+  // above: the polyfill installs its ModelContext instance on
+  // document.modelContext as usual, then a second init script relocates
+  // that SAME instance onto navigator.modelContext and deletes the
+  // document property, before assets/webmcp.js's own feature-detection
+  // ever runs (both scripts are addInitScript — guaranteed to run, in
+  // this order, before any page script).
+  const navPage = await browser.newPage();
+  await navPage.addInitScript({ content: POLYFILL_SRC });
+  await navPage.addInitScript({
+    content: `(function () {
+      var mc = document.modelContext;
+      if (!mc) return;
+      delete document.modelContext;
+      Object.defineProperty(navigator, "modelContext", { value: mc, writable: false, configurable: true });
+    })();`
+  });
+  await navPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+
+  const navOnly = await navPage.evaluate(() => ({
+    hasDocument: "modelContext" in document && !!document.modelContext,
+    hasNavigator: "modelContext" in navigator && !!navigator.modelContext
+  }));
+  check(
+    "harness fixture actually relocated modelContext to navigator-only",
+    !navOnly.hasDocument && navOnly.hasNavigator,
+    JSON.stringify(navOnly)
+  );
+
+  async function callToolOn(pg, obj, name, args) {
+    return pg.evaluate(
+      async ({ obj, name, args }) => {
+        const mc = obj === "navigator" ? navigator.modelContext : document.modelContext;
+        const tools = await mc.getTools();
+        const tool = tools.find((t) => t.name === name);
+        if (!tool) return { __missing: true };
+        return mc.executeTool(tool, args);
+      },
+      { obj, name, args }
+    );
+  }
+
+  const navToolNames = await navPage.evaluate(async () => {
+    const tools = await navigator.modelContext.getTools();
+    return tools.map((t) => t.name);
+  });
+  check(
+    "navigator-only: both tools are still discoverable via getTools()",
+    navToolNames.includes("get_anima_service_info") && navToolNames.includes("request_coffee_service_assessment"),
+    JSON.stringify(navToolNames)
+  );
+
+  const navTrialResult = await callToolOn(navPage, "navigator", "get_anima_service_info", {
+    question: "Do you offer a free trial?",
+    language: "en"
+  });
+  check(
+    "navigator-only: get_anima_service_info still answers the published trial fact",
+    navTrialResult && navTrialResult.published === true && /14-day/i.test(navTrialResult.answer || ""),
+    JSON.stringify(navTrialResult)
+  );
+
+  await navPage.evaluate(async ({ name, args }) => {
+    const tools = await navigator.modelContext.getTools();
+    const tool = tools.find((t) => t.name === name);
+    window.__navAgentResultPromise = navigator.modelContext.executeTool(tool, args);
+  }, {
+    name: "request_coffee_service_assessment",
+    args: {
+      name: "Nav Fallback Buyer",
+      business: "Nav Test Co",
+      city: "Kyiv",
+      machines: "1",
+      contact: "navtest@example.com",
+      message: "Office, prefers email."
+    }
+  });
+  await navPage.waitForTimeout(50);
+  await navPage.click('#leadForm button[type="submit"]');
+  const navAgentResult = await navPage.evaluate(() => window.__navAgentResultPromise);
+  check(
+    "navigator-only: declarative form tool still registers and answers (not_connected)",
+    navAgentResult &&
+      navAgentResult.status === "not_connected" &&
+      navAgentResult.phone === "+38 (073) 873 01 45",
+    JSON.stringify(navAgentResult)
+  );
+
   await browser.close();
 
   console.log(`\nHeadless WebMCP check: ${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);

@@ -9,12 +9,26 @@
  * as "not published" and the agent is told to put the question in the lead
  * request instead.
  *
- * Feature-detected (`'modelContext' in document`) — no polyfill is loaded in
- * production; browsers/agents without WebMCP support simply never see the
- * tool. Loaded `defer` on every page via assets/analytics.js.
+ * Feature-detected — no polyfill is loaded in production; browsers/agents
+ * without WebMCP support simply never see the tool. Loaded `defer` on every
+ * page via assets/analytics.js.
+ *
+ * Context resolution (round 4, 2026-09-14): the current spec puts the API
+ * on Document —
+ *   partial interface Document { [SecureContext, SameObject] readonly attribute ModelContext modelContext; };
+ * (webmachinelearning.github.io/webmcp) — so `document.modelContext` is
+ * tried first. `navigator.modelContext` is kept as a fallback only because
+ * some early Chrome preview builds and older explainer drafts exposed it
+ * there instead; if a visitor's browser (or an injected test harness) only
+ * has the navigator form, this still finds it. Neither existing means no
+ * WebMCP support: do nothing.
  */
 (function () {
-  if (!("modelContext" in document)) return;
+  var modelContext =
+    (typeof document !== "undefined" && document.modelContext) ||
+    (typeof navigator !== "undefined" && navigator.modelContext) ||
+    null;
+  if (!modelContext) return;
 
   // Matchers run against the question regardless of the requested answer
   // language (a buyer can ask in English and request a Ukrainian answer, or
@@ -120,7 +134,7 @@
     return { published: false, answer: uk ? NOT_PUBLISHED.uk : NOT_PUBLISHED.en };
   }
 
-  document.modelContext.registerTool({
+  modelContext.registerTool({
     name: "get_anima_service_info",
     title: "Anima Volitiva service facts",
     description:

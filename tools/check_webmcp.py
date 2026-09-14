@@ -147,11 +147,13 @@ def check_webmcp_js():
     if hits:
         errors.append(f"assets/webmcp.js: contains forbidden claim(s) {hits}")
     if "registerTool" not in text:
-        errors.append("assets/webmcp.js: does not call document.modelContext.registerTool")
+        errors.append("assets/webmcp.js: does not call modelContext.registerTool")
     if "readOnlyHint" not in text:
         errors.append("assets/webmcp.js: read-only tool(s) missing readOnlyHint annotation")
-    if "'modelContext' in document" not in text and '"modelContext" in document' not in text:
-        errors.append("assets/webmcp.js: missing feature detection ('modelContext' in document)")
+    if "document.modelContext" not in text:
+        errors.append("assets/webmcp.js: missing document.modelContext (spec-primary context)")
+    if "navigator.modelContext" not in text:
+        errors.append("assets/webmcp.js: missing navigator.modelContext fallback (round 4)")
     return errors
 
 
