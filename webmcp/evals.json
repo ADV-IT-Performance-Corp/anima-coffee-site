@@ -1,0 +1,73 @@
+[
+  {
+    "name": "buyer asks about the trial",
+    "messages": [
+      { "role": "user", "type": "message", "content": "Do you offer a free trial before I commit?" }
+    ],
+    "expectedCall": [
+      {
+        "functionName": "get_anima_service_info",
+        "arguments": { "question": "Do you offer a free trial before I commit?", "language": "en" }
+      }
+    ]
+  },
+  {
+    "name": "buyer asks about support SLA",
+    "messages": [
+      { "role": "user", "type": "message", "content": "What happens if a machine breaks down over a weekend?" }
+    ],
+    "expectedCall": [
+      {
+        "functionName": "get_anima_service_info",
+        "arguments": { "question": "What happens if a machine breaks down over a weekend?", "language": "en" }
+      }
+    ]
+  },
+  {
+    "name": "buyer asks an unpublished question (machine brand list)",
+    "messages": [
+      { "role": "user", "type": "message", "content": "Which exact machine brands and models will you install at my office?" }
+    ],
+    "expectedCall": [
+      {
+        "functionName": "get_anima_service_info",
+        "arguments": { "question": "Which exact machine brands and models will you install at my office?", "language": "en" }
+      }
+    ]
+  },
+  {
+    "name": "buyer on the Ukrainian site asks about coverage",
+    "messages": [
+      { "role": "user", "type": "message", "content": "Ви обслуговуєте Київську область?" }
+    ],
+    "expectedCall": [
+      {
+        "functionName": "get_anima_service_info",
+        "arguments": { "question": "Ви обслуговуєте Київську область?", "language": "uk" }
+      }
+    ]
+  },
+  {
+    "name": "buyer asks to submit a request for a Kyiv office",
+    "messages": [
+      {
+        "role": "user",
+        "type": "message",
+        "content": "Please request a custom coffee assessment for our office: I'm Olena Petrenko from Bright Studio in Kyiv, we'd need about 2 machines, reach me at olena@brightstudio.example. We're an office of ~30 people, I'm the office manager, interested in the Pro package, prefer email."
+      }
+    ],
+    "expectedCall": [
+      {
+        "functionName": "request_coffee_service_assessment",
+        "arguments": {
+          "name": "Olena Petrenko",
+          "business": "Bright Studio",
+          "city": "Kyiv",
+          "machines": "2",
+          "contact": "olena@brightstudio.example",
+          "message": "Business type: office. Headcount: ~30. Role: office manager. City: Kyiv city. Package: Pro. Preferred contact: email."
+        }
+      }
+    ]
+  }
+]
