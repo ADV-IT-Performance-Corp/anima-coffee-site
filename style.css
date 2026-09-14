@@ -132,6 +132,19 @@ section.block{padding:96px 0}
 .badge b{color:var(--accent-deep)}
 @media(max-width:760px){.quotes{grid-template-columns:1fr}}
 
+.testi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:8px}
+.testi{background:var(--cream);border:1px solid var(--line);border-radius:8px;padding:26px 28px;margin:0}
+.testi blockquote{margin:0;font-size:15.5px;line-height:1.5;color:var(--ink)}
+.testi blockquote p{margin:0}
+.testi figcaption{margin-top:16px;font-size:13.5px;color:var(--ink-soft);font-weight:600}
+.testi figcaption b{color:var(--accent-deep)}
+.testi .t-note{margin-top:10px;font-size:12px;color:var(--ink-soft);font-style:italic}
+.testi .t-orig{margin-top:10px;font-size:12px;color:var(--ink-soft)}
+.testi .t-orig summary{cursor:pointer;font-weight:600}
+.testi .t-orig blockquote{margin-top:8px;font-size:13.5px;font-style:italic}
+@media(max-width:900px){.testi-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.testi-grid{grid-template-columns:1fr}}
+
 .cmp,div[style*="overflow-x:auto"]{overflow-x:auto;-webkit-overflow-scrolling:touch;position:relative}
 table{border-collapse:collapse;width:100%;min-width:640px;font-size:15px}
 thead th{text-align:left;padding:20px;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-soft);font-weight:700;border-bottom:1px solid var(--line)}
