@@ -524,24 +524,27 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
   // cap and delivers exactly once, instead of losing the lead to (3).
   const lateStubPage = await browser.newPage();
   await blockRoistat(lateStubPage);
-  await lateStubPage.addInitScript({
-    content: `(function () {
-      window.__roistatCalls = [];
-      setTimeout(function () {
-        window.roistatGoal = { reach: function (p) { window.__roistatCalls.push(p); } };
-      }, 1500);
-    })();`
-  });
+  await lateStubPage.addInitScript({ content: `window.__roistatCalls = [];` });
   await lateStubPage.addInitScript({ content: POLYFILL_SRC });
   await lateStubPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
   await lateStubPage.fill('#leadForm input[name="name"]', "Late Roistat Human");
   await lateStubPage.fill('#leadForm input[name="business"]', "Late Co");
   await lateStubPage.fill('#leadForm input[name="city"]', "Kyiv");
   await lateStubPage.fill('#leadForm input[name="contact"]', "late@example.com");
+  // Codex round-1 fix: schedule the delayed stub relative to the click
+  // itself, not to page load — networkidle can eat an unpredictable slice
+  // of any fixed pre-navigation delay, which could let roistatGoal exist
+  // before submit and skip the (2b) wait path entirely without the test
+  // noticing. Installing it right before the click guarantees this
+  // exercises the poll, not a lucky race.
+  await lateStubPage.evaluate(() => {
+    setTimeout(function () {
+      window.roistatGoal = { reach: function (p) { window.__roistatCalls.push(p); } };
+    }, 1500);
+  });
   await lateStubPage.click('#leadForm button[type="submit"]');
-  // Submit fires ~immediately after goto resolves, so roistatGoal (defined
-  // 1.5s after page load) lands well inside the wait window; poll past the
-  // stub's 1.5s mark with slack for the wait loop's own 100ms interval.
+  // Poll past the stub's 1.5s mark with slack for the wait loop's own
+  // 100ms interval.
   await lateStubPage.waitForTimeout(2200);
   const lateCalls = await lateStubPage.evaluate(() => window.__roistatCalls);
   check(
@@ -592,15 +595,25 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
   await dupPage.addInitScript({ content: POLYFILL_SRC });
   await dupPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
 
+  // Codex round-1 fix: a real Playwright click() waits for the submit
+  // button to become actionable (enabled) before landing, so by the time
+  // it fires the guard window has already closed and the "race" never
+  // actually happens — it just becomes a normal, later, legitimate
+  // submit. form.requestSubmit() (called with no submitter argument)
+  // fires the same 'submit' event the polyfill and lead.js listen for,
+  // without requiring any particular button to be enabled, so it lands
+  // deterministically INSIDE the guarded window instead of waiting it out.
   async function agentSubmit(pg, args) {
-    await pg.evaluate(async ({ name, args }) => {
+    return pg.evaluate(async ({ name, args }) => {
       const tools = await document.modelContext.getTools();
       const tool = tools.find((t) => t.name === name);
-      window.__dupResultPromise = document.modelContext.executeTool(tool, args);
+      // executeTool()'s Promise executor attaches the form's 'submit'
+      // listener synchronously, so requestSubmit() right after this call
+      // (no await, no timeout) is guaranteed to be seen by it.
+      const resultPromise = document.modelContext.executeTool(tool, args);
+      document.getElementById("leadForm").requestSubmit();
+      return resultPromise;
     }, { name: "request_coffee_service_assessment", args });
-    await pg.waitForTimeout(50);
-    await pg.click('#leadForm button[type="submit"]');
-    return pg.evaluate(() => window.__dupResultPromise);
   }
 
   const dupArgs = {
@@ -613,20 +626,14 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
   };
   const dupResult1 = await agentSubmit(dupPage, dupArgs);
   check("duplicate guard: first submit accepted", dupResult1 && dupResult1.status === "accepted", JSON.stringify(dupResult1));
-  // Second submit fired inside the widened (400ms) deferred-reset window —
-  // the sending guard must still be held, so this resolves as an
-  // in-flight error rather than delivering a second reach().
+  // Second submit fires immediately after the first resolves — well inside
+  // the widened (400ms) deferred-reset window — so the sending guard must
+  // still be held: this must resolve as an in-flight error, never a
+  // second "accepted".
   const dupResult2 = await agentSubmit(dupPage, dupArgs);
-  // The second executeTool() call's own promise may resolve to
-  // {status:"error"} (blocked by the dataset.lfSending guard) OR to null
-  // (the polyfill's own 'reset' listener for THIS call fires first, from
-  // the FIRST submit's deferred form.reset(), and cancels it per the
-  // polyfill's onReset handler) — both mean "not delivered as a second
-  // lead", which is what matters; the reach()-count assertion below is
-  // the one that actually proves no duplicate was created.
   check(
-    "duplicate guard: second (racing) submit is not delivered as accepted",
-    dupResult2 === null || (dupResult2 && dupResult2.status === "error"),
+    "duplicate guard: second (racing) submit is rejected in-flight, not delivered",
+    dupResult2 && dupResult2.status === "error",
     JSON.stringify(dupResult2)
   );
   await dupPage.waitForTimeout(500);
