@@ -32,6 +32,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <link rel="alternate" hreflang="uk" href="https://aeo.animacoffee.com.ua/ua/services.html" />
 <link rel="alternate" hreflang="x-default" href="https://aeo.animacoffee.com.ua/ua/services.html" />
 <script src="../assets/analytics.js"></script>
+<script src="../assets/webmcp.js" defer></script>
 </head>
 <body>
 <!-- Google Tag Manager (noscript) -->
@@ -80,17 +81,17 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <span class="eyebrow on-dark">Почніть сьогодні</span>
     <h2>Не впевнені, яка послуга вам потрібна?</h2>
     <p>Замовте індивідуальний B2B-аудит кави. Ми враховуємо вашу мережу, воду й обсяг чашок, а тоді рекомендуємо точний пакет — без зобов'язань.</p>
-    <div class="lead-wrap"><form class="lead-form" id="leadForm" data-endpoint="">
+    <div class="lead-wrap"><form class="lead-form" id="leadForm" data-endpoint="" toolname="request_coffee_service_assessment" tooldescription="Замовити безкоштовний, без зобов'язань індивідуальний розрахунок або аудит оренди та сервісу кавомашин для вашого бізнесу в Києві чи Київській області. Anima Volitiva підбирає обладнання під об'єкт, розраховує вартість індивідуально та пропонує безкоштовний 14-денний тест без передоплати.">
   <div class="lf-row">
-    <label>&#1030;м&#39;я<input name="name" required autocomplete="name" placeholder="&#1042;аше &#1110;м&#39;я"></label>
-    <label>&#1050;омпан&#1110;я<input name="business" required placeholder="&#1050;омпан&#1110;я або заклад"></label>
+    <label>&#1030;м&#39;я<input name="name" required autocomplete="name" placeholder="&#1042;аше &#1110;м&#39;я" toolparamdescription="Повне ім'я контактної особи."></label>
+    <label>&#1050;омпан&#1110;я<input name="business" required placeholder="&#1050;омпан&#1110;я або заклад" toolparamdescription="Назва компанії або закладу."></label>
   </div>
   <div class="lf-row">
-    <label>&#1052;&#1110;сто<input name="city" required placeholder="&#1050;и&#1111;в"></label>
-    <label>&#1057;к&#1110;льки машин<input name="machines" inputmode="numeric" placeholder="напр. 2"></label>
+    <label>&#1052;&#1110;сто<input name="city" required placeholder="&#1050;и&#1111;в" toolparamdescription="Місто. Сервіс доступний у місті Київ та Київській області."></label>
+    <label>&#1057;к&#1110;льки машин<input name="machines" inputmode="numeric" placeholder="напр. 2" toolparamdescription="Кількість кавомашин, якщо відомо (необов'язково)."></label>
   </div>
-  <label>Email або телефон<input name="contact" required placeholder="you@company.com або +380..."></label>
-  <label>&#1044;одаткова &#1110;нформац&#1110;я <span class="lf-opt">(необов&#39;язково)</span><textarea name="message" rows="2" placeholder="&#1063;ашок на день, тип об&#39;&#1108;кта, терм&#1110;ни..."></textarea></label>
+  <label>Email або телефон<input name="contact" required placeholder="you@company.com або +380..." toolparamdescription="Email або номер телефону для зв'язку."></label>
+  <label>&#1044;одаткова &#1110;нформац&#1110;я <span class="lf-opt">(необов&#39;язково)</span><textarea name="message" rows="2" placeholder="&#1063;ашок на день, тип об&#39;&#1108;кта, терм&#1110;ни..." toolparamdescription="Додаткові нотатки для нашої команди. Якщо відомо, вкажіть: тип бізнесу (офіс, кафе чи ресторан, готель, роздрібна торгівля чи АЗС, коворкінг або інше), приблизну кількість співробітників, вашу посаду в компанії, чи це місто Київ, чи Київська область, який пакет вас цікавить (Start, Pro, Max або ще не визначились), і бажаний канал зв'язку (телефон, email чи Telegram)."></textarea></label>
   <input type="text" name="company_url" class="lf-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
   <button type="submit" class="btn btn-primary lf-submit">&#1054;тримати &#1110;ндив&#1110;дуальний аудит</button>
   <p class="lf-note">&#1041;ез зобов&#39;язань &middot; п&#1110;дтримка 24/7 &middot; в&#1110;дпов&#1110;даємо протягом робочого дня.</p>

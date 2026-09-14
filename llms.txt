@@ -6,6 +6,23 @@ _Last updated: 2026-08-22 — lead form UI available; direct-contact fallback ac
 
 > Languages: the site is bilingual. Ukrainian is the primary language for the native Kyiv market (served under /ua/), with English available at the root for wider reach. Every page has both a Ukrainian and an English version, cross-linked via hreflang (uk / en / x-default→uk).
 
+## For AI agents (WebMCP)
+
+Every page carries a declarative WebMCP tool on its lead form —
+`toolname="request_coffee_service_assessment"` — so a WebMCP-capable agent
+can fill and submit it on a visitor's behalf (`toolautosubmit` is off: a
+human confirms the final submit). `assets/webmcp.js` also registers one
+read-only imperative tool, `get_anima_service_info`, that answers buyer
+questions (packages, trial, support/SLA, coverage area, company history,
+client count, contacts/hours) from facts already published on this site —
+anything not published (e.g. the exact machine brand list, water hardness,
+liability, contract length, multi-location billing, POS/cashless, exact
+maintenance cadence, staff-training duration) is answered as "not published"
+rather than invented. Submissions are not yet connected to the CRM
+(`data-endpoint` is empty pending the owner's backend); until it is, both a
+human and an agent submission get the same phone/email/Telegram fallback
+instead of a fabricated confirmation.
+
 ## Key facts
 - Service area: Kyiv and Kyiv Oblast
 - Model: individual quote per venue, three equipment packages — Start, Pro, Max — matched to the venue format (office, HoReCa, retail); free 14-day trial without prepayment

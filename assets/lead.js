@@ -17,6 +17,12 @@
  * lead-form page by tools/add_lead_honeypot.py. If it's filled in, the
  * submit is silently dropped (spam bots fill every field; real visitors
  * never see this one — it's off-screen via .lf-hp in style.css).
+ *
+ * WebMCP (W1, 2026-09-14): a browser agent submits this same form with
+ * `SubmitEvent.agentInvoked` set. That path runs the SAME validation and
+ * SAME submit call as a human, then answers with `e.respondWith(promise)`
+ * instead of writing to the DOM — see handleAgent(). Human behaviour above
+ * is byte-for-byte unchanged.
  */
 (function () {
   var uk = (document.documentElement.lang || "en").toLowerCase().indexOf("uk") === 0;
@@ -33,6 +39,16 @@
         err: "Could not send via the site. Please use the contacts below — we reply fast.",
         noBackend: "This form isn't wired to our system yet. Reach us directly — we reply fast:"
       };
+
+  // Published contact facts (CLAUDE.md "Contacts & business info", canonical
+  // — mirrored here as constants rather than scraped from the DOM so the
+  // agent-facing not_connected result is a stable, machine-readable
+  // contract independent of page layout).
+  var CONTACT = {
+    phone: "+38 (073) 873 01 45",
+    email: "animacoffeeco@gmail.com",
+    telegram: "https://t.me/Animavolitiva"
+  };
 
   var UTM_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "gclid"];
   var UTM_STORE_KEY = "anima_utm_v1";
@@ -87,8 +103,8 @@
     }
   }
 
-  function fireAccepted(sourcePage, leadId) {
-    try { if (window.animaTrackLead) window.animaTrackLead(sourcePage, leadId); } catch (e) {}
+  function fireAccepted(sourcePage, leadId, origin) {
+    try { if (window.animaTrackLead) window.animaTrackLead(sourcePage, leadId, origin); } catch (e) {}
   }
 
   function submitLead(form, status, data, endpoint) {
@@ -102,7 +118,7 @@
       return r.json();
     }).then(function (body) {
       if (!body || !body.lead_id) { throw new Error("no_lead_id"); }
-      fireAccepted(data.source_page, body.lead_id);
+      fireAccepted(data.source_page, body.lead_id, "human");
       form.reset();
       setStatus(status, T.sent, "ok");
     }).catch(function () {
@@ -110,45 +126,103 @@
     });
   }
 
+  // Agent path (WebMCP): same POST as submitLead, but resolves a structured
+  // result for e.respondWith() instead of writing to the DOM.
+  function submitLeadAgent(form, data, endpoint) {
+    return fetch(endpoint, {
+      method: "POST",
+      headers: { "Accept": "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    }).then(function (r) {
+      if (r.status !== 200) { throw new Error("lead_not_accepted"); }
+      return r.json();
+    }).then(function (body) {
+      if (!body || !body.lead_id) { throw new Error("no_lead_id"); }
+      fireAccepted(data.source_page, body.lead_id, "agent");
+      form.reset();
+      return { status: "accepted", leadId: body.lead_id };
+    }).catch(function () {
+      return { status: "error", message: T.err };
+    });
+  }
+
+  function notConnectedResult() {
+    return {
+      status: "not_connected",
+      message: T.noBackend,
+      phone: CONTACT.phone,
+      email: CONTACT.email,
+      telegram: CONTACT.telegram
+    };
+  }
+
+  function invalidResult(form) {
+    var fields = [];
+    Array.prototype.forEach.call(form.querySelectorAll(":invalid"), function (f) {
+      if (f.name && f.name !== "company_url") fields.push(f.name);
+    });
+    return { status: "invalid", message: T.err, fields: fields };
+  }
+
+  function collectData(form) {
+    var raw = {};
+    Array.prototype.forEach.call(form.querySelectorAll("input,textarea"), function (f) {
+      if (f.name && f.name !== "company_url") raw[f.name] = (f.value || "").trim();
+    });
+    var utm = captureUtm();
+    return {
+      name: raw.name || "",
+      company: raw.business || "",
+      city: raw.city || "",
+      machines: raw.machines || "",
+      contact: raw.contact || "",
+      details: raw.details || raw.message || "",
+      source_page: location.pathname,
+      referrer: document.referrer || "",
+      utm_source: utm.utm_source || "",
+      utm_medium: utm.utm_medium || "",
+      utm_campaign: utm.utm_campaign || "",
+      utm_term: utm.utm_term || "",
+      utm_content: utm.utm_content || "",
+      gclid: utm.gclid || ""
+    };
+  }
+
   function handle(form) {
     form.addEventListener("submit", function (e) {
       e.preventDefault();
-      if (!form.checkValidity()) { form.reportValidity(); return; }
+      var isAgent = !!e.agentInvoked;
+
+      if (!form.checkValidity()) {
+        if (isAgent) { e.respondWith(Promise.resolve(invalidResult(form))); return; }
+        form.reportValidity();
+        return;
+      }
 
       var status = form.querySelector(".lf-status");
       var hp = form.querySelector('input[name="company_url"]');
       if (hp && (hp.value || "").trim()) {
-        // Honeypot tripped — silently drop, don't tell the bot anything useful.
+        // Honeypot tripped — silently drop, don't tell the bot anything useful
+        // (a real agent never sees or fills this hidden field).
         form.reset();
+        if (isAgent) { e.respondWith(Promise.resolve({ status: "error", message: T.err })); return; }
         setStatus(status, T.sent, "ok");
         return;
       }
 
-      var raw = {};
-      Array.prototype.forEach.call(form.querySelectorAll("input,textarea"), function (f) {
-        if (f.name && f.name !== "company_url") raw[f.name] = (f.value || "").trim();
-      });
-      var utm = captureUtm();
-      var data = {
-        name: raw.name || "",
-        company: raw.business || "",
-        city: raw.city || "",
-        machines: raw.machines || "",
-        contact: raw.contact || "",
-        details: raw.details || raw.message || "",
-        source_page: location.pathname,
-        referrer: document.referrer || "",
-        utm_source: utm.utm_source || "",
-        utm_medium: utm.utm_medium || "",
-        utm_campaign: utm.utm_campaign || "",
-        utm_term: utm.utm_term || "",
-        utm_content: utm.utm_content || "",
-        gclid: utm.gclid || ""
-      };
-
+      var data = collectData(form);
       var endpoint = (form.getAttribute("data-endpoint") || "").trim();
-      if (!endpoint) { showFallbackContact(status); return; }
 
+      if (!endpoint) {
+        if (isAgent) { e.respondWith(Promise.resolve(notConnectedResult())); return; }
+        showFallbackContact(status);
+        return;
+      }
+
+      if (isAgent) {
+        e.respondWith(submitLeadAgent(form, data, endpoint));
+        return;
+      }
       submitLead(form, status, data, endpoint);
     });
   }
