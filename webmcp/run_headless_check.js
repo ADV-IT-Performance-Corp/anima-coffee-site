@@ -66,10 +66,20 @@ const ROISTAT_STUB_SRC = `(function () {
   };
 })();`;
 
+// assets/analytics.js carries a live ROISTAT_PROJECT_ID, so on any page
+// that doesn't stub window.roistatGoal, assets/lead.js's (2b) wait path
+// (fast-follow, 2026-09-14) now polls for up to ~4s before falling back —
+// window.roistatGoal never appears here because blockRoistat() aborts the
+// real counter request. Shrink that wait for pages whose tests want the
+// pre-existing "falls straight to fallback" behaviour, so the suite
+// doesn't spend 4 real seconds per such page.
+const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
+
 (async () => {
   const browser = await chromium.launch();
   const page = await browser.newPage();
   await blockRoistat(page);
+  await page.addInitScript({ content: SHORT_WAIT_SRC });
 
   // Third-party analytics beacons (GA4/GTM/Metrica, all live via real IDs
   // in assets/analytics.js) fire on page load and form interaction
@@ -263,7 +273,10 @@ const ROISTAT_STUB_SRC = `(function () {
   await page.fill('#leadForm input[name="city"]', "Kyiv");
   await page.fill('#leadForm input[name="contact"]', "human@example.com");
   await page.click('#leadForm button[type="submit"]');
-  await page.waitForTimeout(200);
+  // Roistat is configured (live ROISTAT_PROJECT_ID) but blockRoistat()
+  // means window.roistatGoal never appears, so this now runs the (2b)
+  // wait path (SHORT_WAIT_SRC caps it at 250ms) before falling back.
+  await page.waitForTimeout(400);
   const statusText = await page.textContent("#leadForm .lf-status");
   const hasHighlight = await page.evaluate(() => !!document.querySelector(".contact-block.lf-highlight"));
   check(
@@ -286,6 +299,7 @@ const ROISTAT_STUB_SRC = `(function () {
   // this order, before any page script).
   const navPage = await browser.newPage();
   await blockRoistat(navPage);
+  await navPage.addInitScript({ content: SHORT_WAIT_SRC });
   await navPage.addInitScript({ content: POLYFILL_SRC });
   await navPage.addInitScript({
     content: `(function () {
@@ -502,6 +516,176 @@ const ROISTAT_STUB_SRC = `(function () {
     "data-endpoint set: success message shown via the POST path",
     /thank you|дякуємо/i.test(endpointStatus || ""),
     JSON.stringify(endpointStatus)
+  );
+
+  // 6. Fast-follow (2026-09-14): window.roistatGoal appears 1.5s AFTER
+  // submit (a fast agent, or a human on a slow connection, racing the
+  // async counter script) -> the (2b) wait path picks it up inside its
+  // cap and delivers exactly once, instead of losing the lead to (3).
+  const lateStubPage = await browser.newPage();
+  await blockRoistat(lateStubPage);
+  await lateStubPage.addInitScript({ content: `window.__roistatCalls = [];` });
+  await lateStubPage.addInitScript({ content: POLYFILL_SRC });
+  await lateStubPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  await lateStubPage.fill('#leadForm input[name="name"]', "Late Roistat Human");
+  await lateStubPage.fill('#leadForm input[name="business"]', "Late Co");
+  await lateStubPage.fill('#leadForm input[name="city"]', "Kyiv");
+  await lateStubPage.fill('#leadForm input[name="contact"]', "late@example.com");
+  // Codex round-1 fix: schedule the delayed stub relative to the click
+  // itself, not to page load — networkidle can eat an unpredictable slice
+  // of any fixed pre-navigation delay, which could let roistatGoal exist
+  // before submit and skip the (2b) wait path entirely without the test
+  // noticing. Installing it right before the click guarantees this
+  // exercises the poll, not a lucky race.
+  await lateStubPage.evaluate(() => {
+    setTimeout(function () {
+      window.roistatGoal = { reach: function (p) { window.__roistatCalls.push(p); } };
+    }, 1500);
+  });
+  await lateStubPage.click('#leadForm button[type="submit"]');
+  // Poll past the stub's 1.5s mark with slack for the wait loop's own
+  // 100ms interval.
+  await lateStubPage.waitForTimeout(2200);
+  const lateCalls = await lateStubPage.evaluate(() => window.__roistatCalls);
+  check(
+    "roistatGoal defined 1.5s after submit: exactly one reach() call, no lead lost",
+    Array.isArray(lateCalls) && lateCalls.length === 1,
+    JSON.stringify(lateCalls)
+  );
+  const lateStatus = await lateStubPage.textContent("#leadForm .lf-status");
+  check(
+    "roistatGoal defined 1.5s after submit: success message shown, not the fallback",
+    /thank you|дякуємо/i.test(lateStatus || ""),
+    JSON.stringify(lateStatus)
+  );
+
+  // 7. Fast-follow: window.roistatGoal never becomes ready (counter
+  // permanently blocked) -> falls back only after the wait times out, and
+  // still never claims a reach() that didn't happen.
+  const neverReadyPage = await browser.newPage();
+  await blockRoistat(neverReadyPage);
+  await neverReadyPage.addInitScript({ content: SHORT_WAIT_SRC });
+  await neverReadyPage.addInitScript({ content: POLYFILL_SRC });
+  await neverReadyPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  await neverReadyPage.fill('#leadForm input[name="name"]', "Never Ready Human");
+  await neverReadyPage.fill('#leadForm input[name="business"]', "Never Co");
+  await neverReadyPage.fill('#leadForm input[name="city"]', "Kyiv");
+  await neverReadyPage.fill('#leadForm input[name="contact"]', "never@example.com");
+  await neverReadyPage.click('#leadForm button[type="submit"]');
+  await neverReadyPage.waitForTimeout(500);
+  const neverReadyStatus = await neverReadyPage.textContent("#leadForm .lf-status");
+  const neverReadyHighlight = await neverReadyPage.evaluate(() => !!document.querySelector(".contact-block.lf-highlight"));
+  check(
+    "roistatGoal never ready: falls back to the contact block after the wait times out",
+    /isn't wired|reach us directly/i.test(neverReadyStatus || "") || neverReadyHighlight,
+    JSON.stringify({ neverReadyStatus, neverReadyHighlight })
+  );
+  const neverReadyDataLayer = await neverReadyPage.evaluate(() => (window.dataLayer || []).filter((e) => e && e.event === "lead_accepted"));
+  check("roistatGoal never ready: no lead_accepted event was pushed", neverReadyDataLayer.length === 0, JSON.stringify(neverReadyDataLayer));
+
+  // 8. Fast-follow: two back-to-back agent submits with the SAME data must
+  // produce exactly one reach() call. window.__LEAD_RESET_DELAY_MS widens
+  // the deferred-reset window (normally a single macrotask) so the second
+  // submit deterministically lands inside it instead of depending on real
+  // event-loop timing.
+  const dupPage = await browser.newPage();
+  await blockRoistat(dupPage);
+  await dupPage.addInitScript({ content: `window.__LEAD_RESET_DELAY_MS = 400;` });
+  await dupPage.addInitScript({ content: ROISTAT_STUB_SRC });
+  await dupPage.addInitScript({ content: POLYFILL_SRC });
+  await dupPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+
+  // Codex round-1 fix: a real Playwright click() waits for the submit
+  // button to become actionable (enabled) before landing, so by the time
+  // it fires the guard window has already closed and the "race" never
+  // actually happens — it just becomes a normal, later, legitimate
+  // submit. form.requestSubmit() (called with no submitter argument)
+  // fires the same 'submit' event the polyfill and lead.js listen for,
+  // without requiring any particular button to be enabled, so it lands
+  // deterministically INSIDE the guarded window instead of waiting it out.
+  async function agentSubmit(pg, args) {
+    return pg.evaluate(async ({ name, args }) => {
+      const tools = await document.modelContext.getTools();
+      const tool = tools.find((t) => t.name === name);
+      // executeTool()'s Promise executor attaches the form's 'submit'
+      // listener synchronously, so requestSubmit() right after this call
+      // (no await, no timeout) is guaranteed to be seen by it.
+      const resultPromise = document.modelContext.executeTool(tool, args);
+      document.getElementById("leadForm").requestSubmit();
+      return resultPromise;
+    }, { name: "request_coffee_service_assessment", args });
+  }
+
+  const dupArgs = {
+    name: "Duplicate Guard Buyer",
+    business: "Dup Co",
+    city: "Kyiv",
+    machines: "1",
+    contact: "dup@example.com",
+    message: "Same submit twice."
+  };
+  const dupResult1 = await agentSubmit(dupPage, dupArgs);
+  check("duplicate guard: first submit accepted", dupResult1 && dupResult1.status === "accepted", JSON.stringify(dupResult1));
+  // Second submit fires immediately after the first resolves — well inside
+  // the widened (400ms) deferred-reset window — so the sending guard must
+  // still be held: this must resolve as an in-flight error, never a
+  // second "accepted".
+  const dupResult2 = await agentSubmit(dupPage, dupArgs);
+  check(
+    "duplicate guard: second (racing) submit is rejected in-flight, not delivered",
+    dupResult2 && dupResult2.status === "error",
+    JSON.stringify(dupResult2)
+  );
+  await dupPage.waitForTimeout(500);
+  const dupCalls = await dupPage.evaluate(() => window.__roistatCalls);
+  check(
+    "duplicate guard: exactly one reach() call total for the two racing submits",
+    Array.isArray(dupCalls) && dupCalls.length === 1,
+    JSON.stringify(dupCalls)
+  );
+
+  // 9. Fast-follow: a throwing Roistat counter snippet must never prevent
+  // window.animaTrackLead from being defined, and must not take GA4/dataLayer
+  // or Metrica down with it. Targets the exact insertBefore() call the
+  // counter snippet makes (see assets/analytics.js), regardless of call
+  // order relative to GTM/Metrica's own script insertions.
+  const throwPage = await browser.newPage();
+  await blockRoistat(throwPage);
+  await throwPage.addInitScript({
+    content: `(function () {
+      var orig = Node.prototype.insertBefore;
+      Node.prototype.insertBefore = function (newNode, refNode) {
+        if (newNode && newNode.tagName === "SCRIPT" && typeof newNode.src === "string" && newNode.src.indexOf("roistat.com") !== -1) {
+          throw new Error("simulated roistat snippet failure");
+        }
+        return orig.call(this, newNode, refNode);
+      };
+    })();`
+  });
+  await throwPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  const throwPageState = await throwPage.evaluate(() => ({
+    hasAnimaTrackLead: typeof window.animaTrackLead === "function",
+    hasYm: typeof window.ym === "function",
+    hasDataLayer: Array.isArray(window.dataLayer)
+  }));
+  check(
+    "throwing Roistat snippet: window.animaTrackLead is still defined",
+    throwPageState.hasAnimaTrackLead,
+    JSON.stringify(throwPageState)
+  );
+  check(
+    "throwing Roistat snippet: Metrica (window.ym) is still initialized",
+    throwPageState.hasYm,
+    JSON.stringify(throwPageState)
+  );
+  const throwPageTrack = await throwPage.evaluate(() => {
+    window.animaTrackLead("/test", "lead_throw_test", "human");
+    return (window.dataLayer || []).filter((e) => e && e.event === "lead_accepted" && e.lead_id === "lead_throw_test");
+  });
+  check(
+    "throwing Roistat snippet: animaTrackLead still pushes lead_accepted to dataLayer",
+    Array.isArray(throwPageTrack) && throwPageTrack.length === 1,
+    JSON.stringify(throwPageTrack)
   );
 
   await browser.close();
