@@ -45,7 +45,7 @@
     },
     { unpublished: true, re: /water hardness|hardness of the water|water quality spec|жорсткість води/i },
     { unpublished: true, re: /liabilit|insurance|who('?s| is) (liable|responsible) if|відповідальніст|страхуванн/i },
-    { unpublished: true, re: /contract (length|term|duration)|minimum contract|how long is the contract|commitment period|термін контракту|тривалість контракту/i },
+    { unpublished: true, re: /contract (length|term|duration)|minimum contract (length|term|duration|period)|how long is the contract|commitment period|термін контракту|тривалість контракту/i },
     { unpublished: true, re: /multi-?location|multiple locations|multi-?site account|chain account|central(ized)? billing|мереж[аеу] закладів|кілька локацій/i },
     { unpublished: true, re: /\bpos\b|point of sale|cashless payment|card payment on the machine|безготівков|термінал/i },
     { unpublished: true, re: /maintenance (frequency|schedule) in (days|hours)|how many (visits|technician visits) per (week|month)|exact maintenance (schedule|cadence)|точний графік обслуговування/i },
@@ -67,6 +67,15 @@
       en: "Free 14-day trial with no prepayment.",
       uk: "Безкоштовний 14-денний тест без передоплати."
     },
+    // Codex round-4 fix: "minimum contract [length/term]" stays unpublished
+    // above, but a DIFFERENT, published fact — no forced minimum coffee
+    // volume/order per month — is what the site's own FAQ answers. Checked
+    // here, before it could ever fall through to the unpublished catch-all.
+    {
+      re: /minimum (volume|order|amount|quantity)|forced (minimum|quota)|monthly minimum|do (we|i) have to (buy|order)|мінімальн(ий|у) обсяг|обов'?язков(ий|а) мінімум/i,
+      en: "No forced minimum. Your quote is based on your real volume, across one of the three equipment packages, with no minimum monthly amount to hit.",
+      uk: "Без обов'язкового мінімуму. Розрахунок базується на вашому реальному обсязі в межах одного з трьох пакетів обладнання, без мінімальної щомісячної кількості."
+    },
     // Checked BEFORE the general support/breakdown matcher below: "weekly
     // visit"/"maintenance included" are a more specific ask than the bare
     // word "technician", which also appears in the breakdown fact — a
@@ -78,19 +87,21 @@
       en: "Water filtration and maintenance are included with every machine, plus weekly resupply of beans/consumables and a weekly technician quality visit.",
       uk: "Фільтрація води та обслуговування входять у кожен апарат, а також щотижневе поповнення кави/витратних матеріалів і щотижневий технічний візит."
     },
-    {
-      re: /support|24\/7|break(s|ing)? ?down|breakdown|\bsla\b|response time|replacement machine|technician|поломк|підтримк|ремонт/i,
-      en: "24/7 support line. On breakdown, a technician or a replacement machine is provided within 24 hours.",
-      uk: "Лінія підтримки 24/7. У разі поломки технік або підмінний апарат надається протягом 24 годин."
-    },
-    // Checked BEFORE the coverage matcher below: "hours"/"contact"/"address"
-    // are more specific asks than a bare region mention, and a question like
-    // "What are your opening hours in Kyiv Oblast?" must resolve to contact
-    // info, not to the coverage-area fact (Codex #2 review, W1 round 2).
+    // Checked BEFORE the general support/breakdown matcher below, same as
+    // the round-2 hours/coverage fix: "phone number"/"contact"/"address"
+    // are a more specific ask than the bare word "support", which also
+    // appears in the breakdown fact — "What is your support phone number?"
+    // must resolve to contact info, not just the breakdown SLA (Codex
+    // round 4).
     {
       re: /phone number|contact (info|details|you)|email address|\baddress\b|opening hours|business hours|what (time|hours)|call you|reach you|телефон|адреса|пошта|години роботи|график роботи|зв'?язатися/i,
       en: "Phone: +38 (073) 873 01 45. Email: animacoffeeco@gmail.com. Address: Kyiv Oblast, Bila Tserkva, 29a Pavlichenko St. Hours: Mon–Sat 09:00–17:00.",
       uk: "Телефон: +38 (073) 873 01 45. Email: animacoffeeco@gmail.com. Адреса: Київська обл., Біла Церква, вул. Павліченко 29а. Години роботи: Пн–Сб 09:00–17:00."
+    },
+    {
+      re: /support|24\/7|break(s|ing)? ?down|breakdown|\bsla\b|response time|replacement machine|technician|поломк|підтримк|ремонт/i,
+      en: "24/7 support line. On breakdown, a technician or a replacement machine is provided within 24 hours.",
+      uk: "Лінія підтримки 24/7. У разі поломки технік або підмінний апарат надається протягом 24 годин."
     },
     {
       re: /coverage|service area|where do you operate|which (city|cities|region)|do you (cover|serve|operate in)|де ви (працюєте|обслуговуєте)|обслуговуєте|яку територію/i,

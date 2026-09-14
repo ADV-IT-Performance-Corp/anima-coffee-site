@@ -156,6 +156,40 @@ function check(label, cond, detail) {
     JSON.stringify(weeklyVisitResult)
   );
 
+  // 1g. Codex round-4 fix: "minimum contract length" stays unpublished,
+  // but "do we have to order a minimum volume" is a distinct, published
+  // fact (the site's own FAQ: no forced monthly minimum).
+  const minVolumeResult = await callTool("get_anima_service_info", {
+    question: "Do we have to buy a minimum amount of coffee every month?",
+    language: "en"
+  });
+  check(
+    "get_anima_service_info answers the published no-minimum-volume fact",
+    minVolumeResult && minVolumeResult.published === true && /no forced minimum/i.test(minVolumeResult.answer || ""),
+    JSON.stringify(minVolumeResult)
+  );
+  const contractLengthResult = await callTool("get_anima_service_info", {
+    question: "What is the minimum contract length?",
+    language: "en"
+  });
+  check(
+    "get_anima_service_info still refuses the unpublished contract-length question",
+    contractLengthResult && contractLengthResult.published === false,
+    JSON.stringify(contractLengthResult)
+  );
+
+  // 1h. Codex round-4 fix: "support phone number" must resolve to contact
+  // info, not the general breakdown/SLA fact.
+  const supportPhoneResult = await callTool("get_anima_service_info", {
+    question: "What is your support phone number?",
+    language: "en"
+  });
+  check(
+    "get_anima_service_info resolves 'support phone number' to contact info, not just the SLA",
+    supportPhoneResult && supportPhoneResult.published === true && /\+38/.test(supportPhoneResult.answer || ""),
+    JSON.stringify(supportPhoneResult)
+  );
+
   // 2. Agent form submission via the declarative tool, endpoint empty.
   // toolautosubmit is deliberately OFF (D1: human confirms submit), so the
   // polyfill fills the fields and focuses the submit button but does NOT
