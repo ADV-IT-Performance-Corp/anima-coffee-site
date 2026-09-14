@@ -168,13 +168,18 @@
     if (roistatReady()) return Promise.resolve(true);
     if (typeof navigator !== "undefined" && navigator.onLine === false) return Promise.resolve(false);
     return new Promise(function (resolve) {
-      var waited = 0;
+      // Codex round-2 fix: measure elapsed wall-clock time via Date.now(),
+      // not a fixed-per-tick counter — a backgrounded tab throttles
+      // setInterval callbacks (Chrome: as infrequently as ~1/min), so
+      // counting "ticks * 100ms" as if each tick were punctual could
+      // stretch this well past the intended ~4s cap, leaving the button
+      // disabled / the respondWith promise pending far longer than meant.
+      var deadline = Date.now() + ROISTAT_WAIT_MS;
       var timer = setInterval(function () {
-        waited += ROISTAT_POLL_MS;
         if (roistatReady()) {
           clearInterval(timer);
           resolve(true);
-        } else if (waited >= ROISTAT_WAIT_MS) {
+        } else if (Date.now() >= deadline) {
           clearInterval(timer);
           resolve(false);
         }
