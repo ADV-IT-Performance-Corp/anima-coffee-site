@@ -143,6 +143,19 @@ function check(label, cond, detail) {
     JSON.stringify(hoursVsCoverageResult)
   );
 
+  // 1f. Codex round-3 fix: "technician" appears in both the weekly-visit
+  // fact and the breakdown fact — the more specific weekly-visit ask must
+  // win.
+  const weeklyVisitResult = await callTool("get_anima_service_info", {
+    question: "Do you include a weekly technician quality visit?",
+    language: "en"
+  });
+  check(
+    "get_anima_service_info resolves the weekly-visit question to maintenance, not breakdown coverage",
+    weeklyVisitResult && weeklyVisitResult.published === true && /weekly/i.test(weeklyVisitResult.answer || ""),
+    JSON.stringify(weeklyVisitResult)
+  );
+
   // 2. Agent form submission via the declarative tool, endpoint empty.
   // toolautosubmit is deliberately OFF (D1: human confirms submit), so the
   // polyfill fills the fields and focuses the submit button but does NOT

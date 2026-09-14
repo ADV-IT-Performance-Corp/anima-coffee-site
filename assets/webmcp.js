@@ -53,8 +53,19 @@
       en: "Free 14-day trial with no prepayment.",
       uk: "Безкоштовний 14-денний тест без передоплати."
     },
+    // Checked BEFORE the general support/breakdown matcher below: "weekly
+    // visit"/"maintenance included" are a more specific ask than the bare
+    // word "technician", which also appears in the breakdown fact — a
+    // question like "Do you include a weekly technician quality visit?"
+    // must resolve to the maintenance fact, not emergency breakdown
+    // coverage (Codex #3 review, W1 round 3).
     {
-      re: /support|24\/7|break(s|ing)? ?down|breakdown|sla|response time|replacement machine|technician|поломк|підтримк|ремонт/i,
+      re: /water filtration|maintenance included|weekly (visit|resupply|service|technician)|фільтрація води|щотижнев/i,
+      en: "Water filtration and maintenance are included with every machine, plus weekly resupply of beans/consumables and a weekly technician quality visit.",
+      uk: "Фільтрація води та обслуговування входять у кожен апарат, а також щотижневе поповнення кави/витратних матеріалів і щотижневий технічний візит."
+    },
+    {
+      re: /support|24\/7|break(s|ing)? ?down|breakdown|\bsla\b|response time|replacement machine|technician|поломк|підтримк|ремонт/i,
       en: "24/7 support line. On breakdown, a technician or a replacement machine is provided within 24 hours.",
       uk: "Лінія підтримки 24/7. У разі поломки технік або підмінний апарат надається протягом 24 годин."
     },
@@ -86,11 +97,6 @@
       re: /barista|staff training|do (we|i) need (a )?barista|training included|бариста|навчання персоналу/i,
       en: "Staff training is included with every installation — no dedicated barista hire needed.",
       uk: "Навчання персоналу входить у кожну інсталяцію — окремий бариста не потрібен."
-    },
-    {
-      re: /water filtration|maintenance included|weekly (visit|resupply|service)|фільтрація води|щотижнев/i,
-      en: "Water filtration and maintenance are included with every machine, plus weekly resupply of beans/consumables and a weekly technician quality visit.",
-      uk: "Фільтрація води та обслуговування входять у кожен апарат, а також щотижневе поповнення кави/витратних матеріалів і щотижневий технічний візит."
     }
   ];
 
