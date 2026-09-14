@@ -26,15 +26,27 @@
  * its existing goal name for BOTH origins — renaming/splitting it would
  * silently stop reporting conversions against the goal already configured
  * in Metrica; `lead_origin` segmentation lives in dataLayer/GA4 only.
+ *
+ * Roistat (W2, 2026-09-14): the counter snippet below is the documented
+ * Roistat installation code (help-en.roistat.com/settings/project/
+ * tracking_code/installing/), adapted to read the project id/host from the
+ * two constants instead of being hardcoded per-page. ROISTAT_PROJECT_ID
+ * empty -> the whole block no-ops, same as the two secrets above. Once the
+ * counter has loaded it exposes `window.roistatGoal.reach()`, which
+ * assets/lead.js uses as its client-side lead-delivery path (see W2 spec) —
+ * this file only loads the counter; it never calls reach() itself.
  */
 (function () {
-  // ==== THE TWO SECRETS — paste real IDs on these two lines to activate ==========
+  // ==== THE THREE SECRETS — paste real IDs on these lines to activate ============
   var GA4_ID     = "G-XXXXXXXXXX"; // <-- GA4 Measurement ID (Google Analytics 4)
   var METRICA_ID = "101507598";    // <-- Yandex Metrica counter id (Anima, live)
+  var ROISTAT_PROJECT_ID = "7c0c18bea7088f4a9551779737558ad3"; // <-- Roistat project key (Anima, live)
+  var ROISTAT_HOST = "cloud-eu.roistat.com"; // <-- EU mirror (not cloud.roistat.com)
   // ===============================================================================
 
   var GA4_LIVE     = !/X{6,}/.test(GA4_ID);        // "G-XXXXXXXXXX" placeholder -> skip
   var METRICA_LIVE = /^\d{5,}$/.test(METRICA_ID);  // only a numeric counter is live
+  var ROISTAT_LIVE = !!ROISTAT_PROJECT_ID;         // empty string -> skip
 
   // --- GA4 (gtag.js) ---
   window.dataLayer = window.dataLayer || [];
@@ -58,6 +70,25 @@
       k.async = 1; k.src = r; a.parentNode.insertBefore(k, a);
     })(window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
     ym(METRICA_ID, "init", { clickmap: true, trackLinks: true, accurateTrackBounce: true });
+  }
+
+  // --- Roistat (visit analytics + client-side lead delivery via
+  // roistatGoal.reach(), called from assets/lead.js) ---
+  if (ROISTAT_LIVE) {
+    (function (w, d, s, h, id) {
+      w.roistatProjectId = id;
+      w.roistatHost = h;
+      var p = d.location.protocol === "https:" ? "https://" : "http://";
+      var u = /^.*roistat_visit=[^;]+(.*)?$/.test(d.cookie)
+        ? "/dist/module.js"
+        : "/api/site/1.0/" + id + "/init?referrer=" + encodeURIComponent(d.location.href);
+      var js = d.createElement(s);
+      js.charset = "UTF-8";
+      js.async = 1;
+      js.src = p + h + u;
+      var js2 = d.getElementsByTagName(s)[0];
+      js2.parentNode.insertBefore(js, js2);
+    })(window, document, "script", ROISTAT_HOST, ROISTAT_PROJECT_ID);
   }
 
   // --- Conversion hook, called by lead.js ONLY after the first-party lead

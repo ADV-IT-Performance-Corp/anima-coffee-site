@@ -23,6 +23,18 @@
  * SAME submit call as a human, then answers with `e.respondWith(promise)`
  * instead of writing to the DOM — see handleAgent(). Human behaviour above
  * is byte-for-byte unchanged.
+ *
+ * Roistat delivery (W2, 2026-09-14): exactly one delivery path runs per
+ * submit, chosen in this order — (1) data-endpoint set -> the POST path
+ * above, unchanged; (2) else Roistat ready (window.roistatGoal.reach is a
+ * function, set by assets/analytics.js once its counter script has
+ * loaded) -> one roistatGoal.reach() call, whose Roistat->AmoCRM
+ * integration opens the CRM deal, no POST, and a client-generated lead_id
+ * is used for animaTrackLead/respondWith; (3) else -> today's fallback
+ * contact block / not_connected. If the counter is configured but blocked
+ * (ad blocker, network failure) window.roistatGoal never appears, so this
+ * falls through to (3) on its own — no explicit "blocked" detection is
+ * needed, and success is never claimed without an actual reach() call.
  */
 (function () {
   var uk = (document.documentElement.lang || "en").toLowerCase().indexOf("uk") === 0;
@@ -107,6 +119,86 @@
     try { if (window.animaTrackLead) window.animaTrackLead(sourcePage, leadId, origin); } catch (e) {}
   }
 
+  // Double-submit guard: disables the submit button AND marks the form
+  // "sending" (checked at the top of the submit handler, since a disabled
+  // button can still be re-triggered by a keyboard Enter on some browsers).
+  function setSending(form, sending) {
+    var btn = form.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = sending;
+    form.dataset.lfSending = sending ? "1" : "";
+  }
+
+  // roistatGoal.reach() is a fire-and-forget beacon call with no delivery
+  // confirmation (same as GA4/Metrica elsewhere in this codebase) — a
+  // network failure AFTER this check still can't be detected client-side,
+  // which is inherent to the no-backend design this slice implements
+  // (Codex round-1 review: known, accepted residual risk). The
+  // navigator.onLine check below catches the one failure mode that IS
+  // detectable up front — an offline device — so at least that case falls
+  // through to the honest contact-fallback instead of a false "accepted".
+  function roistatReady() {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return false;
+    return !!(window.roistatGoal && typeof window.roistatGoal.reach === "function");
+  }
+
+  // No phone-vs-email validation exists elsewhere in this file (the
+  // "contact" field is plain free text) — an "@" is the same minimal
+  // heuristic a human would use to tell the two apart.
+  function splitContact(contact) {
+    return contact.indexOf("@") !== -1 ? { email: contact } : { phone: contact };
+  }
+
+  // Roistat has no test mode for goals (see spec) — a "ТЕСТ"/"TEST" marker
+  // in the name or details is the owner's own convention for spotting and
+  // deleting test deals in the CRM. Bounded by non-letter/start/end on both
+  // sides (Codex round-1 fix) so ordinary words that merely CONTAIN the
+  // substring — "latest", "contest", "testimonial" — never false-positive;
+  // \b is not used because it only recognises ASCII \w, not Cyrillic.
+  var TEST_MARKER_RE = /(^|[^a-zа-яіїєґ'])(?:тест|test)(?:[^a-zа-яіїєґ']|$)/i;
+  function isTestLead(data) {
+    return TEST_MARKER_RE.test(data.name) || TEST_MARKER_RE.test(data.details);
+  }
+
+  function buildLeadName(data, origin) {
+    var leadName = "Заявка з " + location.hostname;
+    if (origin === "agent") leadName += " (AI-агент)";
+    if (isTestLead(data)) leadName = "ТЕСТ — " + leadName;
+    return leadName;
+  }
+
+  function genLeadId() {
+    return "rst_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 10);
+  }
+
+  // Calls roistatGoal.reach() exactly once and returns the client-generated
+  // lead_id, or null if reach() itself threw (never claim success without a
+  // real reach call — caller falls through to the fallback path on null).
+  function reachRoistat(data, origin) {
+    var leadId = genLeadId();
+    var payload = {
+      leadName: buildLeadName(data, origin),
+      text: data.details,
+      name: data.name,
+      fields: {
+        company: data.company,
+        city: data.city,
+        machines: data.machines,
+        details: data.details,
+        source_page: data.source_page,
+        lead_origin: origin,
+        lead_id: leadId
+      }
+    };
+    var contact = splitContact(data.contact);
+    if (contact.email) { payload.email = contact.email; } else { payload.phone = contact.phone; }
+    try {
+      window.roistatGoal.reach(payload);
+    } catch (e) {
+      return null;
+    }
+    return leadId;
+  }
+
   function submitLead(form, status, data, endpoint) {
     setStatus(status, T.sending, "");
     fetch(endpoint, {
@@ -123,6 +215,8 @@
       setStatus(status, T.sent, "ok");
     }).catch(function () {
       setStatus(status, T.err, "err");
+    }).then(function () {
+      setSending(form, false);
     });
   }
 
@@ -143,6 +237,9 @@
       return { status: "accepted", leadId: body.lead_id };
     }).catch(function () {
       return { status: "error", message: T.err };
+    }).then(function (result) {
+      setSending(form, false);
+      return result;
     });
   }
 
@@ -210,20 +307,58 @@
         return;
       }
 
+      // Double-submit guard: a submit already in flight (button disabled by
+      // a prior submit of THIS form) is ignored outright — covers a
+      // keyboard Enter re-submit racing a disabled-but-still-focused button.
+      // An agent's tool call still needs a resolution (Codex round-2 fix):
+      // leaving executeTool()'s promise unresolved would hang the caller.
+      if (form.dataset.lfSending === "1") {
+        if (isAgent) { e.respondWith(Promise.resolve({ status: "error", message: T.err })); }
+        return;
+      }
+
       var data = collectData(form);
       var endpoint = (form.getAttribute("data-endpoint") || "").trim();
 
-      if (!endpoint) {
-        if (isAgent) { e.respondWith(Promise.resolve(notConnectedResult())); return; }
-        showFallbackContact(status);
+      // (1) data-endpoint set -> POST path, unchanged.
+      if (endpoint) {
+        setSending(form, true);
+        if (isAgent) {
+          e.respondWith(submitLeadAgent(form, data, endpoint));
+          return;
+        }
+        submitLead(form, status, data, endpoint);
         return;
       }
 
-      if (isAgent) {
-        e.respondWith(submitLeadAgent(form, data, endpoint));
-        return;
+      // (2) else Roistat ready -> one reach() call, no POST.
+      if (roistatReady()) {
+        setSending(form, true);
+        var origin = isAgent ? "agent" : "human";
+        var leadId = reachRoistat(data, origin);
+        setSending(form, false);
+        if (leadId) {
+          fireAccepted(data.source_page, leadId, origin);
+          if (isAgent) {
+            e.respondWith(Promise.resolve({ status: "accepted", leadId: leadId }));
+            // Deferred to the next tick: resetting the form synchronously,
+            // in the same turn as respondWith(), was observed to break the
+            // WebMCP polyfill's resolution of the returned promise (it
+            // never delivered the result back to the caller) — see W2 spec.
+            setTimeout(function () { form.reset(); }, 0);
+            return;
+          }
+          form.reset();
+          setStatus(status, T.sent, "ok");
+          return;
+        }
+        // reach() threw (e.g. blocked mid-call) -> fall through to (3),
+        // never claim success without a real reach call.
       }
-      submitLead(form, status, data, endpoint);
+
+      // (3) fallback — today's behaviour.
+      if (isAgent) { e.respondWith(Promise.resolve(notConnectedResult())); return; }
+      showFallbackContact(status);
     });
   }
 

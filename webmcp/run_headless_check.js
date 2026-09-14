@@ -15,6 +15,18 @@
  *   3. A plain human form submit (no agent flag) with data-endpoint empty
  *      -> asserts the fallback contact block is shown (same code path as
  *      before this change, byte-for-byte).
+ *   4. Roistat delivery (W2, 2026-09-14): with data-endpoint still empty and
+ *      a stubbed window.roistatGoal.reach installed, a human submit fires
+ *      exactly one reach() call with the mapped fields and no POST, an
+ *      agent submit gets status "accepted" plus one reach() call with
+ *      lead_origin "agent", and a "ТЕСТ"/"TEST" marker in the name prefixes
+ *      leadName with "ТЕСТ — ". A separate case sets data-endpoint and
+ *      asserts ONLY the POST path runs (no reach() call at all).
+ *
+ * Every page/context in this file blocks requests to cloud.roistat.com and
+ * cloud-eu.roistat.com (route abort) — assets/analytics.js now carries a
+ * live ROISTAT_PROJECT_ID, so this is the only thing standing between the
+ * harness and calling the real counter. Never remove this blocking.
  *
  * Never points at the live site; this loads the local worktree only, so no
  * real lead can be created.
@@ -39,9 +51,25 @@ function check(label, cond, detail) {
   }
 }
 
+// Never let a test load the real Roistat counter or reach cloud(-eu).roistat.com.
+async function blockRoistat(pg) {
+  await pg.route(/roistat\.com/, (route) => route.abort());
+}
+
+// Stub window.roistatGoal.reach BEFORE navigation, same as the polyfill init
+// script, so assets/lead.js's readiness check (`window.roistatGoal &&
+// typeof window.roistatGoal.reach === "function"`) sees it on first submit.
+const ROISTAT_STUB_SRC = `(function () {
+  window.__roistatCalls = [];
+  window.roistatGoal = {
+    reach: function (payload) { window.__roistatCalls.push(payload); }
+  };
+})();`;
+
 (async () => {
   const browser = await chromium.launch();
   const page = await browser.newPage();
+  await blockRoistat(page);
 
   // Third-party analytics beacons (GA4/GTM/Metrica, all live via real IDs
   // in assets/analytics.js) fire on page load and form interaction
@@ -257,6 +285,7 @@ function check(label, cond, detail) {
   // ever runs (both scripts are addInitScript — guaranteed to run, in
   // this order, before any page script).
   const navPage = await browser.newPage();
+  await blockRoistat(navPage);
   await navPage.addInitScript({ content: POLYFILL_SRC });
   await navPage.addInitScript({
     content: `(function () {
@@ -335,6 +364,144 @@ function check(label, cond, detail) {
       navAgentResult.status === "not_connected" &&
       navAgentResult.phone === "+38 (073) 873 01 45",
     JSON.stringify(navAgentResult)
+  );
+
+  // 5. Roistat delivery (W2): stub window.roistatGoal.reach and re-navigate
+  // on a fresh page so lead.js's readiness check finds it. data-endpoint
+  // stays empty, so this exercises path (2) of the three-way choice.
+  const roistatPage = await browser.newPage();
+  await blockRoistat(roistatPage);
+  await roistatPage.addInitScript({ content: POLYFILL_SRC });
+  await roistatPage.addInitScript({ content: ROISTAT_STUB_SRC });
+  var roistatPostRequests = [];
+  roistatPage.on("request", (req) => {
+    if (req.method() !== "POST") return;
+    if (ANALYTICS_HOSTS.some((h) => req.url().includes(h))) return;
+    roistatPostRequests.push(req.url());
+  });
+  await roistatPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+
+  await roistatPage.fill('#leadForm input[name="name"]', "Roistat Human");
+  await roistatPage.fill('#leadForm input[name="business"]', "Roistat Co");
+  await roistatPage.fill('#leadForm input[name="city"]', "Kyiv");
+  await roistatPage.fill('#leadForm input[name="contact"]', "roistat-human@example.com");
+  await roistatPage.fill('#leadForm textarea[name="message"]', "Office, ~8 people.");
+  await roistatPage.click('#leadForm button[type="submit"]');
+  await roistatPage.waitForTimeout(100);
+
+  const humanRoistatCalls = await roistatPage.evaluate(() => window.__roistatCalls);
+  check(
+    "human submit with Roistat ready fires exactly one reach() call",
+    Array.isArray(humanRoistatCalls) && humanRoistatCalls.length === 1,
+    JSON.stringify(humanRoistatCalls)
+  );
+  const humanReach = (humanRoistatCalls || [])[0] || {};
+  check(
+    "human reach() call carries the mapped fields and lead_origin human",
+    humanReach.name === "Roistat Human" &&
+      humanReach.email === "roistat-human@example.com" &&
+      humanReach.fields &&
+      humanReach.fields.company === "Roistat Co" &&
+      humanReach.fields.city === "Kyiv" &&
+      humanReach.fields.lead_origin === "human" &&
+      !!humanReach.fields.lead_id,
+    JSON.stringify(humanReach)
+  );
+  check("human Roistat submit makes no POST", roistatPostRequests.length === 0, JSON.stringify(roistatPostRequests));
+  const humanRoistatStatus = await roistatPage.textContent("#leadForm .lf-status");
+  check(
+    "human Roistat submit shows the normal success message, not the fallback",
+    /thank you|дякуємо/i.test(humanRoistatStatus || ""),
+    JSON.stringify(humanRoistatStatus)
+  );
+  const humanRoistatDataLayer = await roistatPage.evaluate(() => (window.dataLayer || []).filter((e) => e && e.event === "lead_accepted"));
+  check("human Roistat submit pushed exactly one lead_accepted event", humanRoistatDataLayer.length === 1, JSON.stringify(humanRoistatDataLayer));
+
+  // Agent submit on the same stubbed page — reset the form's own call log
+  // and dataLayer aren't reset, but the count check below only cares about
+  // the delta being exactly one for the new call.
+  await roistatPage.evaluate(async ({ name, args }) => {
+    const tools = await document.modelContext.getTools();
+    const tool = tools.find((t) => t.name === name);
+    window.__agentReachPromise = document.modelContext.executeTool(tool, args);
+  }, {
+    name: "request_coffee_service_assessment",
+    args: {
+      name: "Roistat Agent Buyer",
+      business: "Roistat Agent Co",
+      city: "Kyiv",
+      machines: "2",
+      contact: "+380991234567",
+      message: "Retail kiosk."
+    }
+  });
+  await roistatPage.waitForTimeout(50);
+  await roistatPage.click('#leadForm button[type="submit"]');
+  const agentReachResult = await roistatPage.evaluate(() => window.__agentReachPromise);
+  check(
+    "agent submit with Roistat ready returns accepted with a lead_id",
+    agentReachResult && agentReachResult.status === "accepted" && !!agentReachResult.leadId,
+    JSON.stringify(agentReachResult)
+  );
+  const allRoistatCalls = await roistatPage.evaluate(() => window.__roistatCalls);
+  const agentReach = (allRoistatCalls || [])[1];
+  check(
+    "agent submit fired exactly one additional reach() call with lead_origin agent",
+    Array.isArray(allRoistatCalls) && allRoistatCalls.length === 2 && agentReach && agentReach.fields.lead_origin === "agent",
+    JSON.stringify(allRoistatCalls)
+  );
+  check("agent Roistat submit made no POST either", roistatPostRequests.length === 0, JSON.stringify(roistatPostRequests));
+
+  // 5b. "ТЕСТ" marker in the name prefixes leadName — fresh page + fresh stub.
+  const testMarkerPage = await browser.newPage();
+  await blockRoistat(testMarkerPage);
+  await testMarkerPage.addInitScript({ content: POLYFILL_SRC });
+  await testMarkerPage.addInitScript({ content: ROISTAT_STUB_SRC });
+  await testMarkerPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  await testMarkerPage.fill('#leadForm input[name="name"]', "ТЕСТ Buyer");
+  await testMarkerPage.fill('#leadForm input[name="business"]', "Test Co");
+  await testMarkerPage.fill('#leadForm input[name="city"]', "Kyiv");
+  await testMarkerPage.fill('#leadForm input[name="contact"]', "test@example.com");
+  await testMarkerPage.click('#leadForm button[type="submit"]');
+  await testMarkerPage.waitForTimeout(100);
+  const testMarkerCalls = await testMarkerPage.evaluate(() => window.__roistatCalls);
+  const testMarkerLeadName = ((testMarkerCalls || [])[0] || {}).leadName || "";
+  check(
+    "'ТЕСТ' in the name prefixes leadName with 'ТЕСТ — '",
+    testMarkerLeadName.indexOf("ТЕСТ — ") === 0,
+    JSON.stringify(testMarkerLeadName)
+  );
+
+  // 5c. data-endpoint set -> POST path only, even with Roistat stubbed and
+  // ready; roistatGoal.reach must NOT be called.
+  const endpointPage = await browser.newPage();
+  await blockRoistat(endpointPage);
+  await endpointPage.addInitScript({ content: ROISTAT_STUB_SRC });
+  await endpointPage.route("**/fake-lead-endpoint", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ lead_id: "srv_test_1" }) })
+  );
+  var endpointPostRequests = [];
+  endpointPage.on("request", (req) => {
+    if (req.method() === "POST" && req.url().includes("fake-lead-endpoint")) endpointPostRequests.push(req.url());
+  });
+  await endpointPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  await endpointPage.evaluate(() => {
+    document.getElementById("leadForm").setAttribute("data-endpoint", "/fake-lead-endpoint");
+  });
+  await endpointPage.fill('#leadForm input[name="name"]', "Endpoint Human");
+  await endpointPage.fill('#leadForm input[name="business"]', "Endpoint Co");
+  await endpointPage.fill('#leadForm input[name="city"]', "Kyiv");
+  await endpointPage.fill('#leadForm input[name="contact"]', "endpoint@example.com");
+  await endpointPage.click('#leadForm button[type="submit"]');
+  await endpointPage.waitForTimeout(200);
+  check("data-endpoint set: exactly one POST is made", endpointPostRequests.length === 1, JSON.stringify(endpointPostRequests));
+  const endpointRoistatCalls = await endpointPage.evaluate(() => window.__roistatCalls || []);
+  check("data-endpoint set: roistatGoal.reach is never called", endpointRoistatCalls.length === 0, JSON.stringify(endpointRoistatCalls));
+  const endpointStatus = await endpointPage.textContent("#leadForm .lf-status");
+  check(
+    "data-endpoint set: success message shown via the POST path",
+    /thank you|дякуємо/i.test(endpointStatus || ""),
+    JSON.stringify(endpointStatus)
   );
 
   await browser.close();

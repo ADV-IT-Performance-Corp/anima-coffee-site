@@ -90,9 +90,11 @@ FIELD_DESCRIPTIONS["details"] = FIELD_DESCRIPTIONS["message"]
 HONEYPOT_NAME = "company_url"
 
 FORM_OPEN_RE = re.compile(r'<form\b[^>]*class="lead-form"[^>]*>')
+LEAD_FORM_RE = re.compile(r'<form\b[^>]*class="lead-form"[^>]*>.*?</form>', re.S)
 FIELD_RE = re.compile(r'<(input|textarea)\b[^>]*>')
 NAME_ATTR_RE = re.compile(r'\bname="([^"]+)"')
 TYPE_ATTR_RE = re.compile(r'\btype="([^"]+)"')
+STRAY_TOOLPARAM_RE = re.compile(r'\s+toolparam\w*="[^"]*"')
 
 
 def is_uk(rel_path: str) -> bool:
@@ -141,35 +143,70 @@ def field_description(name: str, preceding_text: str):
 
 
 def add_field_attrs(text: str, rel_path: str) -> tuple[str, bool]:
+    # Scoped strictly to each <form class="lead-form">...</form> span — a
+    # page can carry an unrelated form (e.g. `form.ppc-form` on PPC pages)
+    # whose fields happen to share a name like "machines" with the lead
+    # form; only fields inside an actual lead-form ever get a
+    # toolparamdescription (W2.6 fix — the previous whole-document pass
+    # leaked toolparamdescription onto form.ppc-form inputs).
+    changed = False
+
+    def process_form(fm: re.Match) -> str:
+        nonlocal changed
+        form_text = fm.group(0)
+        out = []
+        pos = 0
+        for m in FIELD_RE.finditer(form_text):
+            tag = m.group(0)
+            out.append(form_text[pos:m.start()])
+            pos = m.end()
+
+            if "toolparamdescription=" in tag:
+                out.append(tag)
+                continue
+            name_m = NAME_ATTR_RE.search(tag)
+            if not name_m or name_m.group(1) == HONEYPOT_NAME:
+                out.append(tag)
+                continue
+            type_m = TYPE_ATTR_RE.search(tag)
+            if type_m and type_m.group(1) == "hidden":
+                out.append(tag)
+                continue
+            preceding = form_text[max(0, m.start() - 40):m.start()]
+            pair = field_description(name_m.group(1), preceding)
+            if not pair:
+                out.append(tag)
+                continue
+            desc = pair[1] if is_uk(rel_path) else pair[0]
+            changed = True
+            out.append(tag[:-1] + f' toolparamdescription="{desc}"' + ">")
+        out.append(form_text[pos:])
+        return "".join(out)
+
+    return LEAD_FORM_RE.sub(process_form, text), changed
+
+
+def strip_stray_toolparam_attrs(text: str) -> tuple[str, bool]:
+    """Self-healing cleanup: remove any toolparam* attribute that landed
+    outside a <form class="lead-form"> span (e.g. from a prior buggy run
+    of this script), so re-running always converges to the correct state.
+    """
+    tool_spans = [(m.start(), m.end()) for m in LEAD_FORM_RE.finditer(text)]
+
+    def in_tool_span(pos: int) -> bool:
+        return any(start <= pos < end for start, end in tool_spans)
+
     changed = False
     out = []
     pos = 0
-    for m in FIELD_RE.finditer(text):
-        tag = m.group(0)
+    for m in STRAY_TOOLPARAM_RE.finditer(text):
+        if in_tool_span(m.start()):
+            continue
+        changed = True
         out.append(text[pos:m.start()])
         pos = m.end()
-
-        if "toolparamdescription=" in tag:
-            out.append(tag)
-            continue
-        name_m = NAME_ATTR_RE.search(tag)
-        if not name_m or name_m.group(1) == HONEYPOT_NAME:
-            out.append(tag)
-            continue
-        type_m = TYPE_ATTR_RE.search(tag)
-        if type_m and type_m.group(1) == "hidden":
-            out.append(tag)
-            continue
-        preceding = text[max(0, m.start() - 40):m.start()]
-        pair = field_description(name_m.group(1), preceding)
-        if not pair:
-            out.append(tag)
-            continue
-        desc = pair[1] if is_uk(rel_path) else pair[0]
-        changed = True
-        out.append(tag[:-1] + f' toolparamdescription="{desc}"' + ">")
     out.append(text[pos:])
-    return "".join(out), changed
+    return ("".join(out) if changed else text), changed
 
 
 def webmcp_script_path(rel_path: str) -> str:
@@ -196,6 +233,7 @@ def process(path: pathlib.Path) -> bool:
     if 'class="lead-form"' in text:
         text, _ = add_form_attrs(text, rel)
         text, _ = add_field_attrs(text, rel)
+    text, _ = strip_stray_toolparam_attrs(text)
     text, _ = add_script_tag(text, rel)
     if text != orig:
         path.write_text(text, encoding="utf-8")
