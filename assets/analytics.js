@@ -16,6 +16,14 @@
  * durably accepted the lead and returned a lead_id (DC-3). It carries no
  * currency/value (a non-revenue event) and no PII — source_page and
  * lead_id only.
+ *
+ * WebMCP (W1, 2026-09-14): animaTrackLead() takes an optional third
+ * argument, `origin` ("human" | "agent"), pushed to dataLayer as
+ * `lead_origin` so an agent-submitted lead is distinguishable from a
+ * human-submitted one in GTM/Metrica without changing the POST payload
+ * (the DC-2 backend contract is untouched). Defaults to "human" when
+ * omitted, so any caller written before this change keeps behaving exactly
+ * as before.
  */
 (function () {
   // ==== THE TWO SECRETS — paste real IDs on these two lines to activate ==========
@@ -54,10 +62,11 @@
   // API returns HTTP 200 with a lead_id (never on mailto: open, never
   // speculatively). No currency/value — this is a non-revenue event — and
   // no PII: source_page + lead_id only.
-  window.animaTrackLead = function (sourcePage, leadId) {
+  window.animaTrackLead = function (sourcePage, leadId, origin) {
     var sp = sourcePage || location.pathname;
-    try { window.dataLayer = window.dataLayer || []; window.dataLayer.push({ event: "lead_accepted", source_page: sp, lead_id: leadId || "" }); } catch (e) {}
-    try { if (GA4_LIVE) gtag("event", "lead_accepted", { source_page: sp, lead_id: leadId || "" }); } catch (e) {}
-    try { if (METRICA_LIVE && window.ym) ym(METRICA_ID, "reachGoal", "lead_accepted"); } catch (e) {}
+    var leadOrigin = origin === "agent" ? "agent" : "human";
+    try { window.dataLayer = window.dataLayer || []; window.dataLayer.push({ event: "lead_accepted", source_page: sp, lead_id: leadId || "", lead_origin: leadOrigin }); } catch (e) {}
+    try { if (GA4_LIVE) gtag("event", "lead_accepted", { source_page: sp, lead_id: leadId || "", lead_origin: leadOrigin }); } catch (e) {}
+    try { if (METRICA_LIVE && window.ym) ym(METRICA_ID, "reachGoal", "lead_accepted_" + leadOrigin); } catch (e) {}
   };
 })();
