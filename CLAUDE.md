@@ -25,8 +25,12 @@ products, brands, SLAs, statistics, prices or testimonials. Ever.
   forbidden-entity scanner even in this negated, doc-only context — see PR
   fix/dc0-dc1-cutover-2026-08-21.)
 
-**Coffee:** fresh-roasted premium coffee — Covim S.p.A. (Italy) plus Ukrainian
-roasting partners. Named blends: Bellissima, SS (notes: chocolate, nuts,
+**Coffee:** fresh-roasted premium coffee. Roaster name unconfirmed by the owner
+(2026-09-15), do not publish until confirmed — see truth registry
+`~/briefs/anima-owner-questionnaire-2026-09-01.md` row 27; the truth registry
+wins over this file. Published blends are Bellissima, LOT 101, Ethiopia
+Yirgacheffe (confirmed verbatim on the client's own site animacoffee.com.ua).
+Named blends: Bellissima, SS (notes: chocolate, nuts,
 citrus, jasmine; medium roast), LOT 101, LOT 105, Magnifica, Ethiopia
 Yirgacheffe, Colombia Excelso Decaf, Ambra, Ametista. This is NOT
 "origin-traced specialty / Q-grader" coffee — never use that framing
@@ -123,10 +127,8 @@ phone/handle-only contacts line):**
   breakdown, delivery and installation within 24 hours."
   UA: "Підтримка 24/7, заміна апарата день у день у разі поломки, доставка
   та встановлення протягом 24 годин."
-- Coffee EN: "Premium roasted coffee from Covim S.p.A. (Italy) and Ukrainian
-  roasting partners — blends like Bellissima, LOT 101 and Ethiopia
-  Yirgacheffe." UA: "Преміальна кава від Covim S.p.A. (Італія) та українських
-  обсмажувачів — бленди Bellissima, LOT 101, Ethiopia Yirgacheffe."
+- Coffee EN: "Premium roasted coffee — blends like Bellissima, LOT 101 and Ethiopia
+  Yirgacheffe." UA: "Преміальна кава — бленди Bellissima, LOT 101, Ethiopia Yirgacheffe."
 - Terms EN: "Individual quote for your volume, free 14-day trial with no
   prepayment; free first rental month for HoReCa."
   UA: "Індивідуальний розрахунок під ваш обсяг, безкоштовний 14-денний тест
@@ -182,6 +184,10 @@ replacing the old "3 price tiers" framing with three named equipment
 packages (Start, Pro, Max, pricing per venue — no prices or package
 contents published), and confirming the address, hours, canonical email,
 and full social/sameAs set now in the "Contacts & business info" block
-above. Machine brand list and Covim origin remain undecided — do not
+above. Machine brand list and roaster origin remain undecided — do not
 change any rule about them from this note. Everything in this file except
 the specific lines cited above is unchanged and still binding.
+
+On 2026-09-15, the unconfirmed roaster name was removed site-wide (it had
+never been confirmed by the owner — see the "Coffee:" entry above); this is a
+removal, not a rule change on the still-undecided brand list.
