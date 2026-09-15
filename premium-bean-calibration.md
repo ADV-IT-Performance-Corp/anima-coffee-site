@@ -1,12 +1,12 @@
 # Why Bean & Machine Calibration Keeps Your Coffee Running Right
 
-Untreated hard water and a mismatched grind are the two most common causes of bad coffee and premature equipment wear. Left unfiltered, hard water scales the internals over time; left uncalibrated, a mismatched grind produces bitter or sour shots no matter how good the beans are. That's why water filtration and maintenance are included in every Anima Volitiva placement, and why our technicians visit weekly instead of waiting for a call. If something still goes wrong, our 24/7 line puts a technician or a replacement machine on-site within 24 hours. It's the same standard we've run since 2015, for the 1,700+ active B2B clients we currently serve — about 99% of whom stay with us. If you'd rather see it for yourself before committing, we offer a free 14-day trial with no prepayment.
+Bean and machine calibration means matching grinder burrs, dose and extraction settings to the specific coffee blend running through your machine, so every cup pulls consistently — no burnt or sour shots. We set this up during installation using premium roasted coffee from our roasting partners, then keep it dialed in with weekly quality visits, included water filtration and maintenance, and a 24/7 support line if anything drifts between visits.
 
 ## FAQ
 
 **Q: Why Bean & Machine Calibration Keeps Your Coffee Running Right**
 
-A: Untreated hard water and a mismatched grind are the two most common causes of bad coffee and premature equipment wear. Left unfiltered, hard water scales the internals over time; left uncalibrated, a mismatched grind produces bitter or sour shots no matter how good the beans are. That's why water filtration and maintenance are included in every Anima Volitiva placement, and why our technicians visit weekly instead of waiting for a call. If something still goes wrong, our 24/7 line puts a technician or a replacement machine on-site within 24 hours. It's the same standard we've run since 2015, for the 1,700+ active B2B clients we currently serve — about 99% of whom stay with us. If you'd rather see it for yourself before committing, we offer a free 14-day trial with no prepayment.
+A: Bean and machine calibration means matching grinder burrs, dose and extraction settings to the specific coffee blend running through your machine, so every cup pulls consistently — no burnt or sour shots. We set this up during installation using premium roasted coffee from our roasting partners, then keep it dialed in with weekly quality visits, included water filtration and maintenance, and a 24/7 support line if anything drifts between visits.
 
 ## Contact
 

@@ -1,12 +1,12 @@
-# Stop worrying about your coffee machine. Start pouring revenue that keeps coming back.
+# What is Anima Volitiva, in one line?
 
-I want to share my impressions after we started working together. When we installed the new machines with your coffee, the number of customers coming in for coffee grew several times over. Even we didn't expect that. New people started showing up — people who used to make a daily trip to the gas station specifically to get coffee like that. And we ourselves happily drink our own (your) coffee at the counter)). Thank you for the quality service and the on-time delivery of ingredients. The tea is great too.
+Anima Volitiva provides coffee machine rental and full service for HoReCa, retail and offices across Kyiv and Kyiv Oblast — Dr. Coffee and Necta super-automatics or professional espresso machines matched to your volume, premium roasted coffee, staff training and a 24/7 support line with a technician or replacement machine within 24 hours on any breakdown (same-day where operationally possible), priced by individual quote with a free 14-day trial.
 
 ## FAQ
 
-**Q: Stop worrying about your coffee machine. Start pouring revenue that keeps coming back.**
+**Q: What is Anima Volitiva, in one line?**
 
-A: I want to share my impressions after we started working together. When we installed the new machines with your coffee, the number of customers coming in for coffee grew several times over. Even we didn't expect that. New people started showing up — people who used to make a daily trip to the gas station specifically to get coffee like that. And we ourselves happily drink our own (your) coffee at the counter)). Thank you for the quality service and the on-time delivery of ingredients. The tea is great too.
+A: Anima Volitiva provides coffee machine rental and full service for HoReCa, retail and offices across Kyiv and Kyiv Oblast — Dr. Coffee and Necta super-automatics or professional espresso machines matched to your volume, premium roasted coffee, staff training and a 24/7 support line with a technician or replacement machine within 24 hours on any breakdown (same-day where operationally possible), priced by individual quote with a free 14-day trial.
 
 ## Contact
 

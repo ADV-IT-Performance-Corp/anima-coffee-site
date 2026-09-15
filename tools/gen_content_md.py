@@ -72,17 +72,28 @@ class BodyExtractor(HTMLParser):
         self.cur_text = []
         self.blocks = []  # list of (kind, text)
         self.seen_h1 = False
+        self.div_stack = []  # bool per open <div>: True if it (or an ancestor) is div.aio
+        self.cur_orig_tag = None
+
+    @property
+    def in_aio(self):
+        return bool(self.div_stack) and self.div_stack[-1]
 
     def handle_starttag(self, tag, attrs):
         attrs_d = dict(attrs)
-        if tag in SKIP_TAGS or (tag == "div" and "contact-block" in attrs_d.get("class", "")):
+        classes = attrs_d.get("class", "")
+        if tag in SKIP_TAGS or (tag == "div" and "contact-block" in classes):
             self.skip_stack.append(tag)
             self.skip_depth += 1
             return
         if self.skip_depth:
             return
+        if tag == "div":
+            is_aio = self.in_aio or bool(re.search(r"(^|\s)aio(\s|$)", classes))
+            self.div_stack.append(is_aio)
         if tag in HEADING_TAGS or tag in ("p", "li"):
-            self.cur_tag = tag
+            self.cur_orig_tag = tag
+            self.cur_tag = "p-direct" if (tag == "p" and self.in_aio) else tag
             self.cur_text = []
 
     def handle_endtag(self, tag):
@@ -92,11 +103,14 @@ class BodyExtractor(HTMLParser):
             return
         if self.skip_depth:
             return
-        if tag == self.cur_tag and tag in HEADING_TAGS | {"p", "li"}:
+        if tag == "div" and self.div_stack:
+            self.div_stack.pop()
+        if tag == self.cur_orig_tag and tag in HEADING_TAGS | {"p", "li"}:
             text = re.sub(r"\s+", " ", "".join(self.cur_text)).strip()
             if text:
-                self.blocks.append((tag, text))
+                self.blocks.append((self.cur_tag, text))
             self.cur_tag = None
+            self.cur_orig_tag = None
             self.cur_text = []
 
     def handle_data(self, data):
@@ -118,10 +132,9 @@ def blocks_to_markdown(blocks):
     lines = []
     seen = set()
     for tag, text in blocks:
-        key = (tag, text)
-        if key in seen:
+        if text in seen:
             continue  # dedupe (Direct-answer paragraphs are often repeated verbatim in a second block)
-        seen.add(key)
+        seen.add(text)
         if tag == "h1":
             lines.append(f"# {text}")
         elif tag == "h2":
@@ -130,7 +143,7 @@ def blocks_to_markdown(blocks):
             lines.append(f"### {text}")
         elif tag == "li":
             lines.append(f"- {text}")
-        else:
+        else:  # "p" or "p-direct"
             lines.append(text)
         lines.append("")
     return "\n".join(lines).strip() + "\n"
@@ -170,12 +183,15 @@ def twin_markdown(path: pathlib.Path) -> str:
     h1 = next((t for tag, t in blocks if tag == "h1"), None)
     if not h1:
         return None
-    # Direct answer: the longest <p> block on the page. The site's "Direct
-    # answer" / lead paragraphs are consistently the densest prose block —
-    # far longer than hero taglines or nav fragments — so this is more
-    # reliable than picking the first paragraph past a length threshold.
-    paragraphs = [t for tag, t in blocks if tag == "p"]
-    direct = max(paragraphs, key=len) if paragraphs else h1
+    # Direct answer: prefer the page's own div.aio "Direct answer" block
+    # (marked "p-direct" by the extractor); fall back to the longest plain
+    # <p> for pages without one (taglines/nav fragments are always short).
+    direct_blocks = [t for tag, t in blocks if tag == "p-direct"]
+    if direct_blocks:
+        direct = max(direct_blocks, key=len)
+    else:
+        paragraphs = [t for tag, t in blocks if tag == "p"]
+        direct = max(paragraphs, key=len) if paragraphs else h1
     url = url_for(path)
     parts = [f"# {h1}", "", direct, "", "## FAQ", "", f"**Q: {h1}**", "", f"A: {direct}", ""]
     cline = contact_line(src)

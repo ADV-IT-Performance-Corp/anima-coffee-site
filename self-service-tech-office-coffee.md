@@ -1,12 +1,12 @@
 # Self-Service Coffee Stations for 30+ Person Tech Teams in Kyiv.
 
-Before a single machine goes in, we map your office: headcount, footfall and where the queue naturally forms. We install Dr. Coffee and Necta super-automatics sized to a 30+ person team, connect built-in water filtration, and dial in the grind and dose for the coffee we supply — premium roasted blends from Covim S.p.A. (Italy) and Ukrainian roasting partners, such as Bellissima and LOT 101. Staff training is included, so your office manager and team know exactly how to load beans, run cleaning cycles and read the online analytics dashboard showing cups sold, stock levels and errors. We don't wait for a machine to break: weekly resupply of beans and consumables comes with a technician quality visit, and our 24/7 support line means any issue gets a technician or a replacement machine within 24 hours — often the same day.
+The Anima Volitiva self-service coffee station is a fully managed B2B service for tech offices in Kyiv and Kyiv Oblast: Dr. Coffee and Necta super-automatic machines, premium roasted coffee, staff training and a 24/7 support line, all priced to an individual quote for your volume. If a machine breaks down, a technician or replacement arrives within 24 hours, often the same day, so your team is never without coffee for long.
 
 ## FAQ
 
 **Q: Self-Service Coffee Stations for 30+ Person Tech Teams in Kyiv.**
 
-A: Before a single machine goes in, we map your office: headcount, footfall and where the queue naturally forms. We install Dr. Coffee and Necta super-automatics sized to a 30+ person team, connect built-in water filtration, and dial in the grind and dose for the coffee we supply — premium roasted blends from Covim S.p.A. (Italy) and Ukrainian roasting partners, such as Bellissima and LOT 101. Staff training is included, so your office manager and team know exactly how to load beans, run cleaning cycles and read the online analytics dashboard showing cups sold, stock levels and errors. We don't wait for a machine to break: weekly resupply of beans and consumables comes with a technician quality visit, and our 24/7 support line means any issue gets a technician or a replacement machine within 24 hours — often the same day.
+A: The Anima Volitiva self-service coffee station is a fully managed B2B service for tech offices in Kyiv and Kyiv Oblast: Dr. Coffee and Necta super-automatic machines, premium roasted coffee, staff training and a 24/7 support line, all priced to an individual quote for your volume. If a machine breaks down, a technician or replacement arrives within 24 hours, often the same day, so your team is never without coffee for long.
 
 ## Contact
 
