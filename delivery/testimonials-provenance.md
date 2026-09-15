@@ -63,7 +63,11 @@ pass had introduced two transcription errors — see the `normalized:` /
 - Attribution as shown: "Леся (М-н «Продукти»)"
 - Date collected: 2026-09-14
 - Verified against source image: 2026-09-14
-- Quote (verbatim, uk): "Хочу поділитися своїми враженнями після початку співпраці. Коли ми поставили нові апарати з вашою кавою у нас в кілька разів зріс потік клієнтів на каву. Це було неочікувано навіть для нас. З'явились люди, які відмовились від щоденних поїздок на заправку, куди їздили спеціально випити кави саме такої як там. Та ми й самі із задоволенням зранку п'ємо саме нашу (вашу каву)). Дякуємо за якісне обслуговування та своєчасну доставку інгредієнтів. Чай теж топчик"
+- Quote (verbatim, uk): "Хочу поділитись своїми враженнями після початку співпраці. Коли ми поставили нові апарати з вашою кавою у нас в кілька разів зріс потік клієнтів на каву. Це було неочікувано навіть для нас. З'явились люди, які відмовились від щоденних поїздок на заправку, куди їздили спеціально випити кави саме такої як там. Та ми й самі із задоволенням зранку п'ємо саме нашу (вашу каву)). Дякуємо за якісне обслуговування та своєчасну доставку інгредієнтів. Чай теж топчик"
+- corrected (round 2): a prior pass had "поділитися" — the source image
+  reads "поділитись". Both are grammatically valid Ukrainian infinitives,
+  but the published quote must match the source image exactly; reverted on
+  both site occurrences (index.html, ua/index.html).
 - normalized: source image renders "З'явились люди. Які відмовились" as two
   sentences (capital "Які") — normalized to one sentence with a lowercase
   "які" for readability; same for the missing comma before "куди їздили".
@@ -83,6 +87,9 @@ pass had introduced two transcription errors — see the `normalized:` /
 - Date collected: 2026-09-14
 - Verified against source image: 2026-09-14
 - Quote (verbatim, uk): "Ми власники продуктового магазину, почали працювати з кавою Anima Volitiva. Кавою і обслуговуванням дуже задоволені. Любителі кави також оцінили смак та ціну! Вартує своїх коштів! Окремо хочемо подякувати Стасу за ввічливість, оперативність і професіоналізм у своїй сфері."
+- normalized: source image reads "вічливість" — a typo missing the "в"
+  prefix of "ввічливість" (politeness); corrected to the standard spelling
+  on publication.
 - Note: "оцінили ... ціну" / "Вартує своїх коштів" is the customer's own
   general value comment — no price figure, tier name or "flat monthly
   price" claim is stated, so it does not smuggle in a rejected commercial
