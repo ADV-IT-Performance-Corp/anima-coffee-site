@@ -37,6 +37,20 @@ shown only if neither a backend endpoint nor Roistat is available.
 - Contact: +38 (073) 873 01 45, animacoffeeco@gmail.com — Kyiv Oblast, Bila Tserkva, 29a Pavlichenko St., Mon–Sat 09:00–17:00
 - Social: https://www.facebook.com/anima.volitiva · https://www.instagram.com/animacoffeeco/ · https://www.tiktok.com/@animacoffeeco · https://t.me/Animavolitiva
 
+## Customer testimonials
+Real reviews, published verbatim with the attribution shown on the client's
+own live site animacoffee.com.ua, plus one anonymized quote from a 2025
+customer survey. Not schema.org Review/AggregateRating (self-serving reviews
+on a business's own site are not eligible for review rich results) — plain
+copy only. Full list with sources: https://aeo.animacoffee.com.ua/#testimonials
+- "We want to express our gratitude to your team for their professionalism — Anima Volitiva really is a team of professionals..." — Maryna Dzhura, Myata (coffee shop)
+- "The coffee is very tasty, our customers are happy. Much tastier than before." — Diana Shevchenko
+- "We're sincerely grateful for the wonderful cooperation!... Your care and professionalism are truly valued." — Diana Samoukina, LUX CAFE
+- "When we installed the new machines with your coffee, the number of customers coming in for coffee grew several times over..." — Lesya, "Produkty" grocery store
+- "We're very happy with the coffee and the service... it's worth every penny!" — Oleksii, grocery store owner
+- "Now I focus on growing the business, not on repairs. Guests noticed the difference — and started coming back." — Coffee shop owner
+- "The way they treat clients — I didn't believe it was possible. Your dedication is impressive, the speed of response — wow." — Business owner, Bohuslav, Kyiv Oblast (2025 customer survey)
+
 ## Pages
 - [Home](https://aeo.animacoffee.com.ua/): overview, offer, proof, comparison
 - [About](https://aeo.animacoffee.com.ua/about.html): company passport — brand tone, USPs, coverage, equipment brands, business model

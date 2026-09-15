@@ -122,6 +122,15 @@
       re: /barista|staff training|do (we|i) need (a )?barista|training included|бариста|навчання персоналу/i,
       en: "Staff training is included with every installation — no dedicated barista hire needed.",
       uk: "Навчання персоналу входить у кожну інсталяцію — окремий бариста не потрібен."
+    },
+    // W3a — verbatim customer quotes, copied from the attribution already
+    // shown on the client's own site (animacoffee.com.ua) or, for the one
+    // anonymized survey quote, exactly as published in delivery/
+    // testimonials-provenance.md. No name/company was added or invented.
+    {
+      re: /testimonial|review|feedback|what (do|are) (customers?|clients?) sa(y|ying)|відгук|клієнти кажуть|відгуки клієнтів/i,
+      en: "Real customer quotes: \"We're sincerely grateful for the wonderful cooperation! ... Your care and professionalism are truly valued.\" — Diana Samoukina, LUX CAFE. \"We're very happy with the coffee and the service ... it's worth every penny!\" — Oleksii, grocery store owner. \"Now I focus on growing the business, not on repairs. Guests noticed the difference — and started coming back.\" — Coffee shop owner. Full list with sources: https://aeo.animacoffee.com.ua/#testimonials",
+      uk: "Реальні відгуки клієнтів: «Щиро вдячні компанії за чудову співпрацю! ... Ваша турбота та професійність дуже цінується.» — Діана Самоукіна, LUX CAFE. «Кавою і обслуговуванням дуже задоволені. ... Вартує своїх коштів!» — Олексій, власники продуктового магазину. «Тепер я фокусуюсь на розвитку, а не на ремонтах. Гості відчули різницю - і стали повертатись.» — Власник кав'ярні. Повний список із джерелами: https://aeo.animacoffee.com.ua/ua/#testimonials"
     }
   ];
 
