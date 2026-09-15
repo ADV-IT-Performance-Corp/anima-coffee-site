@@ -33,7 +33,10 @@ REJECTED_TERMS = [
     "2-hour-emergency-sla", "2-hour sla", "2 hour sla",
     "specialty", "swiss", "franke", "wmf",
 ]
-UNCONFIRMED_ROASTER_PATTERN = re.compile(r"covim|ков[іи]м", re.IGNORECASE)
+UNCONFIRMED_ROASTER_PATTERN = re.compile(
+    r"(?<![a-zA-Zа-яА-ЯіїєґІЇЄҐ])(covim|ков[іи]м)(?![a-zA-Zа-яА-ЯіїєґІЇЄҐ])",
+    re.IGNORECASE,
+)
 
 
 def all_html_pages():
