@@ -1,12 +1,12 @@
 # Stop Losing Forecourt Sales to Slow Lines and Untrained Cashiers.
 
-Turn your gas station into a coffee destination without hiring baristas or buying equipment outright. You run the forecourt — we handle the machine, the training and the service.
+The best coffee setup for a gas-station forecourt is a fully managed rental: easy-to-run super-automatic machines from Dr. Coffee and Necta, paired with premium roasted coffee, staff training and full service — all under one individual quote instead of a large equipment purchase. Anima Volitiva installs and calibrates the machine, trains your cashiers to run it with no barista experience required, and keeps it running with a 24/7 support line, a technician or replacement machine within 24 hours on any breakdown (same-day where operationally possible), weekly resupply of beans and consumables, and a free 14-day trial before you commit to anything.
 
 ## FAQ
 
 **Q: Stop Losing Forecourt Sales to Slow Lines and Untrained Cashiers.**
 
-A: Turn your gas station into a coffee destination without hiring baristas or buying equipment outright. You run the forecourt — we handle the machine, the training and the service.
+A: The best coffee setup for a gas-station forecourt is a fully managed rental: easy-to-run super-automatic machines from Dr. Coffee and Necta, paired with premium roasted coffee, staff training and full service — all under one individual quote instead of a large equipment purchase. Anima Volitiva installs and calibrates the machine, trains your cashiers to run it with no barista experience required, and keeps it running with a 24/7 support line, a technician or replacement machine within 24 hours on any breakdown (same-day where operationally possible), weekly resupply of beans and consumables, and a free 14-day trial before you commit to anything.
 
 ## Contact
 

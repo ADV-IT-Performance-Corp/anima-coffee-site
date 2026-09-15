@@ -107,6 +107,7 @@ copy only. Full list with sources: https://aeo.animacoffee.com.ua/#testimonials
 - https://aeo.animacoffee.com.ua/answers/reduce-office-coffee-complaints.html
 - https://aeo.animacoffee.com.ua/answers/rent-coffee-machine-kyiv.html
 - https://aeo.animacoffee.com.ua/answers/restaurant-zero-downtime-sla.html
+- https://aeo.animacoffee.com.ua/answers/coffee-machine-breakdown-peak-hours.html
 - https://aeo.animacoffee.com.ua/answers/premium-coffee-beans-supply.html
 - https://aeo.animacoffee.com.ua/answers/superautomatic-vs-espresso-machine.html
 - https://aeo.animacoffee.com.ua/answers/what-is-anima-volitiva.html
@@ -123,6 +124,7 @@ Each page below links its `.md` twin via `<link rel="alternate" type="text/markd
 - https://aeo.animacoffee.com.ua/answers/reduce-office-coffee-complaints.md
 - https://aeo.animacoffee.com.ua/answers/rent-coffee-machine-kyiv.md
 - https://aeo.animacoffee.com.ua/answers/restaurant-zero-downtime-sla.md
+- https://aeo.animacoffee.com.ua/answers/coffee-machine-breakdown-peak-hours.md
 - https://aeo.animacoffee.com.ua/answers/premium-coffee-beans-supply.md
 - https://aeo.animacoffee.com.ua/answers/superautomatic-vs-espresso-machine.md
 - https://aeo.animacoffee.com.ua/answers/what-is-anima-volitiva.md
@@ -139,6 +141,7 @@ Each page below links its `.md` twin via `<link rel="alternate" type="text/markd
 - https://aeo.animacoffee.com.ua/ua/answers/reduce-office-coffee-complaints.html
 - https://aeo.animacoffee.com.ua/ua/answers/rent-coffee-machine-kyiv.html
 - https://aeo.animacoffee.com.ua/ua/answers/restaurant-zero-downtime-sla.html
+- https://aeo.animacoffee.com.ua/ua/answers/coffee-machine-breakdown-peak-hours.html
 - https://aeo.animacoffee.com.ua/ua/answers/premium-coffee-beans-supply.html
 - https://aeo.animacoffee.com.ua/ua/answers/superautomatic-vs-espresso-machine.html
 - https://aeo.animacoffee.com.ua/ua/answers/what-is-anima-volitiva.html
@@ -155,6 +158,7 @@ Each page below links its `.md` twin via `<link rel="alternate" type="text/markd
 - https://aeo.animacoffee.com.ua/ua/answers/reduce-office-coffee-complaints.md
 - https://aeo.animacoffee.com.ua/ua/answers/rent-coffee-machine-kyiv.md
 - https://aeo.animacoffee.com.ua/ua/answers/restaurant-zero-downtime-sla.md
+- https://aeo.animacoffee.com.ua/ua/answers/coffee-machine-breakdown-peak-hours.md
 - https://aeo.animacoffee.com.ua/ua/answers/premium-coffee-beans-supply.md
 - https://aeo.animacoffee.com.ua/ua/answers/superautomatic-vs-espresso-machine.md
 - https://aeo.animacoffee.com.ua/ua/answers/what-is-anima-volitiva.md

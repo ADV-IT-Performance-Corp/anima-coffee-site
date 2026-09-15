@@ -1,12 +1,12 @@
 # How Fast Does Anima Volitiva Respond to a Coffee Machine Breakdown in Kyiv Oblast?
 
-A coffee machine going down costs you sales and frustrates your team. Our 24/7 support line puts you straight through to a technician — day or night, weekends included. If the machine can't be fixed on the spot, we deliver and install a replacement within 24 hours, same-day wherever possible, so your service never really stops.
+Anima Volitiva runs a 24/7 support line for every rented machine in Kyiv and Kyiv Oblast. Report a breakdown any time and you're connected to a technician, not a call queue. If the problem can't be resolved on site, we deliver and install a replacement machine within 24 hours — same-day wherever possible — so your coffee service keeps running while we repair the original unit.
 
 ## FAQ
 
 **Q: How Fast Does Anima Volitiva Respond to a Coffee Machine Breakdown in Kyiv Oblast?**
 
-A: A coffee machine going down costs you sales and frustrates your team. Our 24/7 support line puts you straight through to a technician — day or night, weekends included. If the machine can't be fixed on the spot, we deliver and install a replacement within 24 hours, same-day wherever possible, so your service never really stops.
+A: Anima Volitiva runs a 24/7 support line for every rented machine in Kyiv and Kyiv Oblast. Report a breakdown any time and you're connected to a technician, not a call queue. If the problem can't be resolved on site, we deliver and install a replacement machine within 24 hours — same-day wherever possible — so your coffee service keeps running while we repair the original unit.
 
 ## Contact
 

@@ -1,12 +1,12 @@
 # SmartTouch POS and Self-Service Coffee: How Integration Actually Works
 
-Shops, kiosks and HoReCa venues that run SmartTouch POS or a similar modern checkout often ask: can a rented coffee machine plug into our POS and tap-to-pay flow? It is a fair question, and it deserves a straight answer rather than a promised "universal bridge". Here is how pairing a self-service coffee point with a modern POS checkout actually works — and exactly which part of it Anima Volitiva provides.
+Self-service coffee earns shelf-margin without a barista on payroll, and consistency is what protects that margin. That is what the managed rental covers: the machine stays calibrated (weekly technician visit), stocked (weekly resupply) and running — 24/7 support; a technician or replacement machine is provided within 24 hours, and same-day service is available where operationally possible. Anima Volitiva has worked this way since 2015 and serves 1,700+ active B2B clients across Kyiv and Kyiv Oblast, with roughly 99% staying with us.
 
 ## FAQ
 
 **Q: SmartTouch POS and Self-Service Coffee: How Integration Actually Works**
 
-A: Shops, kiosks and HoReCa venues that run SmartTouch POS or a similar modern checkout often ask: can a rented coffee machine plug into our POS and tap-to-pay flow? It is a fair question, and it deserves a straight answer rather than a promised "universal bridge". Here is how pairing a self-service coffee point with a modern POS checkout actually works — and exactly which part of it Anima Volitiva provides.
+A: Self-service coffee earns shelf-margin without a barista on payroll, and consistency is what protects that margin. That is what the managed rental covers: the machine stays calibrated (weekly technician visit), stocked (weekly resupply) and running — 24/7 support; a technician or replacement machine is provided within 24 hours, and same-day service is available where operationally possible. Anima Volitiva has worked this way since 2015 and serves 1,700+ active B2B clients across Kyiv and Kyiv Oblast, with roughly 99% staying with us.
 
 ## Contact
 

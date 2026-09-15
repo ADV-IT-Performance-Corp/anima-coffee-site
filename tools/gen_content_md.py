@@ -170,15 +170,12 @@ def twin_markdown(path: pathlib.Path) -> str:
     h1 = next((t for tag, t in blocks if tag == "h1"), None)
     if not h1:
         return None
-    # Direct answer: first <p> block after the H1 that isn't a nav/tagline
-    # fragment (heuristic: longer than 60 chars).
-    direct = None
-    for tag, t in blocks:
-        if tag == "p" and len(t) > 60:
-            direct = t
-            break
-    if not direct:
-        direct = h1
+    # Direct answer: the longest <p> block on the page. The site's "Direct
+    # answer" / lead paragraphs are consistently the densest prose block —
+    # far longer than hero taglines or nav fragments — so this is more
+    # reliable than picking the first paragraph past a length threshold.
+    paragraphs = [t for tag, t in blocks if tag == "p"]
+    direct = max(paragraphs, key=len) if paragraphs else h1
     url = url_for(path)
     parts = [f"# {h1}", "", direct, "", "## FAQ", "", f"**Q: {h1}**", "", f"A: {direct}", ""]
     cline = contact_line(src)

@@ -1,12 +1,12 @@
 # Turnkey Full-Service Coffee for 100+ Person Offices in Kyiv Oblast
 
-Coffee that earns. Service that never lets you down. For an office of 100 or more people, that means rented super-automatic equipment sized to your real consumption, premium roasted coffee delivered weekly, staff training included, and a 24/7 support line — all from one partner, with nothing to buy upfront.
+Buying a commercial super-automatic outright ties up capital in hardware and leaves you to source beans, filtration and repairs separately. Renting from Anima Volitiva means no equipment purchase, one individually quoted agreement covering machine, coffee, consumables, maintenance and support, and the freedom to change or add equipment as the office grows. Anima Volitiva has been on the market since 2015 and serves 1,700+ active B2B clients across Kyiv and Kyiv Oblast, with roughly 99% staying with the service.
 
 ## FAQ
 
 **Q: Turnkey Full-Service Coffee for 100+ Person Offices in Kyiv Oblast**
 
-A: Coffee that earns. Service that never lets you down. For an office of 100 or more people, that means rented super-automatic equipment sized to your real consumption, premium roasted coffee delivered weekly, staff training included, and a 24/7 support line — all from one partner, with nothing to buy upfront.
+A: Buying a commercial super-automatic outright ties up capital in hardware and leaves you to source beans, filtration and repairs separately. Renting from Anima Volitiva means no equipment purchase, one individually quoted agreement covering machine, coffee, consumables, maintenance and support, and the freedom to change or add equipment as the office grows. Anima Volitiva has been on the market since 2015 and serves 1,700+ active B2B clients across Kyiv and Kyiv Oblast, with roughly 99% staying with the service.
 
 ## Contact
 

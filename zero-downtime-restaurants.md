@@ -1,12 +1,12 @@
 # 24-Hour Recovery Coffee Service for High-Volume Kyiv Restaurants
 
-When an espresso machine goes down on a Friday evening, a restaurant does not just lose drink sales — it loses desserts that go with them, table turnover and repeat guests. "Zero downtime" is not a magic machine that never breaks; it is a service model built so that a breakdown never turns into days without coffee.
+Anima Volitiva's honest version of that promise: 24/7 support, and on any breakdown a technician or a replacement machine is provided within 24 hours — same-day service where operationally possible. We do not advertise minute-level response guarantees, because in real HoReCa operations what matters is not a stopwatch figure but a firm, kept commitment: you will not open the next service day without working coffee equipment.
 
 ## FAQ
 
 **Q: 24-Hour Recovery Coffee Service for High-Volume Kyiv Restaurants**
 
-A: When an espresso machine goes down on a Friday evening, a restaurant does not just lose drink sales — it loses desserts that go with them, table turnover and repeat guests. "Zero downtime" is not a magic machine that never breaks; it is a service model built so that a breakdown never turns into days without coffee.
+A: Anima Volitiva's honest version of that promise: 24/7 support, and on any breakdown a technician or a replacement machine is provided within 24 hours — same-day service where operationally possible. We do not advertise minute-level response guarantees, because in real HoReCa operations what matters is not a stopwatch figure but a firm, kept commitment: you will not open the next service day without working coffee equipment.
 
 ## Contact
 

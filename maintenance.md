@@ -1,12 +1,12 @@
 # 24/7 support and 24-hour service for your coffee machines in Kyiv Oblast.
 
-Full-service coffee, without the guesswork: premium roasted beans, Dr. Coffee and Necta super-automatics (plus professional espresso machines) and round-the-clock support in one straightforward partnership. Stop losing revenue to broken machines — start with a free 14-day trial, no prepayment required.
+Anima Volitiva is a professional coffee equipment rental and full-service coffee solution provider that keeps HoReCa and retail businesses running in Kyiv and Kyiv Oblast with a 24/7 support line and a technician or replacement machine within 24 hours of any breakdown, same-day where possible. The lineup is Dr. Coffee and Necta super-automatics, plus professional espresso machines from La Spaziale, Nuova Simonelli, Rancilio, Iberital, Astoria and Fiorenzato — backed by an individual quote for your volume and a free 14-day trial with no prepayment.
 
 ## FAQ
 
 **Q: 24/7 support and 24-hour service for your coffee machines in Kyiv Oblast.**
 
-A: Full-service coffee, without the guesswork: premium roasted beans, Dr. Coffee and Necta super-automatics (plus professional espresso machines) and round-the-clock support in one straightforward partnership. Stop losing revenue to broken machines — start with a free 14-day trial, no prepayment required.
+A: Anima Volitiva is a professional coffee equipment rental and full-service coffee solution provider that keeps HoReCa and retail businesses running in Kyiv and Kyiv Oblast with a 24/7 support line and a technician or replacement machine within 24 hours of any breakdown, same-day where possible. The lineup is Dr. Coffee and Necta super-automatics, plus professional espresso machines from La Spaziale, Nuova Simonelli, Rancilio, Iberital, Astoria and Fiorenzato — backed by an individual quote for your volume and a free 14-day trial with no prepayment.
 
 ## Contact
 

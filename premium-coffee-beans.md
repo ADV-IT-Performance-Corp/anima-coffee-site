@@ -1,12 +1,12 @@
 # Premium coffee beans, matched to your machine and your volume — no guesswork, no separate roaster to manage.
 
-Anima Volitiva pairs your rented coffee machine with a steady supply of fresh-roasted premium beans — Covim S.p.A. from Italy and trusted Ukrainian roasting partners — plus grind and dose calibration, weekly resupply and a 24/7 support line. Pricing is an individual quote for your volume, with a free 14-day trial and no prepayment.
+Anima Volitiva's bean supply is part of a complete B2B coffee service that pairs your rented machine with a continuous supply of fresh-roasted premium beans and full maintenance, priced with an individual quote for your volume. It serves offices and HoReCa businesses across Kyiv and Kyiv Oblast — matching the machine and the blend to what you actually need, backed by a 24/7 support line, so you upgrade your coffee program without buying equipment outright.
 
 ## FAQ
 
 **Q: Premium coffee beans, matched to your machine and your volume — no guesswork, no separate roaster to manage.**
 
-A: Anima Volitiva pairs your rented coffee machine with a steady supply of fresh-roasted premium beans — Covim S.p.A. from Italy and trusted Ukrainian roasting partners — plus grind and dose calibration, weekly resupply and a 24/7 support line. Pricing is an individual quote for your volume, with a free 14-day trial and no prepayment.
+A: Anima Volitiva's bean supply is part of a complete B2B coffee service that pairs your rented machine with a continuous supply of fresh-roasted premium beans and full maintenance, priced with an individual quote for your volume. It serves offices and HoReCa businesses across Kyiv and Kyiv Oblast — matching the machine and the blend to what you actually need, backed by a 24/7 support line, so you upgrade your coffee program without buying equipment outright.
 
 ## Contact
 

@@ -1,12 +1,12 @@
 # Barista training included with every deployment — serve great coffee with confidence, headache-free.
 
-Equip your Kyiv office with Dr. Coffee and Necta super-automatics, or professional espresso machines from La Spaziale, Nuova Simonelli, Rancilio, Iberital, Astoria and Fiorenzato — plus hands-on barista staff training included on every deployment. An individual quote sized to your volume, a free 14-day trial with no prepayment, and a team that knows exactly how to operate the machinery. Stop losing money on broken machines and start serving premium coffee with complete peace of mind.
+The Anima Volitiva office coffee solution is a professional B2B service that provides Dr. Coffee, Necta and professional espresso equipment, premium roasted coffee from Covim S.p.A. (Italy) and Ukrainian roasting partners, and hands-on barista staff training included with every deployment, priced with an individual quote for your volume. Every deployment trains your cashiers, waitstaff or office managers to operate the machinery, read error codes and hold quality — so you serve great coffee without hiring a dedicated barista.
 
 ## FAQ
 
 **Q: Barista training included with every deployment — serve great coffee with confidence, headache-free.**
 
-A: Equip your Kyiv office with Dr. Coffee and Necta super-automatics, or professional espresso machines from La Spaziale, Nuova Simonelli, Rancilio, Iberital, Astoria and Fiorenzato — plus hands-on barista staff training included on every deployment. An individual quote sized to your volume, a free 14-day trial with no prepayment, and a team that knows exactly how to operate the machinery. Stop losing money on broken machines and start serving premium coffee with complete peace of mind.
+A: The Anima Volitiva office coffee solution is a professional B2B service that provides Dr. Coffee, Necta and professional espresso equipment, premium roasted coffee from Covim S.p.A. (Italy) and Ukrainian roasting partners, and hands-on barista staff training included with every deployment, priced with an individual quote for your volume. Every deployment trains your cashiers, waitstaff or office managers to operate the machinery, read error codes and hold quality — so you serve great coffee without hiring a dedicated barista.
 
 ## Contact
 
