@@ -21,10 +21,22 @@ def find_pages():
     # served for arbitrary unmatched URLs, so canonical/hreflang/JSON-LD
     # (which all assert "this URL is the authoritative version of X") do
     # not apply to it — same exemption class as the verification file.
+    def _is_redirect_stub(p):
+        # Old-slug stubs (tools/make_stub.py): meta-refresh + canonical +
+        # noindex to the page's new URL. Same exemption class as 404.html —
+        # deliberately not the authoritative version of anything, so
+        # canonical/hreflang/JSON-LD/H1 assertions about "this page" don't
+        # apply.
+        try:
+            return 'http-equiv="refresh"' in p.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            return False
+
     return [p for p in pages
             if "node_modules" not in str(p)
             and not p.name.startswith("google")
-            and p.name != "404.html"]
+            and p.name != "404.html"
+            and not _is_redirect_stub(p)]
 
 def check_page(path, all_h1s):
     html = path.read_text(encoding="utf-8", errors="ignore")

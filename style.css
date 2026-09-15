@@ -74,6 +74,15 @@ nav .wrap{display:flex;align-items:center;justify-content:space-between;height:7
 .page-hero .sub{margin-top:22px;font-size:19px;color:#d3c6b6;max-width:44em}
 .page-hero .hero-cta{margin-top:32px}
 
+/* Answer-first heading: a short buyer-question/subject H1 leads the hero;
+   the pre-existing marketing hook moves to .tagline with the exact same
+   type styling the old <h1> had, so the rendered hero is unchanged. */
+.hero h1.q-lead,.page-hero h1.q-lead{font-family:var(--sans);font-weight:600;font-size:clamp(15px,1.6vw,17px);letter-spacing:.01em;line-height:1.4;color:#d3c6b6;margin-bottom:10px}
+.hero .tagline,.page-hero .tagline{font-family:var(--serif);font-weight:700;letter-spacing:-.02em;line-height:1.08}
+.hero .tagline{font-size:clamp(36px,4.8vw,60px);color:var(--cream)}
+.hero .tagline em{font-style:normal;color:var(--accent)}
+.page-hero .tagline{font-size:clamp(32px,4.2vw,50px);color:var(--cream);max-width:16ch}
+
 .stats{background:var(--accent);color:#1c130b}
 .stats .wrap{display:grid;grid-template-columns:repeat(6,1fr);gap:0;padding:0}
 .stat{padding:38px 20px;border-right:1px solid rgba(28,19,11,.14)}

@@ -27,7 +27,7 @@ resubmitting one URL at a time by hand.
 | `https://aeo.animacoffee.com.ua/answers.html` | Answers-index link text updated to match the renamed page's new title. |
 | `https://aeo.animacoffee.com.ua/ua/answers.html` | Same, Ukrainian mirror. |
 | `https://aeo.animacoffee.com.ua/about.html` | "Related answers" anchor text updated to the new SLA page title. |
-| `https://aeo.animacoffee.com.ua/ua/2-hour-emergency-sla.html` | "Related answers" anchor text updated to the new SLA page title. |
+| `https://aeo.animacoffee.com.ua/ua/coffee-machine-emergency-support.html` | "Related answers" anchor text updated to the new SLA page title. |
 | `https://aeo.animacoffee.com.ua/answers/gas-station-retail-coffee-equipment.html` | "Related answers" anchor text updated. |
 | `https://aeo.animacoffee.com.ua/answers/reduce-office-coffee-complaints.html` | "Related answers" anchor text updated. |
 | `https://aeo.animacoffee.com.ua/answers/do-we-need-a-barista.html` | "Related answers" anchor text updated. |
