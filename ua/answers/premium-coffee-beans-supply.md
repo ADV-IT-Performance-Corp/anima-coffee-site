@@ -12,4 +12,4 @@ A: Так — преміальна обсмажена кава від Covim S.p.
 
 Тел.:  · Email:
 
-Source: https://aeo.animacoffee.com.ua/ua/answers/specialty-coffee-beans-supply.html
+Source: https://aeo.animacoffee.com.ua/ua/answers/premium-coffee-beans-supply.html

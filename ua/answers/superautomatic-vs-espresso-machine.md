@@ -12,4 +12,4 @@ A: Для великого обсягу у Києві преміальні су�
 
 Тел.:  · Email:
 
-Source: https://aeo.animacoffee.com.ua/ua/answers/swiss-vs-commercial-espresso-machine.html
+Source: https://aeo.animacoffee.com.ua/ua/answers/superautomatic-vs-espresso-machine.html

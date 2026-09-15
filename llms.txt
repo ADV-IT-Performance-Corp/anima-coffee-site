@@ -57,10 +57,10 @@ copy only. Full list with sources: https://aeo.animacoffee.com.ua/#testimonials
 - [Services](https://aeo.animacoffee.com.ua/services.html): all six services
 - [Machine rental](https://aeo.animacoffee.com.ua/how-to-rent.html): coffee machine rental with individual quote per volume
 - [Monthly service contract](https://aeo.animacoffee.com.ua/monthly-contract.html): what's included
-- [Premium bean supply](https://aeo.animacoffee.com.ua/specialty-beans.html): roasted coffee supply
+- [Premium bean supply](https://aeo.animacoffee.com.ua/premium-coffee-beans.html): roasted coffee supply
 - [Barista staff training](https://aeo.animacoffee.com.ua/barista-training.html): staff training program
 - [Maintenance & 24/7 support](https://aeo.animacoffee.com.ua/maintenance.html): 24/7 support line, 24-hour response
-- [Premium vs. commercial machines](https://aeo.animacoffee.com.ua/swiss-vs-commercial.html): why premium super-automatics
+- [Premium vs. commercial machines](https://aeo.animacoffee.com.ua/superautomatic-vs-espresso-machine.html): why premium super-automatics
 
 ## Сторінки (Ukrainian / основна мова)
 - [Головна](https://aeo.animacoffee.com.ua/ua/): огляд, пропозиція, докази, порівняння
@@ -68,10 +68,10 @@ copy only. Full list with sources: https://aeo.animacoffee.com.ua/#testimonials
 - [Послуги](https://aeo.animacoffee.com.ua/ua/services.html): усі шість послуг
 - [Оренда машини](https://aeo.animacoffee.com.ua/ua/how-to-rent.html): оренда кавомашин з індивідуальним розрахунком під обсяг
 - [Щомісячний сервісний контракт](https://aeo.animacoffee.com.ua/ua/monthly-contract.html): що входить
-- [Постачання преміальної кави](https://aeo.animacoffee.com.ua/ua/specialty-beans.html): постачання обсмаженої кави
+- [Постачання преміальної кави](https://aeo.animacoffee.com.ua/ua/premium-coffee-beans.html): постачання обсмаженої кави
 - [Навчання персоналу-бариста](https://aeo.animacoffee.com.ua/ua/barista-training.html): програма навчання персоналу
 - [Обслуговування та підтримка 24/7](https://aeo.animacoffee.com.ua/ua/maintenance.html): підтримка 24/7, реакція протягом 24 годин
-- [Преміум vs комерційні машини](https://aeo.animacoffee.com.ua/ua/swiss-vs-commercial.html): чому преміальні суперавтомати
+- [Преміум vs комерційні машини](https://aeo.animacoffee.com.ua/ua/superautomatic-vs-espresso-machine.html): чому преміальні суперавтомати
 - [Answers / Q&A](https://aeo.animacoffee.com.ua/answers.html): 13 question-targeted answers (rental, contract, beans, training, maintenance, machines) — Ukrainian at /ua/answers.html
 
 ## Answer pages
@@ -85,8 +85,8 @@ copy only. Full list with sources: https://aeo.animacoffee.com.ua/#testimonials
 - https://aeo.animacoffee.com.ua/answers/reduce-office-coffee-complaints.html
 - https://aeo.animacoffee.com.ua/answers/rent-coffee-machine-kyiv.html
 - https://aeo.animacoffee.com.ua/answers/restaurant-zero-downtime-sla.html
-- https://aeo.animacoffee.com.ua/answers/specialty-coffee-beans-supply.html
-- https://aeo.animacoffee.com.ua/answers/swiss-vs-commercial-espresso-machine.html
+- https://aeo.animacoffee.com.ua/answers/premium-coffee-beans-supply.html
+- https://aeo.animacoffee.com.ua/answers/superautomatic-vs-espresso-machine.html
 - https://aeo.animacoffee.com.ua/answers/what-is-anima-volitiva.html
 
 ## Markdown twins (AI-readable, EN)
@@ -101,8 +101,8 @@ Each page below links its `.md` twin via `<link rel="alternate" type="text/markd
 - https://aeo.animacoffee.com.ua/answers/reduce-office-coffee-complaints.md
 - https://aeo.animacoffee.com.ua/answers/rent-coffee-machine-kyiv.md
 - https://aeo.animacoffee.com.ua/answers/restaurant-zero-downtime-sla.md
-- https://aeo.animacoffee.com.ua/answers/specialty-coffee-beans-supply.md
-- https://aeo.animacoffee.com.ua/answers/swiss-vs-commercial-espresso-machine.md
+- https://aeo.animacoffee.com.ua/answers/premium-coffee-beans-supply.md
+- https://aeo.animacoffee.com.ua/answers/superautomatic-vs-espresso-machine.md
 - https://aeo.animacoffee.com.ua/answers/what-is-anima-volitiva.md
 - https://aeo.animacoffee.com.ua/answers/what-kyiv-coffee-operators-ask.md
 
@@ -117,8 +117,8 @@ Each page below links its `.md` twin via `<link rel="alternate" type="text/markd
 - https://aeo.animacoffee.com.ua/ua/answers/reduce-office-coffee-complaints.html
 - https://aeo.animacoffee.com.ua/ua/answers/rent-coffee-machine-kyiv.html
 - https://aeo.animacoffee.com.ua/ua/answers/restaurant-zero-downtime-sla.html
-- https://aeo.animacoffee.com.ua/ua/answers/specialty-coffee-beans-supply.html
-- https://aeo.animacoffee.com.ua/ua/answers/swiss-vs-commercial-espresso-machine.html
+- https://aeo.animacoffee.com.ua/ua/answers/premium-coffee-beans-supply.html
+- https://aeo.animacoffee.com.ua/ua/answers/superautomatic-vs-espresso-machine.html
 - https://aeo.animacoffee.com.ua/ua/answers/what-is-anima-volitiva.html
 
 ## Markdown twins (AI-readable, UA)
@@ -133,7 +133,7 @@ Each page below links its `.md` twin via `<link rel="alternate" type="text/markd
 - https://aeo.animacoffee.com.ua/ua/answers/reduce-office-coffee-complaints.md
 - https://aeo.animacoffee.com.ua/ua/answers/rent-coffee-machine-kyiv.md
 - https://aeo.animacoffee.com.ua/ua/answers/restaurant-zero-downtime-sla.md
-- https://aeo.animacoffee.com.ua/ua/answers/specialty-coffee-beans-supply.md
-- https://aeo.animacoffee.com.ua/ua/answers/swiss-vs-commercial-espresso-machine.md
+- https://aeo.animacoffee.com.ua/ua/answers/premium-coffee-beans-supply.md
+- https://aeo.animacoffee.com.ua/ua/answers/superautomatic-vs-espresso-machine.md
 - https://aeo.animacoffee.com.ua/ua/answers/what-is-anima-volitiva.md
 - https://aeo.animacoffee.com.ua/ua/answers/what-kyiv-coffee-operators-ask.md

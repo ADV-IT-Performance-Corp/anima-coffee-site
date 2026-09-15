@@ -12,4 +12,4 @@ A: Yes — premium roasted coffee from Covim S.p.A. (Italy) and Ukrainian roasti
 
 Call:  · Email:
 
-Source: https://aeo.animacoffee.com.ua/answers/specialty-coffee-beans-supply.html
+Source: https://aeo.animacoffee.com.ua/answers/premium-coffee-beans-supply.html
