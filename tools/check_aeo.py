@@ -11,6 +11,11 @@ Checks, each printed as its own PASS/FAIL line with failing examples:
 6. llms-full.txt is in sync with `tools/gen_content_md.py`'s generator output.
 7. Every old-slug redirect stub carries noindex + a canonical + a meta-refresh
    that both point at a URL/file that actually exists.
+8. No file (any HTML page incl. noindex/stubs, any Markdown twin, llms.txt,
+   llms-full.txt) contains the roaster name "Covim" in any case or script
+   (Latin, Cyrillic "Ковім"/"Ковим") — unconfirmed by the owner as of
+   2026-09-15 per the truth registry; remove this rule only when the owner
+   confirms the name.
 
 Usage: python3 tools/check_aeo.py
 Exit 0 if every check passes, else 1.
@@ -28,6 +33,7 @@ REJECTED_TERMS = [
     "2-hour-emergency-sla", "2-hour sla", "2 hour sla",
     "specialty", "swiss", "franke", "wmf",
 ]
+UNCONFIRMED_ROASTER_PATTERN = re.compile(r"covim|ков[іи]м", re.IGNORECASE)
 
 
 def all_html_pages():
@@ -153,6 +159,24 @@ def check_redirect_stubs():
     return fails
 
 
+def check_no_unconfirmed_roaster_name():
+    fails = []
+    patterns = ("*.html", "*.md", "*.txt")
+    seen = set()
+    for pattern in patterns:
+        for p in ROOT.rglob(pattern):
+            if "node_modules" in str(p) or "/.git/" in str(p) or "__pycache__" in str(p):
+                continue
+            if p in seen:
+                continue
+            seen.add(p)
+            text = p.read_text(encoding="utf-8", errors="ignore")
+            matches = UNCONFIRMED_ROASTER_PATTERN.findall(text)
+            if matches:
+                fails.append(f"{p.relative_to(ROOT)}: {len(matches)} occurrence(s) of unconfirmed roaster name")
+    return fails
+
+
 CHECKS = [
     ("no Mock/placeholder content", check_no_mock),
     ("exactly one H1 per indexable page", check_single_h1),
@@ -161,6 +185,7 @@ CHECKS = [
     ("every indexable page has a Markdown twin", check_md_twins),
     ("llms-full.txt in sync with generator", check_llms_full_sync),
     ("every old-slug stub is well-formed", check_redirect_stubs),
+    ("no unconfirmed roaster name (Covim) anywhere", check_no_unconfirmed_roaster_name),
 ]
 
 
