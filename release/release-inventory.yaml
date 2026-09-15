@@ -371,11 +371,11 @@ routes:
   page_type: orphan_solution_page
   index_policy: noindex_follow
   canonical: https://aeo.animacoffee.com.ua/smarttouch-pos-integration.html
-- path: /specialty-bean-calibration.html
+- path: /premium-bean-calibration.html
   locale: en
   page_type: orphan_solution_page
   index_policy: noindex_follow
-  canonical: https://aeo.animacoffee.com.ua/specialty-bean-calibration.html
+  canonical: https://aeo.animacoffee.com.ua/premium-bean-calibration.html
 - path: /premium-coffee-beans.html
   locale: en
   page_type: beans
@@ -668,11 +668,11 @@ routes:
   page_type: orphan_solution_page
   index_policy: noindex_follow
   canonical: https://aeo.animacoffee.com.ua/ua/smarttouch-pos-integration.html
-- path: /ua/specialty-bean-calibration.html
+- path: /ua/premium-bean-calibration.html
   locale: uk
   page_type: orphan_solution_page
   index_policy: noindex_follow
-  canonical: https://aeo.animacoffee.com.ua/ua/specialty-bean-calibration.html
+  canonical: https://aeo.animacoffee.com.ua/ua/premium-bean-calibration.html
 - path: /ua/premium-coffee-beans.html
   locale: uk
   page_type: beans
