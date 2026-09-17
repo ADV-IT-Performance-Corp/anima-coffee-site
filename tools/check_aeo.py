@@ -25,6 +25,18 @@ Checks, each printed as its own PASS/FAIL line with failing examples:
    ", –" whose immediate context is new relative to `origin/main` (plain
    ", —" is legitimate UA/RU punctuation elsewhere on the site, so only a
    changed context — proof a deletion left it stranded — is flagged).
+10. No `.html` file carries an empty or whitespace-only inline/text element
+    (`<b>`, `<strong>`, `<i>`, `<em>`, `<span>`, `<a>`, `<li>`, `<p>`,
+    `<h1>`-`<h6>`, `<td>`, `<th>`, `<dd>`, `<dt>`, `<figcaption>`,
+    `<blockquote>`) left behind by a bulk text deletion. Same
+    anti-false-positive principle as check 9's ", —" rule: flagged only
+    when the element is NOT already empty in the same spot on
+    `origin/main` — so icon spans, spacer cells, JS mount points and other
+    by-design empty elements that predate this PR are never flagged.
+    Anchor targets (`id`/`name`, no visible text expected) and
+    `aria-hidden` decorative elements are exempt unconditionally, and a
+    file with no `origin/main` counterpart is skipped (nothing to prove
+    creation against).
 
 Usage: python3 tools/check_aeo.py
 Exit 0 if every check passes, else 1.
@@ -350,6 +362,68 @@ def check_punctuation_artifacts():
     return fails
 
 
+EMPTY_ELEMENT_TAGS = (
+    "b", "strong", "i", "em", "span", "a", "li", "p",
+    "h1", "h2", "h3", "h4", "h5", "h6", "td", "th",
+    "dd", "dt", "figcaption", "blockquote",
+)
+
+# An element counts as empty when its content is nothing but whitespace or
+# a whitespace entity — a genuine text deletion leaves exactly this behind
+# (e.g. `<b></b>`), never a non-whitespace child, so nested markup that
+# happens to render no visible text (e.g. an icon `<i>` wrapping only a
+# `<svg>`) is intentionally out of scope for this check.
+_EMPTY_ELEMENT_RE = re.compile(
+    r"<(" + "|".join(EMPTY_ELEMENT_TAGS) + r")\b([^>]*)>"
+    r"(?:\s|&nbsp;|&#160;|&#xa0;)*</\1>",
+    re.I,
+)
+_ANCHOR_TARGET_RE = re.compile(r"\b(?:id|name)\s*=", re.I)
+_ARIA_HIDDEN_RE = re.compile(r"\baria-hidden\b", re.I)
+
+
+def _strip_non_scan_blocks(html_src: str) -> str:
+    return re.sub(r"<(script|style|template)\b[^>]*>.*?</\1>", " ", html_src, flags=re.S | re.I)
+
+
+def check_empty_inline_elements():
+    fails = []
+    for p in sorted(_punct_scan_files()):
+        if p.suffix != ".html":
+            continue
+        rel = p.relative_to(ROOT).as_posix()
+        raw = _strip_non_scan_blocks(p.read_text(encoding="utf-8", errors="ignore"))
+
+        main_text = _origin_main_text(p)
+        main_raw = _strip_non_scan_blocks(main_text) if main_text is not None else None
+
+        for mm in _EMPTY_ELEMENT_RE.finditer(raw):
+            tag, attrs = mm.group(1), mm.group(2)
+            if tag.lower() == "a" and _ANCHOR_TARGET_RE.search(attrs):
+                continue  # anchor used as a link target, not prose text
+            if _ARIA_HIDDEN_RE.search(attrs):
+                continue  # decorative element, empty by design
+            if main_raw is None:
+                continue  # new file on this branch: nothing to diff against
+            # Backward-only, ending at the element's own closing tag — same
+            # principle as check 9(c)'s ", —" rule: text AFTER the element
+            # (e.g. the answer prose following an FAQ icon span) can get
+            # edited by this same PR for unrelated reasons (the roaster-name
+            # removal) without the element itself being new, and including
+            # that trailing text in the comparison false-positived exactly
+            # that case (icon spans whose following paragraph lost "from
+            # Covim S.p.A. (Italy) and..."). Only the text *before* the
+            # element decides whether this element already stood empty here.
+            lo = max(0, mm.start() - 40)
+            ctx = raw[lo:mm.end()]
+            if ctx in main_raw:
+                continue  # already empty in this exact spot on origin/main
+            fails.append(
+                f"{rel}: empty <{tag.lower()}> element not on origin/main near {ctx!r}"
+            )
+    return fails
+
+
 CHECKS = [
     ("no Mock/placeholder content", check_no_mock),
     ("exactly one H1 per indexable page", check_single_h1),
@@ -360,6 +434,7 @@ CHECKS = [
     ("every old-slug stub is well-formed", check_redirect_stubs),
     ("no unconfirmed roaster name (Covim) anywhere", check_no_unconfirmed_roaster_name),
     ("no mechanical-deletion punctuation artifacts", check_punctuation_artifacts),
+    ("no empty inline elements left by bulk text removal", check_empty_inline_elements),
 ]
 
 
