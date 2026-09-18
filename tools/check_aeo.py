@@ -488,6 +488,15 @@ def _punct_scan_files():
             yield p
 
 
+def _comma_dash_scan_text(path: pathlib.Path, text: str) -> str:
+    """Visible text + JSON-LD prose strings joined into one scan text, for
+    the ', —' count comparison — the ONE code path used for both the head
+    and the origin/main side, so no local variable from one side can leak
+    into the other's join (see the module docstring check 9 and F6)."""
+    visible, jsonld_pairs = _scan_units(path, text)
+    return visible + "\n" + "\n".join(v for _, v in jsonld_pairs)
+
+
 def new_comma_dash_artifacts(head_text: str, main_text: str | None) -> list[str]:
     """Structural COUNT comparison (Step C): flags a net increase of comma
     plus em/en-dash occurrences (any whitespace between, including NBSP —
@@ -605,11 +614,8 @@ def check_punctuation_artifacts():
         # (c) ", —"/", –" — a structural count comparison against
         # origin/main, per file (see module docstring check 9).
         main_text = _origin_main_text(p)
-        head_joined = visible + "\n" + "\n".join(v for _, v in jsonld_pairs)
-        main_joined = None
-        if main_text is not None:
-            main_visible, main_pairs = _scan_units(p, main_text)
-            main_joined = main_visible + "\n" + "\n".join(v for _, v in main_pairs)
+        head_joined = _comma_dash_scan_text(p, text)
+        main_joined = _comma_dash_scan_text(p, main_text) if main_text is not None else None
         for msg in new_comma_dash_artifacts(head_joined, main_joined):
             fails.append(f"{rel}: new ', —' artifact vs origin/main {msg}")
     return fails
