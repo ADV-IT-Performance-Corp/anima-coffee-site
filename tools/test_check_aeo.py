@@ -77,6 +77,22 @@ class EmptyInlineElementTests(unittest.TestCase):
         self.assertEqual(result, [])
 
 
+class NewFileNotScannedTests(unittest.TestCase):
+    def test_new_file_is_not_scanned_for_comma_dash(self):
+        """A file absent from origin/main has no deletion history, so the
+        ', —' rule is out of scope for it — main=None must return []
+        (not compare against an empty document)."""
+        head = "<p>one, — two, — three</p>"
+        self.assertEqual(ca.new_comma_dash_artifacts(head, None), [])
+
+    def test_new_file_is_not_scanned_for_empty_elements(self):
+        """A file absent from origin/main has no deletion history, so the
+        empty-inline-element rule is out of scope for it — main=None must
+        return [] (not compare against an empty document)."""
+        head = '<b></b><span class="ico"></span>'
+        self.assertEqual(ca.new_empty_inline_elements(head, None), [])
+
+
 class CommaDashArtifactTests(unittest.TestCase):
     def test_preexisting_comma_dash_is_not_flagged(self):
         """A legitimate ', —' aside whose surrounding words merely got
