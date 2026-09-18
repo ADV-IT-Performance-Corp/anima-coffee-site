@@ -21,10 +21,32 @@ Checks, each printed as its own PASS/FAIL line with failing examples:
    `:,` `;,` `,,` an empty/space-only `()`/`( )`, or a comma/dash right
    after an opening bracket) in visible page text or in a JSON-LD
    name/text/description/headline/citation string; leading/trailing
-   whitespace in a JSON-LD name/headline/description string; or a ", —"/
-   ", –" whose immediate context is new relative to `origin/main` (plain
-   ", —" is legitimate UA/RU punctuation elsewhere on the site, so only a
-   changed context — proof a deletion left it stranded — is flagged).
+   whitespace in a JSON-LD name/headline/description string; or more
+   ", —"/", –" sequences (any whitespace variant, including NBSP) in a
+   file's scan text than on `origin/main` — a structural COUNT comparison,
+   not a text-context heuristic (plain ", —" is legitimate UA/RU
+   punctuation elsewhere on the site, so only a net increase relative to
+   origin/main is flagged; see new_comma_dash_artifacts()).
+10. No `.html` file has MORE empty/whitespace-only instances of a given
+    (tag, attrs, parent-tag-chain) signature than `origin/main` has of that
+    same signature, for the tracked tag set (`b strong i em span a li p
+    h1`-`h6 td th dd dt figcaption blockquote`) — a structural count
+    comparison via an HTMLParser open-element stack, not a text-context
+    heuristic (see new_empty_inline_elements()). Anchor/id/name targets and
+    `aria-hidden` elements are exempt unconditionally; a `span` whose only
+    attribute is `class` is exempt when an origin/main span of the same
+    class is already empty anywhere in the file. Content inside
+    `script`/`style`/`template` is never scanned.
+
+Known false negative (both checks 9's ", —" rule and check 10, documented
+here rather than "fixed" — see new_comma_dash_artifacts() and
+new_empty_inline_elements()): within ONE file, removing an artifact/empty-
+element instance of signature K while a DIFFERENT instance of the same K
+is newly created elsewhere in the same file nets to zero net change and is
+not flagged. Accepted: the mechanical bulk deletions this gate defends
+against (a site-wide text/name removal) ADD artifacts, they do not move an
+existing one from one spot to another — a same-file net-zero swap is not
+the failure mode this gate exists to catch.
 
 Usage: python3 tools/check_aeo.py
 Exit 0 if every check passes, else 1.
@@ -35,6 +57,8 @@ import pathlib
 import re
 import subprocess
 import sys
+from collections import Counter
+from html.parser import HTMLParser
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 BASE = "https://aeo.animacoffee.com.ua"
@@ -211,28 +235,144 @@ _NEVER_VALID_PATTERNS = [
 # is new relative to origin/main (see check_punctuation_artifacts).
 _DASH_AFTER_COMMA = re.compile(r",\s*[–—]")
 
-EMPTY_ELEMENT_TAGS = (
+EMPTY_ELEMENT_TAGS = frozenset((
     "b", "strong", "i", "em", "span", "a", "li", "p",
     "h1", "h2", "h3", "h4", "h5", "h6", "td", "th",
     "dd", "dt", "figcaption", "blockquote",
-)
+))
+_VOID_TAGS = frozenset((
+    "area", "base", "br", "col", "embed", "hr", "img", "input",
+    "link", "meta", "param", "source", "track", "wbr",
+))
+_MEDIA_DESCENDANT_TAGS = frozenset((
+    "img", "svg", "picture", "video", "audio", "iframe", "input",
+    "select", "textarea", "button", "canvas", "object", "embed", "use",
+))
+_SKIP_SUBTREE_TAGS = frozenset(("script", "style", "template"))
+# Implicit-close pairs: opening `tag` while the innermost open element is
+# one of the keys closes that element first (HTML5's simplified parsing
+# rule for these specific pairs — the only ones this gate needs).
+_IMPLICIT_CLOSE_ON = {
+    "p": {"p"},
+    "li": {"li"},
+    "dt": {"dt", "dd"},
+    "dd": {"dt", "dd"},
+    "td": {"td", "th"},
+    "th": {"td", "th"},
+    "tr": {"tr"},
+}
 
-# An element counts as empty when its content is nothing but whitespace or
-# a whitespace entity — a genuine text deletion leaves exactly this behind
-# (e.g. `<b></b>`), never a non-whitespace child, so nested markup that
-# happens to render no visible text (e.g. an icon `<i>` wrapping only a
-# `<svg>`) is intentionally out of scope for this (Step-A/B scaffold) check.
-_EMPTY_ELEMENT_RE = re.compile(
-    r"<(" + "|".join(EMPTY_ELEMENT_TAGS) + r")\b([^>]*)>"
-    r"(?:\s|&nbsp;|&#160;|&#xa0;)*</\1>",
-    re.I,
-)
-_ANCHOR_TARGET_RE = re.compile(r"\b(?:id|name)\s*=", re.I)
-_ARIA_HIDDEN_RE = re.compile(r"\baria-hidden\b", re.I)
+
+class _EmptyElementScanner(HTMLParser):
+    """Open-element-stack HTML parser producing one record per CLOSED
+    tracked element whose subtree has no non-whitespace text and no
+    media-set descendant. Void elements are never pushed; a stray end tag
+    with no matching open element is ignored; an end tag pops everything
+    above (and including) its match; script/style/template subtrees are
+    skipped entirely, including for the surrounding ancestors' text
+    accumulation. Both the head and the origin/main version of a file go
+    through this SAME parser, so any parsing quirk it has is applied
+    identically to both sides and cancels out of the comparison.
+    """
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.stack = []
+        self.records = []
+        self._skip_depth = 0
+
+    def handle_starttag(self, tag, attrs):
+        tag = tag.lower()
+        if self._skip_depth:
+            if tag in _SKIP_SUBTREE_TAGS:
+                self._skip_depth += 1
+            return
+        if self.stack and tag in _IMPLICIT_CLOSE_ON.get(self.stack[-1]["tag"], ()):
+            self._close_top()
+        if tag in _MEDIA_DESCENDANT_TAGS:
+            self._mark_media_ancestors()
+        if tag in _VOID_TAGS:
+            return  # never pushed
+        node = {
+            "tag": tag,
+            "attrs": tuple(sorted(attrs)),
+            "has_text": False,
+            "has_media": False,
+            "line": self.getpos()[0],
+            "skip_root": tag in _SKIP_SUBTREE_TAGS,
+        }
+        if node["skip_root"]:
+            self._skip_depth += 1
+        self.stack.append(node)
+
+    def handle_startendtag(self, tag, attrs):
+        # Self-closed markup (`<img/>`): treat as a pure start, matching
+        # void-tag handling above; no separate end event needed either way.
+        self.handle_starttag(tag, attrs)
+
+    def handle_endtag(self, tag):
+        tag = tag.lower()
+        if self._skip_depth:
+            if self.stack and self.stack[-1]["tag"] == tag and self.stack[-1]["skip_root"]:
+                self._close_top()
+                self._skip_depth -= 1
+            return  # nested/stray tag inside a skipped subtree: ignored
+        idx = None
+        for i in range(len(self.stack) - 1, -1, -1):
+            if self.stack[i]["tag"] == tag:
+                idx = i
+                break
+        if idx is None:
+            return  # stray end tag with no matching open element: ignored
+        while len(self.stack) > idx:
+            self._close_top()
+
+    def handle_data(self, data):
+        if self._skip_depth:
+            return
+        if data.replace("\xa0", " ").strip():
+            for node in self.stack:
+                node["has_text"] = True
+
+    def _mark_media_ancestors(self):
+        for node in self.stack:
+            node["has_media"] = True
+
+    def _close_top(self):
+        node = self.stack.pop()
+        if node["skip_root"] or node["tag"] not in EMPTY_ELEMENT_TAGS:
+            return
+        if node["has_text"] or node["has_media"]:
+            return
+        parent_path = ">".join(n["tag"] for n in self.stack)
+        self.records.append({
+            "tag": node["tag"],
+            "attrs": node["attrs"],
+            "key": (node["tag"], node["attrs"], parent_path),
+            "line": node["line"],
+        })
 
 
-def _strip_non_scan_blocks(html_src: str) -> str:
-    return re.sub(r"<(script|style|template)\b[^>]*>.*?</\1>", " ", html_src, flags=re.S | re.I)
+def _scan_empty_elements(html_src: str):
+    parser = _EmptyElementScanner()
+    parser.feed(html_src)
+    parser.close()
+    return parser.records
+
+
+def _is_id_or_name(attrs) -> bool:
+    return any(k in ("id", "name") for k, _v in attrs)
+
+
+def _is_aria_hidden(attrs) -> bool:
+    return any(k == "aria-hidden" for k, _v in attrs)
+
+
+def _format_attrs(attrs) -> str:
+    parts = []
+    for k, v in attrs:
+        parts.append(f' {k}="{v}"' if v is not None else f" {k}")
+    return "".join(parts)
 
 # Block-level tags get a newline so stripping them can never *merge*
 # unrelated blocks into a run-on sentence; every other tag (a, span, b, …)
@@ -332,52 +472,91 @@ def _punct_scan_files():
 
 
 def new_comma_dash_artifacts(head_text: str, main_text: str | None) -> list[str]:
-    """Step-A/B scaffold: the CURRENT (pre-fix) ", —"/", –" context heuristic,
-    moved verbatim out of check_punctuation_artifacts()'s part (c) — same
-    backward-only ~50-char substring test, same false-positive/false-negative
-    behavior. `head_text` is one scan chunk (visible text or one JSON-LD
-    prose string); `main_text` is the corresponding origin/main content
-    joined across all of that file's chunks (or None for a file absent from
-    origin/main, in which case nothing is flagged). Returns bare match
-    contexts (newlines collapsed to spaces); the caller adds the file/label
-    prefix. Replaced by a count-based structural comparison in Step C.
+    """Structural COUNT comparison (Step C): flags a net increase of ", —"/
+    ", –" occurrences (any whitespace between, including NBSP — see
+    _DASH_AFTER_COMMA) in `head_text` vs `main_text`, not a text-context
+    match. `main_text=None` (file absent from origin/main) compares against
+    an empty document — every occurrence in head counts as new. Returns one
+    "{line}: {context!r}" string per occurrence in the delta (so
+    len(result) == the net increase), taken from the first `delta` matches
+    in head. Known false negative: a same-file swap (one pre-existing ", —"
+    removed, a different one created elsewhere) nets to zero and is not
+    flagged — see the module docstring.
     """
-    if main_text is None:
+    head_matches = list(_DASH_AFTER_COMMA.finditer(head_text))
+    main_n = len(list(_DASH_AFTER_COMMA.finditer(main_text))) if main_text is not None else 0
+    delta = len(head_matches) - main_n
+    if delta <= 0:
         return []
     fails = []
-    for mm in _DASH_AFTER_COMMA.finditer(head_text):
-        lo = max(0, mm.start() - 50)
-        ctx = head_text[lo:mm.end()]
-        if ctx not in main_text:
-            fails.append(ctx.replace("\n", " "))
+    for mm in head_matches[:delta]:
+        line = head_text.count("\n", 0, mm.start()) + 1
+        lo, hi = max(0, mm.start() - 25), min(len(head_text), mm.end() + 25)
+        ctx = head_text[lo:hi].replace("\n", " ")
+        fails.append(f"{line}: {ctx!r}")
     return fails
 
 
 def new_empty_inline_elements(head_html: str, main_html: str | None) -> list[str]:
-    """Step-A/B scaffold: the reverted ac5bbe2 heuristic, moved verbatim —
-    same backward-only ~40-char substring test against the same-spot text on
-    origin/main. NOT wired into CHECKS yet. `head_html`/`main_html` are raw
-    HTML (script/style/template stripped internally); `main_html=None` means
-    the file is absent from origin/main, so nothing is flagged (there is
-    nothing to prove creation against). Replaced by a structural HTMLParser
-    comparison in Step C.
+    """Structural COUNT comparison (Step C) via _EmptyElementScanner: for
+    each (tag, attrs, parent-tag-chain) signature, flags a net increase of
+    empty-element instances in `head_html` vs `main_html`, not a
+    text-context match. `main_html=None` (file absent from origin/main)
+    compares against an empty document — every non-exempt empty element in
+    head counts as new, and the class-only-span exemption below then has
+    nothing to match against (documented, not a bug).
+
+    Exemptions (unconditional, applied before counting): an element with an
+    `id`/`name` attribute (anchor/link target) or `aria-hidden` (decorative
+    by design); a `span` whose ONLY attribute is `class`, when a span of the
+    same class is ALREADY empty anywhere in main_html (position-independent
+    — an icon-span convention re-templated in a different spot is not a new
+    artifact).
+
+    Returns one "{line}: {delta} new empty <tag[ attrs]> under
+    {parent_path} (main {main_n}, head {head_n})" string per signature with
+    a net increase, ordered by first occurrence in head. Known false
+    negative: a same-file swap (one pre-existing empty element of signature
+    K removed, a different one of the same K created elsewhere) nets to
+    zero and is not flagged — see the module docstring.
     """
-    raw = _strip_non_scan_blocks(head_html)
-    main_raw = _strip_non_scan_blocks(main_html) if main_html is not None else None
+    head_records = _scan_empty_elements(head_html)
+    main_records = _scan_empty_elements(main_html) if main_html is not None else []
+
+    main_class_only_spans = {
+        dict(r["attrs"])["class"]
+        for r in main_records
+        if r["tag"] == "span" and len(r["attrs"]) == 1 and r["attrs"][0][0] == "class"
+    }
+
+    main_counter = Counter(
+        r["key"] for r in main_records
+        if not _is_id_or_name(r["attrs"]) and not _is_aria_hidden(r["attrs"])
+    )
+
+    head_counter = Counter()
+    head_first_pos = {}
+    for r in head_records:
+        if _is_id_or_name(r["attrs"]) or _is_aria_hidden(r["attrs"]):
+            continue
+        if (r["tag"] == "span" and len(r["attrs"]) == 1 and r["attrs"][0][0] == "class"
+                and dict(r["attrs"])["class"] in main_class_only_spans):
+            continue
+        head_counter[r["key"]] += 1
+        head_first_pos.setdefault(r["key"], r["line"])
+
     fails = []
-    for mm in _EMPTY_ELEMENT_RE.finditer(raw):
-        tag, attrs = mm.group(1), mm.group(2)
-        if tag.lower() == "a" and _ANCHOR_TARGET_RE.search(attrs):
-            continue  # anchor used as a link target, not prose text
-        if _ARIA_HIDDEN_RE.search(attrs):
-            continue  # decorative element, empty by design
-        if main_raw is None:
-            continue  # new file on this branch: nothing to diff against
-        lo = max(0, mm.start() - 40)
-        ctx = raw[lo:mm.end()]
-        if ctx in main_raw:
-            continue  # already empty in this exact spot on origin/main
-        fails.append(f"empty <{tag.lower()}> element not on origin/main near {ctx!r}")
+    for key in sorted(head_counter, key=lambda k: head_first_pos[k]):
+        head_n = head_counter[key]
+        main_n = main_counter.get(key, 0)
+        if head_n <= main_n:
+            continue
+        tag, attrs, parent_path = key
+        line = head_first_pos[key]
+        fails.append(
+            f"{line}: {head_n - main_n} new empty <{tag}{_format_attrs(attrs)}> "
+            f"under {parent_path} (main {main_n}, head {head_n})"
+        )
     return fails
 
 
@@ -400,16 +579,29 @@ def check_punctuation_artifacts():
             if k in JSONLD_WS_KEYS and v != v.strip():
                 fails.append(f"{rel}: JSON-LD {k!r} has leading/trailing whitespace: {v!r}")
 
-        # (c) ", —"/", –" — only when the text immediately BEFORE the comma
-        # is new relative to origin/main (see module docstring check 9).
+        # (c) ", —"/", –" — a structural count comparison against
+        # origin/main, per file (see module docstring check 9).
         main_text = _origin_main_text(p)
-        if main_text is None:
-            continue  # new file on this branch: nothing to diff against
-        main_visible, main_pairs = _scan_units(p, main_text)
-        main_joined = main_visible + "\n" + "\n".join(v for _, v in main_pairs)
-        for chunk in [visible] + [v for _, v in jsonld_pairs]:
-            for ctx in new_comma_dash_artifacts(chunk, main_joined):
-                fails.append(f"{rel}: new ', —' artifact vs origin/main near {ctx!r}")
+        head_joined = visible + "\n" + "\n".join(v for _, v in jsonld_pairs)
+        main_joined = None
+        if main_text is not None:
+            main_visible, main_pairs = _scan_units(p, main_text)
+            main_joined = main_visible + "\n" + "\n".join(v for _, v in main_pairs)
+        for msg in new_comma_dash_artifacts(head_joined, main_joined):
+            fails.append(f"{rel}: new ', —' artifact vs origin/main {msg}")
+    return fails
+
+
+def check_empty_inline_elements():
+    fails = []
+    for p in sorted(_punct_scan_files()):
+        if p.suffix != ".html":
+            continue
+        rel = p.relative_to(ROOT).as_posix()
+        head_html = p.read_text(encoding="utf-8", errors="ignore")
+        main_html = _origin_main_text(p)
+        for msg in new_empty_inline_elements(head_html, main_html):
+            fails.append(f"{rel}:{msg}")
     return fails
 
 
@@ -423,6 +615,7 @@ CHECKS = [
     ("every old-slug stub is well-formed", check_redirect_stubs),
     ("no unconfirmed roaster name (Covim) anywhere", check_no_unconfirmed_roaster_name),
     ("no mechanical-deletion punctuation artifacts", check_punctuation_artifacts),
+    ("no empty inline elements left by bulk text removal", check_empty_inline_elements),
 ]
 
 

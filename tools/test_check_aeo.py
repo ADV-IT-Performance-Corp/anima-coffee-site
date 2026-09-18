@@ -29,18 +29,18 @@ class EmptyInlineElementTests(unittest.TestCase):
         self.assertEqual(ca.new_empty_inline_elements(head, main), [])
 
     def test_newly_emptied_element_with_common_context_is_flagged(self):
-        """When the exact same preceding text also precedes an
-        ALREADY-empty element elsewhere on origin/main, the current
-        (Step-A) heuristic treats a genuinely new empty element as
-        'already seen' and misses it — a false negative. RED at Step A/B."""
-        shared_prefix = "the finest fresh roasted coffee beans that we offer"
-        main = (
-            f"<p>{shared_prefix}<b></b> for you.</p>"
-            f"<p>{shared_prefix}<b>Supplier</b> for you.</p>"
-        )
+        """A pre-existing empty <b> is kept unchanged, and a genuinely NEW
+        second empty <b> is added elsewhere in the same file, reusing the
+        same ~40-char preceding text. The current (Step-A) heuristic finds
+        that context already present on origin/main (from the unchanged
+        first element) and misses the new one too — a false negative. The
+        structural check must still flag exactly one net-new empty <b>
+        (main has 1 instance of the signature, head has 2). RED at Step A/B."""
+        shared_prefix = "the finest fresh roasted coffee beans daily by "
+        main = f"<p>{shared_prefix}<b></b> forever.</p>"
         head = (
-            f"<p>{shared_prefix}<b>Supplier</b> for you.</p>"
-            f"<p>{shared_prefix}<b></b> for you.</p>"
+            f"<p>{shared_prefix}<b></b> forever.</p>"
+            f"<p>{shared_prefix}<b></b> newly empty too.</p>"
         )
         result = ca.new_empty_inline_elements(head, main)
         self.assertEqual(len(result), 1)
@@ -49,10 +49,9 @@ class EmptyInlineElementTests(unittest.TestCase):
         """id/name anchor targets, aria-hidden decorative elements, and
         markup inside script/style/template are never flagged regardless
         of history. A class-only span that matches an ALREADY-empty span
-        of the same class elsewhere on origin/main should also be exempt
-        (position-independent, by class) — that specific exemption is a
-        Step C addition, so it is expected to still fail (be flagged) at
-        Step A/B; the other three sub-cases already pass at Step A/B."""
+        of the same class elsewhere on origin/main is also exempt
+        (position-independent, by class) — this sub-case is a Step C
+        addition: it fails (is flagged) at Step A/B and passes at Step C."""
         pad = "Completely different unrelated paragraph text padding padding padding here."
         main = (
             '<span class="ico"></span>'
@@ -74,9 +73,8 @@ class EmptyInlineElementTests(unittest.TestCase):
         self.assertFalse(any("anchor1" in r for r in result))
         self.assertFalse(any("aria-hidden" in r for r in result))
         self.assertFalse(any("markup" in r for r in result))
-        # class-only-span-matches-by-class-on-main exemption: NOT implemented
-        # at Step A/B (position-dependent context only) -- documents RED.
-        self.assertEqual(result, [], "class-only-span exemption not yet implemented (Step C)")
+        # class-only-span-matches-by-class-on-main exemption (Step C).
+        self.assertEqual(result, [])
 
 
 class CommaDashArtifactTests(unittest.TestCase):
@@ -91,18 +89,18 @@ class CommaDashArtifactTests(unittest.TestCase):
         self.assertEqual(ca.new_comma_dash_artifacts(head, main), [])
 
     def test_comma_dash_stranded_by_deletion_is_flagged(self):
-        """When the same preceding text also precedes an
-        ALREADY-present ', —' elsewhere on origin/main, the current
-        (Step-A) heuristic misses a genuinely new stranded ', —' — a
-        false negative. RED at Step A/B."""
-        shared_prefix = "the finest fresh roasted coffee beans that we offer"
-        main = (
-            f"<p>{shared_prefix}, — always fresh.</p>"
-            f"<p>{shared_prefix}, Supplier — always fresh.</p>"
-        )
+        """A pre-existing ', —' is kept unchanged, and a genuinely NEW
+        second ', —' is added elsewhere in the same file, reusing the same
+        ~25-char preceding text. The current (Step-A) heuristic finds that
+        context already present on origin/main (from the unchanged first
+        occurrence) and misses the new one too — a false negative. The
+        count comparison must still flag exactly one net-new ', —' (main
+        has 1 occurrence, head has 2). RED at Step A/B."""
+        shared_prefix = "the finest fresh roasted coffee beans that we offer today"
+        main = f"<p>{shared_prefix}, — always fresh.</p>"
         head = (
-            f"<p>{shared_prefix}, Supplier — always fresh.</p>"
             f"<p>{shared_prefix}, — always fresh.</p>"
+            f"<p>{shared_prefix}, — even more fresh.</p>"
         )
         result = ca.new_comma_dash_artifacts(head, main)
         self.assertEqual(len(result), 1)
