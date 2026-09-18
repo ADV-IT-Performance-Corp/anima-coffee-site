@@ -251,6 +251,48 @@ class ImplicitCloseTests(unittest.TestCase):
         self.assertNotIn("under p>p", result[0])
 
 
+class SelfClosedTagTests(unittest.TestCase):
+    def test_self_closed_svg_children_do_not_become_ancestors(self):
+        """[HIGH] agy, tools/check_aeo.py:327 (full diff 5a62161..746cd77):
+        handle_startendtag overrides HTMLParser.handle_startendtag without
+        calling handle_endtag, leaving non-void self-closing elements
+        unclosed on self.stack — foreign-content markup like
+        `<svg><path/><use/></svg>` pushes `path` and `use` and leaves them
+        open until `</svg>` pops everything above it, so every later
+        sibling would be wrongly attributed under `path`/`use` instead of
+        the real parent. The `<svg>` closes before the `<b>`, so the `<b>`'s
+        parent path is `span`, not `span>svg>path>use`."""
+        main = "<p>t</p>"
+        head = '<p>t</p><span><svg><path d="M0 0"/><use href="#i"/></svg><b></b></span>'
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+        self.assertIn("under span ", result[0])
+        self.assertNotIn("path", result[0])
+
+    def test_self_closed_non_void_element_is_closed_immediately(self):
+        """A self-closed non-void element (`<i/>`) must be closed the
+        moment it is encountered, exactly like a real `<i></i>` pair —
+        the text that follows it belongs to its PARENT, not to the
+        (already-closed) `<i>` itself."""
+        main = "<p>t</p>"
+        head = "<p>t</p><p><i/> text</p>"
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+        self.assertIn("<i>", result[0])
+
+    def test_self_closed_void_tag_still_never_pushed(self):
+        """A self-closed void element (`<br/>`) must still never be
+        pushed onto the stack at all — it must not appear in the parent
+        path of a later sibling, and closing it must not double-pop a
+        real element."""
+        main = "<p>t</p>"
+        head = "<p>t</p><p><br/><b></b></p>"
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+        self.assertIn("under p ", result[0])
+        self.assertNotIn("br", result[0])
+
+
 class CommaDashScanTextTests(unittest.TestCase):
     def test_comma_dash_scan_text_includes_jsonld_prose(self):
         """F6 hardening after the agy [HIGH] false-positive finding at
