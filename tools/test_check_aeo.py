@@ -93,6 +93,31 @@ class NewFileNotScannedTests(unittest.TestCase):
         self.assertEqual(ca.new_empty_inline_elements(head, None), [])
 
 
+class NestedSkipSubtreeTests(unittest.TestCase):
+    def test_nested_template_does_not_swallow_the_rest_of_the_file(self):
+        """agy [HIGH] tools/check_aeo.py:317 (round-1 diff 5a62161..9cb16ef):
+        handle_endtag only decrements _skip_depth when the stack top is a
+        skip root with the matching tag, so a NESTED <template> inside a
+        <template> closes the outer template on the inner end tag and
+        leaves the scanner permanently in skip mode for the rest of the
+        file. An empty <b></b> placed AFTER a nested template pair must
+        still be flagged when main lacks it."""
+        main = "<template><template></template></template>"
+        head = "<template><template></template></template><b></b>"
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+
+    def test_script_nested_in_template_does_not_swallow_the_rest_of_the_file(self):
+        """Second regression shape from the agy finding: a <script> nested
+        inside a <template> must not miscount the skip depth either — an
+        empty <b></b> after the pair must still be flagged when main lacks
+        it."""
+        main = "<template><script>x</script></template>"
+        head = "<template><script>x</script></template><b></b>"
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+
+
 class CommaDashArtifactTests(unittest.TestCase):
     def test_preexisting_comma_dash_is_not_flagged(self):
         """A legitimate ', —' aside whose surrounding words merely got
