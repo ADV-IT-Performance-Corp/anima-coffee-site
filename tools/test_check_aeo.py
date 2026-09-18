@@ -11,6 +11,7 @@ placeholder convention, see tools/check_aeo.py's roaster-name check).
 import pathlib
 import sys
 import unittest
+from unittest import mock
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import check_aeo as ca  # noqa: E402
@@ -75,6 +76,24 @@ class EmptyInlineElementTests(unittest.TestCase):
         self.assertFalse(any("markup" in r for r in result))
         # class-only-span-matches-by-class-on-main exemption (Step C).
         self.assertEqual(result, [])
+
+
+class OriginMainTextMemoizationTests(unittest.TestCase):
+    def test_origin_main_text_is_fetched_once_per_path(self):
+        """F7a (agy-independent verifier, tools/check_aeo.py:584/:602):
+        check_punctuation_artifacts() and check_empty_inline_elements()
+        each call _origin_main_text(p) per file, so every page was fetched
+        via `git show` TWICE per run. Memoize per rel-path for the
+        duration of one run so a repeated lookup of the same path costs
+        one subprocess call."""
+        ca._origin_main_text.cache_clear()
+        fake = subprocess_result = mock.Mock(returncode=0, stdout="cached content")
+        with mock.patch.object(ca.subprocess, "run", return_value=fake) as run_mock:
+            p = pathlib.Path("/fake/root/answers/faq.html")
+            with mock.patch.object(ca, "ROOT", pathlib.Path("/fake/root")):
+                ca._origin_main_text(p)
+                ca._origin_main_text(p)
+        self.assertEqual(run_mock.call_count, 1)
 
 
 class NewFileNotScannedTests(unittest.TestCase):
