@@ -77,6 +77,68 @@ class EmptyInlineElementTests(unittest.TestCase):
         # class-only-span-matches-by-class-on-main exemption (Step C).
         self.assertEqual(result, [])
 
+    def test_name_attribute_is_exempt_like_id(self):
+        """A non-empty `name` attribute is a real anchor/link target just
+        like a non-empty `id`, so an empty <a name="x"></a> introduced in
+        head must not be flagged (see _is_id_or_name)."""
+        main = "<p>text</p>"
+        head = '<p>text</p><a name="x"></a>'
+        self.assertEqual(ca.new_empty_inline_elements(head, main), [])
+
+    def test_template_skips_content_like_script(self):
+        """<template> is in _SKIP_SUBTREE_TAGS, so its content is never
+        scanned — an empty <b></b> inside a <template> introduced in head
+        must not be flagged, exactly like inside <script>."""
+        main = "<p>text</p>"
+        head = "<p>text</p><template><b></b></template>"
+        self.assertEqual(ca.new_empty_inline_elements(head, main), [])
+
+    def test_style_skips_content_like_script(self):
+        """<style> is in _SKIP_SUBTREE_TAGS, so tag-like text inside it
+        (e.g. a CSS content string containing literal markup) is never
+        scanned, exactly like inside <script>."""
+        main = "<p>text</p>"
+        head = '<p>text</p><style>b { content: "<b></b>"; }</style>'
+        self.assertEqual(ca.new_empty_inline_elements(head, main), [])
+
+    def test_media_descendant_exempts_element_with_no_text(self):
+        """An element with no text but a media-set descendant (img, or
+        svg>use) is not empty, even when main lacks the element entirely —
+        _mark_media_ancestors marks every open ancestor, not just the
+        immediate parent."""
+        main = "<p>only text</p>"
+        head = (
+            "<p>only text</p>"
+            '<a href="/x"><img src="a.png" alt=""></a>'
+            "<span><svg><use href=\"#i\"/></svg></span>"
+        )
+        self.assertEqual(ca.new_empty_inline_elements(head, main), [])
+
+    def test_nested_empty_elements_are_separate_signatures(self):
+        """Two DIFFERENT nested empty elements in the same new subtree each
+        get their own (tag, attrs, parent_path) signature and are both
+        counted: an empty <b> (parent path "p>span") and an empty <span>
+        (parent path "p"). The new outer <p> itself carries non-empty text
+        ("extra text") so it does not ALSO register as a third empty
+        signature — isolating exactly the two nested ones under test."""
+        main = "<p>text</p>"
+        head = "<p>text</p><p>extra text<span><b></b></span></p>"
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 2)
+
+    def test_parent_path_differs_makes_new_signature(self):
+        """The parent-tag-chain is part of the signature key: an empty <b>
+        directly under <p> on main and the same empty <b> directly under
+        <li> on head are DIFFERENT signatures (documented consequence of
+        keying by parent path), so the <li>-parented one is flagged as new
+        even though a <b> of this shape already existed on main. Both the
+        <p> and <li> wrappers carry their own text so only the <b> itself
+        differs, isolating the signature comparison to parent path."""
+        main = "<p>text <b></b></p>"
+        head = "<ul><li>text <b></b></li></ul>"
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+
 
 class OriginMainTextMemoizationTests(unittest.TestCase):
     def test_origin_main_text_is_fetched_once_per_path(self):
@@ -164,6 +226,31 @@ class NestedSkipSubtreeTests(unittest.TestCase):
         self.assertEqual(len(result), 1)
 
 
+class ImplicitCloseTests(unittest.TestCase):
+    def test_implicit_p_close_gives_flat_parent_path(self):
+        """`<p>one<p>two<b></b>` has no closing </p> tags at all: opening
+        the second <p> while a <p> is the innermost open element implicitly
+        closes the first (per _IMPLICIT_CLOSE_ON), so the empty <b></b> is a
+        child of the SECOND <p>, with parent_path "p" (flat, one level) —
+        NOT "p>p" (which would imply the second <p> nested inside the
+        first). Verified directly against _scan_empty_elements() output,
+        confirming HTMLParser's implicit-close handling here matches the
+        real HTML5 parsing rule for this pair."""
+        head = "<p>one<p>two<b></b>"
+        records = ca._scan_empty_elements(head)
+        self.assertEqual(len(records), 1)
+        parent_path = records[0]["key"][2]
+        self.assertIn("p", parent_path)
+        self.assertNotIn("p>p", parent_path)
+        self.assertEqual(parent_path, "p")
+
+        main = "<p>one<p>two"
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+        self.assertIn("under p ", result[0])
+        self.assertNotIn("under p>p", result[0])
+
+
 class CommaDashScanTextTests(unittest.TestCase):
     def test_comma_dash_scan_text_includes_jsonld_prose(self):
         """F6 hardening after the agy [HIGH] false-positive finding at
@@ -218,7 +305,7 @@ class CommaDashArtifactTests(unittest.TestCase):
         head = "<p>Оренда кавових машин, — сказав він.</p>"
         self.assertEqual(ca.new_comma_dash_artifacts(head, main), [])
 
-    def test_comma_dash_stranded_by_deletion_is_flagged(self):
+    def test_comma_dash_added_elsewhere_is_flagged(self):
         """A pre-existing ', —' is kept unchanged, and a genuinely NEW
         second ', —' is added elsewhere in the same file, reusing the same
         ~25-char preceding text. The current (Step-A) heuristic finds that
@@ -232,6 +319,17 @@ class CommaDashArtifactTests(unittest.TestCase):
             f"<p>{shared_prefix}, — always fresh.</p>"
             f"<p>{shared_prefix}, — even more fresh.</p>"
         )
+        result = ca.new_comma_dash_artifacts(head, main)
+        self.assertEqual(len(result), 1)
+
+    def test_comma_dash_stranded_by_deletion_is_flagged(self):
+        """The word "Supplier" was deleted from between the comma and the
+        dash: on main the comma and dash are separated by "Supplier" so
+        _DASH_AFTER_COMMA has 0 matches there; on head, with "Supplier"
+        gone, the comma and dash are directly adjacent, giving 1 match — a
+        net increase of exactly 1 for this file, correctly flagged."""
+        main = "<p>Beans, Supplier — roasted weekly.</p><p>Beans are delivered weekly.</p>"
+        head = "<p>Beans, — roasted weekly.</p><p>Beans are delivered weekly.</p>"
         result = ca.new_comma_dash_artifacts(head, main)
         self.assertEqual(len(result), 1)
 
