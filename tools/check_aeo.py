@@ -379,11 +379,16 @@ def _scan_empty_elements(html_src: str):
 
 
 def _is_id_or_name(attrs) -> bool:
-    return any(k in ("id", "name") for k, _v in attrs)
+    """A real anchor/link target needs a non-empty id/name — id="" or
+    name="" is not a usable target and must not exempt an empty element."""
+    return any(k in ("id", "name") and v and v.strip() for k, v in attrs)
 
 
 def _is_aria_hidden(attrs) -> bool:
-    return any(k == "aria-hidden" for k, _v in attrs)
+    """Only aria-hidden="true" (case-insensitive, after strip) is actually
+    hidden from assistive tech — aria-hidden="false" is explicitly visible
+    and must not be exempted."""
+    return any(k == "aria-hidden" and (v or "").strip().lower() == "true" for k, v in attrs)
 
 
 def _format_attrs(attrs) -> str:
