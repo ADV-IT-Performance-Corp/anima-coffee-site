@@ -86,7 +86,7 @@ class OriginMainTextMemoizationTests(unittest.TestCase):
         via `git show` TWICE per run. Memoize per rel-path for the
         duration of one run so a repeated lookup of the same path costs
         one subprocess call."""
-        ca._origin_main_text.cache_clear()
+        ca._origin_main_text_by_rel.cache_clear()
         fake = subprocess_result = mock.Mock(returncode=0, stdout="cached content")
         with mock.patch.object(ca.subprocess, "run", return_value=fake) as run_mock:
             p = pathlib.Path("/fake/root/answers/faq.html")

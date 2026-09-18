@@ -58,6 +58,7 @@ the failure mode this gate exists to catch.
 Usage: python3 tools/check_aeo.py
 Exit 0 if every check passes, else 1.
 """
+import functools
 import html
 import json
 import pathlib
@@ -454,12 +455,19 @@ def _scan_units(path: pathlib.Path, text: str):
     return _strip_code_and_urls(text), []
 
 
-def _origin_main_text(path: pathlib.Path):
-    rel = path.relative_to(ROOT).as_posix()
+@functools.lru_cache(maxsize=None)
+def _origin_main_text_by_rel(rel: str):
     result = subprocess.run(
         ["git", "show", f"origin/main:{rel}"], cwd=ROOT, capture_output=True, text=True,
     )
     return result.stdout if result.returncode == 0 else None
+
+
+def _origin_main_text(path: pathlib.Path):
+    """Memoized per rel-path for the duration of one run (F7a) — every
+    check that needs a file's origin/main version shares the single `git
+    show` call site in _origin_main_text_by_rel()."""
+    return _origin_main_text_by_rel(path.relative_to(ROOT).as_posix())
 
 
 # Not site content: internal handoff/ops docs (verified 2026-09-17 absent
