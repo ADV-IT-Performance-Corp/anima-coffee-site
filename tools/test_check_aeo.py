@@ -112,6 +112,33 @@ class NewFileNotScannedTests(unittest.TestCase):
         self.assertEqual(ca.new_empty_inline_elements(head, None), [])
 
 
+class ValueAwareExemptionTests(unittest.TestCase):
+    def test_aria_hidden_false_is_flagged(self):
+        """F7b (independent verifier, tools/check_aeo.py:363-368):
+        _is_aria_hidden() exempted on attribute-KEY presence only, so
+        aria-hidden="false" was wrongly exempted like a real
+        decorative/hidden element. Measured on the site: 91 aria-hidden
+        usages, all "true", so this must not change current-main output."""
+        main = "<p>text</p>"
+        head = '<p>text</p><span aria-hidden="false"></span>'
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+
+    def test_aria_hidden_true_still_exempt(self):
+        main = "<p>text</p>"
+        head = '<p>text</p><span aria-hidden="true"></span>'
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(result, [])
+
+    def test_empty_id_attribute_is_flagged(self):
+        """id="" is not a real anchor target, so it must not exempt an
+        otherwise-empty <b>."""
+        main = "<p>text</p>"
+        head = '<p>text</p><b id=""></b>'
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+
+
 class NestedSkipSubtreeTests(unittest.TestCase):
     def test_nested_template_does_not_swallow_the_rest_of_the_file(self):
         """agy [HIGH] tools/check_aeo.py:317 (round-1 diff 5a62161..9cb16ef):
