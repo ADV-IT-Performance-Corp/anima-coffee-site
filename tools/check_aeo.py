@@ -323,9 +323,19 @@ class _EmptyElementScanner(HTMLParser):
         self.stack.append(node)
 
     def handle_startendtag(self, tag, attrs):
-        # Self-closed markup (`<img/>`): treat as a pure start, matching
-        # void-tag handling above; no separate end event needed either way.
+        # Self-closed markup (`<img/>`, or foreign-content `<path/>`,
+        # `<use/>`): starts the element like a normal start tag, then
+        # immediately closes it, so a self-closed NON-void element never
+        # stays open on self.stack for later siblings (a void tag is never
+        # pushed in the first place, and an already-skipped subtree has
+        # nothing on self.stack to close — both cases are checked against
+        # the state BEFORE handle_starttag(), since that call is what may
+        # push the node or extend the skip-subtree tracking).
+        was_skipping = bool(self._skip_stack)
+        tag_lower = tag.lower()
         self.handle_starttag(tag, attrs)
+        if not was_skipping and tag_lower not in _VOID_TAGS:
+            self.handle_endtag(tag)
 
     def handle_endtag(self, tag):
         tag = tag.lower()

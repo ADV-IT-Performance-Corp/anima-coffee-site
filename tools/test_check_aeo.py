@@ -284,8 +284,10 @@ class SelfClosedTagTests(unittest.TestCase):
         """A self-closed void element (`<br/>`) must still never be
         pushed onto the stack at all — it must not appear in the parent
         path of a later sibling, and closing it must not double-pop a
-        real element."""
-        main = "<p>t</p>"
+        real element. `main` already has the surrounding `<p><br/></p>`
+        (itself an empty <p>, since a lone <br/> contributes no text
+        either way) so only the new `<b>` is a net-new signature."""
+        main = "<p>t</p><p><br/></p>"
         head = "<p>t</p><p><br/><b></b></p>"
         result = ca.new_empty_inline_elements(head, main)
         self.assertEqual(len(result), 1)
