@@ -290,6 +290,16 @@ class _EmptyElementScanner(HTMLParser):
     element still open at EOF (missing end tag) is never closed, so it
     contributes no record on either side — this cancels out of the
     comparison too, unless only one side introduces the unclosed element.
+
+    Invariants (state-machine read-through, round 4): a void tag is NEVER
+    pushed onto `self.stack`, under any skip state or event type.
+    `_skip_stack` is the single source of truth for "currently skipping" —
+    every other method checks it, never a separate flag or depth counter.
+    Every node pushed onto `self.stack` (and every skip-subtree tag pushed
+    onto `_skip_stack`) is eventually popped by exactly one of: the
+    matching real end tag, an ancestor's end tag closing everything above
+    it, an implicit close from `_IMPLICIT_CLOSE_ON`, or its own self-close
+    in `handle_startendtag` — nothing else ever mutates either stack.
     """
 
     def __init__(self):
@@ -326,15 +336,23 @@ class _EmptyElementScanner(HTMLParser):
         # Self-closed markup (`<img/>`, or foreign-content `<path/>`,
         # `<use/>`): starts the element like a normal start tag, then
         # immediately closes it, so a self-closed NON-void element never
-        # stays open on self.stack for later siblings (a void tag is never
-        # pushed in the first place, and an already-skipped subtree has
-        # nothing on self.stack to close — both cases are checked against
-        # the state BEFORE handle_starttag(), since that call is what may
-        # push the node or extend the skip-subtree tracking).
-        was_skipping = bool(self._skip_stack)
+        # stays open on self.stack (or on _skip_stack, for a self-closed
+        # skip-subtree tag) for later siblings. handle_endtag is called
+        # UNCONDITIONALLY for every non-void tag, regardless of skip
+        # state -- it is itself skip-aware and always does the right
+        # thing given what handle_starttag just did: for a skip-subtree
+        # tag self-closed while already skipping, handle_starttag pushed
+        # it onto _skip_stack and handle_endtag pops that exact entry
+        # (top matches); for a non-skip tag self-closed while skipping,
+        # handle_starttag pushed nothing and handle_endtag is a no-op
+        # (top doesn't match). Skipping the handle_endtag call while
+        # already skipping (the earlier, wrong shape) left a self-closed
+        # skip-subtree tag's push unpopped, so the next real end tag
+        # matching THAT inner tag's name would resolve first and the
+        # scanner would never leave skip mode.
         tag_lower = tag.lower()
         self.handle_starttag(tag, attrs)
-        if not was_skipping and tag_lower not in _VOID_TAGS:
+        if tag_lower not in _VOID_TAGS:
             self.handle_endtag(tag)
 
     def handle_endtag(self, tag):
