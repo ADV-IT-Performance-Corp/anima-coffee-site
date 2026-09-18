@@ -118,6 +118,49 @@ class NestedSkipSubtreeTests(unittest.TestCase):
         self.assertEqual(len(result), 1)
 
 
+class CommaDashScanTextTests(unittest.TestCase):
+    def test_comma_dash_scan_text_includes_jsonld_prose(self):
+        """F6 hardening after the agy [HIGH] false-positive finding at
+        tools/check_aeo.py:588 (main_joined was claimed to be built from
+        head's jsonld_pairs; the conductor verified this was NOT actually
+        the case at 9cb16ef). To make the misread impossible by
+        construction, one helper builds the scan text for BOTH sides. An
+        .html string whose ONLY ', —' sits inside a JSON-LD 'description'
+        must still appear in the scan text via that one helper."""
+        import pathlib as _pathlib
+        html_src = (
+            '<html><body><p>no dash here</p>'
+            '<script type="application/ld+json">'
+            '{"description": "Beans, — roasted weekly."}'
+            "</script></body></html>"
+        )
+        scan_text = ca._comma_dash_scan_text(_pathlib.Path("x.html"), html_src)
+        self.assertIn(", —", scan_text)
+
+    def test_comma_dash_delta_zero_when_dash_moves_between_scan_units(self):
+        """A pair where main has ', —' only inside JSON-LD and head has it
+        only in visible text must yield delta 0 through
+        new_comma_dash_artifacts() — counts are per file across BOTH scan
+        units (visible text + JSON-LD prose), not per unit."""
+        import pathlib as _pathlib
+        p = _pathlib.Path("x.html")
+        main_html = (
+            '<html><body><p>Beans roasted weekly.</p>'
+            '<script type="application/ld+json">'
+            '{"description": "Beans, — a supplier favorite."}'
+            "</script></body></html>"
+        )
+        head_html = (
+            '<html><body><p>Beans, — roasted weekly.</p>'
+            '<script type="application/ld+json">'
+            '{"description": "Beans, a supplier favorite."}'
+            "</script></body></html>"
+        )
+        main_scan = ca._comma_dash_scan_text(p, main_html)
+        head_scan = ca._comma_dash_scan_text(p, head_html)
+        self.assertEqual(ca.new_comma_dash_artifacts(head_scan, main_scan), [])
+
+
 class CommaDashArtifactTests(unittest.TestCase):
     def test_preexisting_comma_dash_is_not_flagged(self):
         """A legitimate ', —' aside whose surrounding words merely got
