@@ -277,22 +277,31 @@ class _EmptyElementScanner(HTMLParser):
     with no matching open element is ignored; an end tag pops everything
     above (and including) its match; script/style/template subtrees are
     skipped entirely, including for the surrounding ancestors' text
-    accumulation. Both the head and the origin/main version of a file go
+    accumulation — a skip-subtree tag nested inside another (e.g.
+    <template><script>...) pushes onto `_skip_stack` rather than the main
+    element stack, so the skip region only ends once every nested
+    skip-subtree tag has been closed, matching the tag that opened it; a
+    naive depth counter that doesn't track WHICH tag opened each nested
+    level can desync when an inner tag's end tag is mistaken for the
+    outer's. Both the head and the origin/main version of a file go
     through this SAME parser, so any parsing quirk it has is applied
-    identically to both sides and cancels out of the comparison.
+    identically to both sides and cancels out of the comparison. An
+    element still open at EOF (missing end tag) is never closed, so it
+    contributes no record on either side — this cancels out of the
+    comparison too, unless only one side introduces the unclosed element.
     """
 
     def __init__(self):
         super().__init__(convert_charrefs=True)
         self.stack = []
         self.records = []
-        self._skip_depth = 0
+        self._skip_stack = []
 
     def handle_starttag(self, tag, attrs):
         tag = tag.lower()
-        if self._skip_depth:
+        if self._skip_stack:
             if tag in _SKIP_SUBTREE_TAGS:
-                self._skip_depth += 1
+                self._skip_stack.append(tag)
             return
         if self.stack and tag in _IMPLICIT_CLOSE_ON.get(self.stack[-1]["tag"], ()):
             self._close_top()
@@ -309,7 +318,7 @@ class _EmptyElementScanner(HTMLParser):
             "skip_root": tag in _SKIP_SUBTREE_TAGS,
         }
         if node["skip_root"]:
-            self._skip_depth += 1
+            self._skip_stack.append(tag)
         self.stack.append(node)
 
     def handle_startendtag(self, tag, attrs):
@@ -319,10 +328,11 @@ class _EmptyElementScanner(HTMLParser):
 
     def handle_endtag(self, tag):
         tag = tag.lower()
-        if self._skip_depth:
-            if self.stack and self.stack[-1]["tag"] == tag and self.stack[-1]["skip_root"]:
-                self._close_top()
-                self._skip_depth -= 1
+        if self._skip_stack:
+            if self._skip_stack[-1] == tag:
+                self._skip_stack.pop()
+                if not self._skip_stack:
+                    self._close_top()  # closes the skip root pushed in handle_starttag
             return  # nested/stray tag inside a skipped subtree: ignored
         idx = None
         for i in range(len(self.stack) - 1, -1, -1):
@@ -335,7 +345,7 @@ class _EmptyElementScanner(HTMLParser):
             self._close_top()
 
     def handle_data(self, data):
-        if self._skip_depth:
+        if self._skip_stack:
             return
         if data.replace("\xa0", " ").strip():
             for node in self.stack:
