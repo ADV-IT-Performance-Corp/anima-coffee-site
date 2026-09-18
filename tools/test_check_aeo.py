@@ -295,6 +295,102 @@ class SelfClosedTagTests(unittest.TestCase):
         self.assertNotIn("br", result[0])
 
 
+class SelfClosedWhileSkippingTests(unittest.TestCase):
+    def test_self_closed_skip_tag_inside_skipped_subtree_does_not_stick(self):
+        """agy [HIGH] tools/check_aeo.py:336 (full diff 5a62161..4384894,
+        round-4 finding): handle_startendtag only calls handle_endtag when
+        `not was_skipping`, so a self-closed skip-subtree tag encountered
+        WHILE ALREADY SKIPPING (e.g. `<script/>` inside `<template>`) has
+        its handle_starttag push onto `_skip_stack` but never gets the
+        matching handle_endtag pop. The outer `</template>` then pops the
+        WRONG stack entry (by name, not by position) and the scanner stays
+        in skip mode for the rest of the document, silently swallowing
+        every element after it. Both a nested `<script/>` and a nested
+        `<template/>` must not stick."""
+        main = "<template><script/></template>"
+        head = "<template><script/></template><b></b>"
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+
+        main2 = "<template><template/></template>"
+        head2 = "<template><template/></template><b></b>"
+        result2 = ca.new_empty_inline_elements(head2, main2)
+        self.assertEqual(len(result2), 1)
+
+    def test_self_closed_other_tag_inside_skipped_subtree_is_ignored(self):
+        """A self-closed NON-skip tag encountered while already skipping
+        (e.g. `<b/>` inside `<template>`) must not touch `_skip_stack` at
+        all in either handle_starttag (nothing pushed, tag is not a
+        skip-subtree tag) or handle_endtag (top of stack is `template`,
+        not `b`, so the stray pop is ignored) — the skip region must close
+        cleanly on the real `</template>` and elements after it must be
+        seen normally."""
+        main = "<p>t</p>"
+        head = "<template><b/></template><p>t</p><i></i>"
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+        self.assertIn("<i>", result[0])
+        self.assertNotIn("<b>", result[0])
+
+    def test_self_closed_void_tag_while_skipping_is_never_pushed(self):
+        """A self-closed VOID tag while skipping (`<br/>` inside
+        `<template>`) must never reach handle_endtag at all (void tags are
+        excluded from the endtag call regardless of skip state) and must
+        leave `_skip_stack` untouched, so the skip region still closes
+        cleanly on the real `</template>`."""
+        main = "<template><br/></template>"
+        head = "<template><br/></template><b></b>"
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+
+    def test_stray_end_tag_for_never_opened_skip_tag_is_ignored(self):
+        """An end tag for a skip-subtree tag that was never opened, seen
+        while NOT skipping, must be ignored like any other stray end tag
+        (no matching entry on `_skip_stack`, which is empty) — it must not
+        put the scanner into skip mode or swallow anything that follows."""
+        main = ""
+        head = "</script><b></b>"
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+        self.assertIn("<b>", result[0])
+
+    def test_mismatched_nested_skip_tags_close_by_name_not_by_position(self):
+        """Malformed markup: `<template><style></template></style><b></b>`
+        closes its two skip-subtree tags in the WRONG order. Documented
+        behaviour (not "fixed" — this is invalid HTML, not a case worth
+        chasing standards-compliant error recovery for): handle_endtag
+        matches the _skip_stack TOP by tag name. `</template>` arrives
+        while the top is `style`, so it is treated as a stray nested tag
+        and ignored; `</style>` then matches and pops, leaving `template`
+        stuck on `_skip_stack` forever (no further `</template>` exists).
+        The scanner never leaves skip mode, so the trailing `<b></b>` is
+        swallowed. Since both the head and origin/main copies of a file go
+        through this same parser, identical malformed markup on both sides
+        produces identical (empty) output and never surfaces as a false
+        positive or false negative in the diff."""
+        html = "<template><style></template></style><b></b>"
+        records = ca._scan_empty_elements(html)
+        self.assertEqual(records, [])
+
+    def test_implicit_close_is_not_confused_by_an_intervening_skip_region(self):
+        """A skip-subtree region sitting between two implicitly-closing
+        `<p>` tags must not change which element the second `<p>` closes,
+        nor where a later empty element's parent path points: `<p>a
+        <template>z</template><p>b<b></b>` closes the FIRST `<p>` when the
+        second `<p>` opens (per `_IMPLICIT_CLOSE_ON`), so the empty `<b>`'s
+        parent path is flat `p` (the second `<p>`), not `p>p` or anything
+        involving `template`."""
+        main = "<p>a<template>z</template><p>b"
+        head = "<p>a<template>z</template><p>b<b></b>"
+        records = ca._scan_empty_elements(head)
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["key"][2], "p")
+
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+        self.assertIn("under p ", result[0])
+
+
 class CommaDashScanTextTests(unittest.TestCase):
     def test_comma_dash_scan_text_includes_jsonld_prose(self):
         """F6 hardening after the agy [HIGH] false-positive finding at
