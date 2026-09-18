@@ -511,13 +511,22 @@ def _punct_scan_files():
             yield p
 
 
-def _comma_dash_scan_text(path: pathlib.Path, text: str) -> str:
+def _join_scan_units(visible: str, jsonld_pairs) -> str:
     """Visible text + JSON-LD prose strings joined into one scan text, for
-    the ', —' count comparison — the ONE code path used for both the head
-    and the origin/main side, so no local variable from one side can leak
+    the ', —' count comparison — the ONE join used by both the head and
+    the origin/main side, so no local variable from one side can leak
     into the other's join (see the module docstring check 9 and F6)."""
-    visible, jsonld_pairs = _scan_units(path, text)
     return visible + "\n" + "\n".join(v for _, v in jsonld_pairs)
+
+
+def _comma_dash_scan_text(path: pathlib.Path, text: str, scan_units=None) -> str:
+    """Wraps _join_scan_units() with the (visible, jsonld_pairs) lookup —
+    pass an already-computed `scan_units` pair (e.g. the one
+    check_punctuation_artifacts() already has for the head side) to avoid
+    recomputing it; omit it (as every test and the origin/main side do) to
+    have this call _scan_units() itself."""
+    visible, jsonld_pairs = scan_units if scan_units is not None else _scan_units(path, text)
+    return _join_scan_units(visible, jsonld_pairs)
 
 
 def new_comma_dash_artifacts(head_text: str, main_text: str | None) -> list[str]:
@@ -637,7 +646,7 @@ def check_punctuation_artifacts():
         # (c) ", —"/", –" — a structural count comparison against
         # origin/main, per file (see module docstring check 9).
         main_text = _origin_main_text(p)
-        head_joined = _comma_dash_scan_text(p, text)
+        head_joined = _comma_dash_scan_text(p, text, scan_units=(visible, jsonld_pairs))
         main_joined = _comma_dash_scan_text(p, main_text) if main_text is not None else None
         for msg in new_comma_dash_artifacts(head_joined, main_joined):
             fails.append(f"{rel}: new ', —' artifact vs origin/main {msg}")
