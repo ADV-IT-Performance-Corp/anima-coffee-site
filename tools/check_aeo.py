@@ -26,17 +26,24 @@ Checks, each printed as its own PASS/FAIL line with failing examples:
    file's scan text than on `origin/main` — a structural COUNT comparison,
    not a text-context heuristic (plain ", —" is legitimate UA/RU
    punctuation elsewhere on the site, so only a net increase relative to
-   origin/main is flagged; see new_comma_dash_artifacts()).
+   origin/main is flagged; see new_comma_dash_artifacts()). A file with no
+   `origin/main` version (a new file) has no deletion history, so this
+   count-comparison rule is out of scope for it — new_comma_dash_artifacts()
+   returns `[]` when `main_text is None`. The never-valid-sequence and
+   JSON-LD-whitespace rules above still run on new files.
 10. No `.html` file has MORE empty/whitespace-only instances of a given
     (tag, attrs, parent-tag-chain) signature than `origin/main` has of that
     same signature, for the tracked tag set (`b strong i em span a li p
     h1`-`h6 td th dd dt figcaption blockquote`) — a structural count
     comparison via an HTMLParser open-element stack, not a text-context
-    heuristic (see new_empty_inline_elements()). Anchor/id/name targets and
-    `aria-hidden` elements are exempt unconditionally; a `span` whose only
-    attribute is `class` is exempt when an origin/main span of the same
-    class is already empty anywhere in the file. Content inside
-    `script`/`style`/`template` is never scanned.
+    heuristic (see new_empty_inline_elements()). Anchor/id/name targets
+    (non-empty `id`/`name` value) and `aria-hidden="true"` elements are
+    exempt unconditionally; a `span` whose only attribute is `class` is
+    exempt when an origin/main span of the same class is already empty
+    anywhere in the file. Content inside `script`/`style`/`template` is
+    never scanned. A file with no `origin/main` version (a new file) has no
+    deletion history, so this rule is out of scope for it —
+    new_empty_inline_elements() returns `[]` when `main_html is None`.
 
 Known false negative (both checks 9's ", —" rule and check 10, documented
 here rather than "fixed" — see new_comma_dash_artifacts() and
@@ -472,19 +479,24 @@ def _punct_scan_files():
 
 
 def new_comma_dash_artifacts(head_text: str, main_text: str | None) -> list[str]:
-    """Structural COUNT comparison (Step C): flags a net increase of ", —"/
-    ", –" occurrences (any whitespace between, including NBSP — see
-    _DASH_AFTER_COMMA) in `head_text` vs `main_text`, not a text-context
-    match. `main_text=None` (file absent from origin/main) compares against
-    an empty document — every occurrence in head counts as new. Returns one
-    "{line}: {context!r}" string per occurrence in the delta (so
-    len(result) == the net increase), taken from the first `delta` matches
-    in head. Known false negative: a same-file swap (one pre-existing ", —"
-    removed, a different one created elsewhere) nets to zero and is not
-    flagged — see the module docstring.
+    """Structural COUNT comparison (Step C): flags a net increase of comma
+    plus em/en-dash occurrences (any whitespace between, including NBSP —
+    see _DASH_AFTER_COMMA) in `head_text` vs `main_text`, not a text-context
+    match. `main_text=None` means the file has no origin/main version (a
+    new file) — a new file has no deletion history, so this rule is out of
+    scope for it and this returns `[]` unconditionally. Returns one
+    "scan-line {line}: {context!r}" string per occurrence in the delta (so
+    len(result) == the net increase; "scan-line" because `line` counts
+    newlines in the joined scan text, not the original HTML file's line
+    numbers), taken from the first `delta` matches in head. Known false
+    negative: a same-file swap (one pre-existing occurrence removed, a
+    different one created elsewhere) nets to zero and is not flagged — see
+    the module docstring.
     """
+    if main_text is None:
+        return []
     head_matches = list(_DASH_AFTER_COMMA.finditer(head_text))
-    main_n = len(list(_DASH_AFTER_COMMA.finditer(main_text))) if main_text is not None else 0
+    main_n = len(list(_DASH_AFTER_COMMA.finditer(main_text)))
     delta = len(head_matches) - main_n
     if delta <= 0:
         return []
@@ -493,7 +505,7 @@ def new_comma_dash_artifacts(head_text: str, main_text: str | None) -> list[str]
         line = head_text.count("\n", 0, mm.start()) + 1
         lo, hi = max(0, mm.start() - 25), min(len(head_text), mm.end() + 25)
         ctx = head_text[lo:hi].replace("\n", " ")
-        fails.append(f"{line}: {ctx!r}")
+        fails.append(f"scan-line {line}: {ctx!r}")
     return fails
 
 
@@ -501,10 +513,9 @@ def new_empty_inline_elements(head_html: str, main_html: str | None) -> list[str
     """Structural COUNT comparison (Step C) via _EmptyElementScanner: for
     each (tag, attrs, parent-tag-chain) signature, flags a net increase of
     empty-element instances in `head_html` vs `main_html`, not a
-    text-context match. `main_html=None` (file absent from origin/main)
-    compares against an empty document — every non-exempt empty element in
-    head counts as new, and the class-only-span exemption below then has
-    nothing to match against (documented, not a bug).
+    text-context match. `main_html=None` means the file has no origin/main
+    version (a new file) — a new file has no deletion history, so this rule
+    is out of scope for it and this returns `[]` unconditionally.
 
     Exemptions (unconditional, applied before counting): an element with an
     `id`/`name` attribute (anchor/link target) or `aria-hidden` (decorative
@@ -520,8 +531,10 @@ def new_empty_inline_elements(head_html: str, main_html: str | None) -> list[str
     K removed, a different one of the same K created elsewhere) nets to
     zero and is not flagged — see the module docstring.
     """
+    if main_html is None:
+        return []
     head_records = _scan_empty_elements(head_html)
-    main_records = _scan_empty_elements(main_html) if main_html is not None else []
+    main_records = _scan_empty_elements(main_html)
 
     main_class_only_spans = {
         dict(r["attrs"])["class"]
