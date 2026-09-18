@@ -211,6 +211,29 @@ _NEVER_VALID_PATTERNS = [
 # is new relative to origin/main (see check_punctuation_artifacts).
 _DASH_AFTER_COMMA = re.compile(r",\s*[–—]")
 
+EMPTY_ELEMENT_TAGS = (
+    "b", "strong", "i", "em", "span", "a", "li", "p",
+    "h1", "h2", "h3", "h4", "h5", "h6", "td", "th",
+    "dd", "dt", "figcaption", "blockquote",
+)
+
+# An element counts as empty when its content is nothing but whitespace or
+# a whitespace entity — a genuine text deletion leaves exactly this behind
+# (e.g. `<b></b>`), never a non-whitespace child, so nested markup that
+# happens to render no visible text (e.g. an icon `<i>` wrapping only a
+# `<svg>`) is intentionally out of scope for this (Step-A/B scaffold) check.
+_EMPTY_ELEMENT_RE = re.compile(
+    r"<(" + "|".join(EMPTY_ELEMENT_TAGS) + r")\b([^>]*)>"
+    r"(?:\s|&nbsp;|&#160;|&#xa0;)*</\1>",
+    re.I,
+)
+_ANCHOR_TARGET_RE = re.compile(r"\b(?:id|name)\s*=", re.I)
+_ARIA_HIDDEN_RE = re.compile(r"\baria-hidden\b", re.I)
+
+
+def _strip_non_scan_blocks(html_src: str) -> str:
+    return re.sub(r"<(script|style|template)\b[^>]*>.*?</\1>", " ", html_src, flags=re.S | re.I)
+
 # Block-level tags get a newline so stripping them can never *merge*
 # unrelated blocks into a run-on sentence; every other tag (a, span, b, …)
 # is dropped with no replacement so inline adjacency — e.g. `</a>,` — scans
@@ -308,6 +331,56 @@ def _punct_scan_files():
             yield p
 
 
+def new_comma_dash_artifacts(head_text: str, main_text: str | None) -> list[str]:
+    """Step-A/B scaffold: the CURRENT (pre-fix) ", —"/", –" context heuristic,
+    moved verbatim out of check_punctuation_artifacts()'s part (c) — same
+    backward-only ~50-char substring test, same false-positive/false-negative
+    behavior. `head_text` is one scan chunk (visible text or one JSON-LD
+    prose string); `main_text` is the corresponding origin/main content
+    joined across all of that file's chunks (or None for a file absent from
+    origin/main, in which case nothing is flagged). Returns bare match
+    contexts (newlines collapsed to spaces); the caller adds the file/label
+    prefix. Replaced by a count-based structural comparison in Step C.
+    """
+    if main_text is None:
+        return []
+    fails = []
+    for mm in _DASH_AFTER_COMMA.finditer(head_text):
+        lo = max(0, mm.start() - 50)
+        ctx = head_text[lo:mm.end()]
+        if ctx not in main_text:
+            fails.append(ctx.replace("\n", " "))
+    return fails
+
+
+def new_empty_inline_elements(head_html: str, main_html: str | None) -> list[str]:
+    """Step-A/B scaffold: the reverted ac5bbe2 heuristic, moved verbatim —
+    same backward-only ~40-char substring test against the same-spot text on
+    origin/main. NOT wired into CHECKS yet. `head_html`/`main_html` are raw
+    HTML (script/style/template stripped internally); `main_html=None` means
+    the file is absent from origin/main, so nothing is flagged (there is
+    nothing to prove creation against). Replaced by a structural HTMLParser
+    comparison in Step C.
+    """
+    raw = _strip_non_scan_blocks(head_html)
+    main_raw = _strip_non_scan_blocks(main_html) if main_html is not None else None
+    fails = []
+    for mm in _EMPTY_ELEMENT_RE.finditer(raw):
+        tag, attrs = mm.group(1), mm.group(2)
+        if tag.lower() == "a" and _ANCHOR_TARGET_RE.search(attrs):
+            continue  # anchor used as a link target, not prose text
+        if _ARIA_HIDDEN_RE.search(attrs):
+            continue  # decorative element, empty by design
+        if main_raw is None:
+            continue  # new file on this branch: nothing to diff against
+        lo = max(0, mm.start() - 40)
+        ctx = raw[lo:mm.end()]
+        if ctx in main_raw:
+            continue  # already empty in this exact spot on origin/main
+        fails.append(f"empty <{tag.lower()}> element not on origin/main near {ctx!r}")
+    return fails
+
+
 def check_punctuation_artifacts():
     fails = []
     for p in sorted(_punct_scan_files()):
@@ -329,24 +402,14 @@ def check_punctuation_artifacts():
 
         # (c) ", —"/", –" — only when the text immediately BEFORE the comma
         # is new relative to origin/main (see module docstring check 9).
-        # Backward-only, ending at the dash itself, on purpose: a mechanical
-        # deletion strands ", —" by removing what used to sit *before* the
-        # comma (e.g. "...обсмажувачі, — фільтрація" -> "...преміальна, —
-        # фільтрація") — the words *after* the dash are irrelevant to
-        # whether the dash itself is now an orphan, and comparing them too
-        # produced false positives on legitimate ", — " asides elsewhere on
-        # the site whose *trailing* clause happened to also get edited.
         main_text = _origin_main_text(p)
         if main_text is None:
             continue  # new file on this branch: nothing to diff against
         main_visible, main_pairs = _scan_units(p, main_text)
         main_joined = main_visible + "\n" + "\n".join(v for _, v in main_pairs)
         for chunk in [visible] + [v for _, v in jsonld_pairs]:
-            for mm in _DASH_AFTER_COMMA.finditer(chunk):
-                lo = max(0, mm.start() - 50)
-                ctx = chunk[lo:mm.end()]
-                if ctx not in main_joined:
-                    fails.append(f"{rel}: new ', —' artifact vs origin/main near {ctx.replace(chr(10), ' ')!r}")
+            for ctx in new_comma_dash_artifacts(chunk, main_joined):
+                fails.append(f"{rel}: new ', —' artifact vs origin/main near {ctx!r}")
     return fails
 
 
