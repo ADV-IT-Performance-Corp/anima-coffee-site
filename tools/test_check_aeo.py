@@ -149,7 +149,7 @@ class OriginMainTextMemoizationTests(unittest.TestCase):
         duration of one run so a repeated lookup of the same path costs
         one subprocess call."""
         ca._origin_main_text_by_rel.cache_clear()
-        fake = subprocess_result = mock.Mock(returncode=0, stdout="cached content")
+        fake = mock.Mock(returncode=0, stdout="cached content")
         with mock.patch.object(ca.subprocess, "run", return_value=fake) as run_mock:
             p = pathlib.Path("/fake/root/answers/faq.html")
             with mock.patch.object(ca, "ROOT", pathlib.Path("/fake/root")):
@@ -313,6 +313,32 @@ class CommaDashScanTextTests(unittest.TestCase):
         )
         scan_text = ca._comma_dash_scan_text(_pathlib.Path("x.html"), html_src)
         self.assertIn(", —", scan_text)
+
+    def test_comma_dash_message_is_labelled_as_scan_line(self):
+        """G4 (LOW, coverage — round-2 independent verifier): the failure
+        message format is 'scan-line {line}: {ctx!r}' (see
+        new_comma_dash_artifacts()'s docstring), not a bare '{line}:'
+        implying an original HTML file line number. `line` counts
+        newlines in the JOINED scan text (visible text + JSON-LD prose),
+        not the source HTML's line numbers — which is why it comes out
+        as 5 here even though the dash is on the second visible line of
+        the source: _visible_text_for_scan() emits a newline for EACH
+        block-tag occurrence (both the opening and closing <p>), so
+        '<p>a</p>\\n<p>Beans, — roasted</p>' becomes
+        '\\na\\n\\n\\nBeans, — roasted\\n' before the final join appends
+        one more trailing newline for the (empty) JSON-LD join — 4
+        newlines precede the match, giving line 5. Verified directly
+        against _comma_dash_scan_text()'s actual output, not assumed."""
+        import pathlib as _pathlib
+        p = _pathlib.Path("x.html")
+        head_html = "<p>a</p>\n<p>Beans, — roasted</p>"
+        main_html = "<p>a</p>\n<p>Beans roasted</p>"
+        head_scan = ca._comma_dash_scan_text(p, head_html)
+        main_scan = ca._comma_dash_scan_text(p, main_html)
+        result = ca.new_comma_dash_artifacts(head_scan, main_scan)
+        self.assertEqual(len(result), 1)
+        self.assertTrue(result[0].startswith("scan-line 5: "))
+        self.assertIn(", —", result[0])
 
     def test_comma_dash_delta_zero_when_dash_moves_between_scan_units(self):
         """A pair where main has ', —' only inside JSON-LD and head has it
