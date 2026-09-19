@@ -494,6 +494,49 @@ class SelfClosedWhileSkippingTests(unittest.TestCase):
         self.assertIn("under p ", result[0])
 
 
+class EofOpenElementTests(unittest.TestCase):
+    def test_element_still_open_at_eof_is_recorded(self):
+        """Finding 3 (tools/check_aeo.py:291): a page ending `<p>Supplier`
+        (perfectly valid HTML — `<p>` has an optional end tag) mechanically
+        deleted down to a page ending just `<p>` must still be caught.
+        Before the fix, an element still open when the document ends was
+        silently discarded and never evaluated for emptiness on either
+        side."""
+        main = "<p>Supplier"
+        head = "<p>"
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+        self.assertIn("<p>", result[0])
+
+    def test_inline_element_still_open_at_eof_is_recorded(self):
+        """Not only optional-end-tag block elements — ANY element left
+        open at EOF (e.g. a missing `</b>`) must be recorded too."""
+        main = "<b>Supplier"
+        head = "<b>"
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+        self.assertIn("<b>", result[0])
+
+    def test_element_open_at_eof_unchanged_both_sides_is_not_flagged(self):
+        """A page that has ALWAYS ended unclosed (no deletion happened)
+        must not be flagged just because the EOF-open element is now
+        evaluated — both sides produce the same (empty) record and net to
+        zero."""
+        main = "<p>"
+        head = "<p>"
+        self.assertEqual(ca.new_empty_inline_elements(head, main), [])
+
+    def test_unterminated_skip_subtree_at_eof_does_not_crash(self):
+        """An unterminated `<script>` at EOF must not crash the scanner
+        and must never itself produce a record (script is never a tracked
+        empty-element tag and its skip-root is exempt in `_close_top`),
+        even though the EOF flush now walks the whole remaining stack."""
+        main = "<script>var x = 1;"
+        head = "<script>var x = 1;<b></b>"
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(result, [])
+
+
 class CommaDashScanTextTests(unittest.TestCase):
     def test_comma_dash_scan_text_includes_jsonld_prose(self):
         """F6 hardening after the agy [HIGH] false-positive finding at
