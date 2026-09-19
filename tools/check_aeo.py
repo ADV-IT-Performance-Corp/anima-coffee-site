@@ -257,18 +257,42 @@ _MEDIA_DESCENDANT_TAGS = frozenset((
     "select", "textarea", "button", "canvas", "object", "embed", "use",
 ))
 _SKIP_SUBTREE_TAGS = frozenset(("script", "style", "template"))
-# Implicit-close pairs: opening `tag` while the innermost open element is
-# one of the keys closes that element first (HTML5's simplified parsing
-# rule for these specific pairs — the only ones this gate needs).
-_IMPLICIT_CLOSE_ON = {
-    "p": {"p"},
-    "li": {"li"},
-    "dt": {"dt", "dd"},
-    "dd": {"dt", "dd"},
-    "td": {"td", "th"},
-    "th": {"td", "th"},
-    "tr": {"tr"},
-}
+# HTML5's "P element" rule: starting almost any block-level element while a
+# <p> is the innermost open element implicitly closes that <p> first (a <p>
+# can never legally contain another block element, so the browser closes it
+# rather than nest). This is also the trigger set for li/dd/dt/td/th/tr
+# below via _should_implicit_close() — those tags close only on a narrower
+# set of siblings, per HTML5's own optional-end-tag rules for each.
+_P_CLOSING_TAGS = frozenset((
+    "address", "article", "aside", "blockquote", "details", "div", "dl",
+    "fieldset", "figcaption", "figure", "footer", "form",
+    "h1", "h2", "h3", "h4", "h5", "h6", "header", "hr", "main", "menu",
+    "nav", "ol", "p", "pre", "section", "table", "ul",
+    "li", "dd", "dt", "td", "th", "tr",
+))
+
+
+def _should_implicit_close(open_tag: str, new_tag: str) -> bool:
+    """True when starting `new_tag` implicitly closes an innermost-open
+    `open_tag` per HTML5's optional-end-tag rules, for the element set this
+    gate tracks (p, li, dd, dt, td, th, tr — finding 1). A <p> closes on any
+    block-level start (see _P_CLOSING_TAGS; this is the finding-1 fix: a
+    <div> starting inside an open <p> used to nest instead of closing it,
+    misattributing the <div>'s content to the <p> and hiding a deletion
+    artifact). <li> closes only on another <li>. <dt>/<dd> close on either.
+    <td>/<th> close on another cell or on a new <tr> (a new row can't nest
+    inside the previous row's cell). <tr> closes only on another <tr>."""
+    if open_tag == "p":
+        return new_tag in _P_CLOSING_TAGS
+    if open_tag == "li":
+        return new_tag == "li"
+    if open_tag in ("dt", "dd"):
+        return new_tag in ("dt", "dd")
+    if open_tag in ("td", "th"):
+        return new_tag in ("td", "th", "tr")
+    if open_tag == "tr":
+        return new_tag == "tr"
+    return False
 
 
 class _EmptyElementScanner(HTMLParser):
@@ -287,19 +311,22 @@ class _EmptyElementScanner(HTMLParser):
     outer's. Both the head and the origin/main version of a file go
     through this SAME parser, so any parsing quirk it has is applied
     identically to both sides and cancels out of the comparison. An
-    element still open at EOF (missing end tag) is never closed, so it
-    contributes no record on either side — this cancels out of the
-    comparison too, unless only one side introduces the unclosed element.
+    element still open at EOF (missing end tag) is flushed and evaluated
+    in `close()` (finding 3) exactly like a properly closed element, so a
+    deletion that leaves a page ending unclosed (e.g. `<p>Supplier` ->
+    `<p>`) is still compared instead of silently dropped on both sides.
 
-    Invariants (state-machine read-through, round 4): a void tag is NEVER
+    Invariants (state-machine read-through, round 5): a void tag is NEVER
     pushed onto `self.stack`, under any skip state or event type.
     `_skip_stack` is the single source of truth for "currently skipping" —
     every other method checks it, never a separate flag or depth counter.
-    Every node pushed onto `self.stack` (and every skip-subtree tag pushed
-    onto `_skip_stack`) is eventually popped by exactly one of: the
-    matching real end tag, an ancestor's end tag closing everything above
-    it, an implicit close from `_IMPLICIT_CLOSE_ON`, or its own self-close
-    in `handle_startendtag` — nothing else ever mutates either stack.
+    A self-closing tag (`handle_startendtag`) is just a start tag — it
+    never self-closes (finding 2). Every node pushed onto `self.stack` (and
+    every skip-subtree tag pushed onto `_skip_stack`) is eventually popped
+    by exactly one of: the matching real end tag, an ancestor's end tag
+    closing everything above it, an implicit close from
+    `_should_implicit_close()`, or the end-of-document flush in `close()`
+    (finding 3) — nothing else ever mutates either stack.
     """
 
     def __init__(self):
@@ -314,7 +341,7 @@ class _EmptyElementScanner(HTMLParser):
             if tag in _SKIP_SUBTREE_TAGS:
                 self._skip_stack.append(tag)
             return
-        if self.stack and tag in _IMPLICIT_CLOSE_ON.get(self.stack[-1]["tag"], ()):
+        while self.stack and _should_implicit_close(self.stack[-1]["tag"], tag):
             self._close_top()
         if tag in _MEDIA_DESCENDANT_TAGS:
             self._mark_media_ancestors()
@@ -333,27 +360,18 @@ class _EmptyElementScanner(HTMLParser):
         self.stack.append(node)
 
     def handle_startendtag(self, tag, attrs):
-        # Self-closed markup (`<img/>`, or foreign-content `<path/>`,
-        # `<use/>`): starts the element like a normal start tag, then
-        # immediately closes it, so a self-closed NON-void element never
-        # stays open on self.stack (or on _skip_stack, for a self-closed
-        # skip-subtree tag) for later siblings. handle_endtag is called
-        # UNCONDITIONALLY for every non-void tag, regardless of skip
-        # state -- it is itself skip-aware and always does the right
-        # thing given what handle_starttag just did: for a skip-subtree
-        # tag self-closed while already skipping, handle_starttag pushed
-        # it onto _skip_stack and handle_endtag pops that exact entry
-        # (top matches); for a non-skip tag self-closed while skipping,
-        # handle_starttag pushed nothing and handle_endtag is a no-op
-        # (top doesn't match). Skipping the handle_endtag call while
-        # already skipping (the earlier, wrong shape) left a self-closed
-        # skip-subtree tag's push unpopped, so the next real end tag
-        # matching THAT inner tag's name would resolve first and the
-        # scanner would never leave skip mode.
-        tag_lower = tag.lower()
+        # HTML parsing (finding 2): a trailing "/" on a non-void element's
+        # start tag (`<i/>`, `<path/>`) is not a real self-close — browsers
+        # ignore it and leave the element open exactly as `<i>` would, so
+        # the markup/text that follows becomes its CHILD, not its sibling.
+        # Only `_VOID_TAGS` (already never pushed by handle_starttag) are
+        # actually "closed" by a self-closing tag. So a self-closing tag is
+        # simply a start tag; nothing here ever calls handle_endtag.
+        # Previously this method force-closed every non-void self-closed
+        # tag immediately, which is why `<p><i/> text</p>` was falsely
+        # flagged as an empty `<i>` — the text belongs inside `<i>` in real
+        # browsers, so `<i>` is not empty at all.
         self.handle_starttag(tag, attrs)
-        if tag_lower not in _VOID_TAGS:
-            self.handle_endtag(tag)
 
     def handle_endtag(self, tag):
         tag = tag.lower()
@@ -371,6 +389,22 @@ class _EmptyElementScanner(HTMLParser):
         if idx is None:
             return  # stray end tag with no matching open element: ignored
         while len(self.stack) > idx:
+            self._close_top()
+
+    def close(self):
+        # HTML parsing (finding 3): an element with no closing tag at all
+        # is still valid HTML for tags with an optional end tag (a page can
+        # legally end in `<p>Supplier`), and even for a genuinely malformed
+        # document a real browser still materializes whatever is left open
+        # when input ends. Previously anything still on `self.stack` at EOF
+        # was silently dropped, so a page ending `<p>Supplier` -> `<p>`
+        # (the text mechanically deleted) produced zero records on EITHER
+        # side and the deletion went uncompared. Flushing the stack through
+        # the normal `_close_top()` path here means each survivor is
+        # evaluated for emptiness exactly like a properly closed element,
+        # innermost first (list order).
+        super().close()
+        while self.stack:
             self._close_top()
 
     def handle_data(self, data):

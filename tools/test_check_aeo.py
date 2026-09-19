@@ -251,6 +251,90 @@ class ImplicitCloseTests(unittest.TestCase):
         self.assertNotIn("under p>p", result[0])
 
 
+class ImplicitCloseOnBlockElementTests(unittest.TestCase):
+    def test_implicit_p_close_on_div_start(self):
+        """Finding 1 (tools/check_aeo.py:317): `<p>Supplier<div>Other</div>`
+        deleted down to `<p><div>Other</div>` must still be caught as a
+        deletion. Before the fix, opening <div> while <p> was open nested
+        the <div> INSIDE the <p> instead of closing it (no
+        _IMPLICIT_CLOSE_ON entry for p->div), so "Other" was misattributed
+        to the <p> (which then looked non-empty) and the emptied <p> was
+        never flagged. After the fix, <div> starting closes the open <p>
+        first, exactly like a real browser, so the now-empty <p> is a new
+        empty-element signature."""
+        main = "<p>Supplier<div>Other</div></p>"
+        head = "<p><div>Other</div></p>"
+        records = ca._scan_empty_elements(head)
+        p_records = [r for r in records if r["tag"] == "p"]
+        self.assertEqual(len(p_records), 1)
+        self.assertEqual(p_records[0]["key"][2], "")
+
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+        self.assertIn("<p>", result[0])
+
+    def test_implicit_p_close_realistic_variant_service_card(self):
+        """Realistic variant drawn from the site's own about.html card
+        markup (`<p>...</p><div class="go">...</div>` inside an `<a
+        class="svc-card">`): a mechanical deletion that removes a card's
+        paragraph text along with its own closing tag, leaving the
+        following <div> as what implicitly closes it, must still be
+        flagged."""
+        main = (
+            '<a class="svc-card" href="services.html">'
+            '<div class="sc-k">All services</div><h3>Six services</h3>'
+            '<p>Equipment, beans, people and support.</p>'
+            '<div class="go">See services &rarr;</div></a>'
+        )
+        head = (
+            '<a class="svc-card" href="services.html">'
+            '<div class="sc-k">All services</div><h3>Six services</h3>'
+            '<p><div class="go">See services &rarr;</div></a>'
+        )
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+        self.assertIn("<p>", result[0])
+
+    def test_p_does_not_close_on_inline_element_start(self):
+        """Only BLOCK elements trigger the implicit close — an inline
+        element (e.g. <b>) starting inside an open <p> must still nest
+        normally, not close the <p>."""
+        head = "<p>text <b>bold</b> more</p>"
+        records = ca._scan_empty_elements(head)
+        self.assertEqual(records, [])
+
+    def test_li_closes_on_li_not_on_div(self):
+        """<li> only closes on another <li> (per _should_implicit_close),
+        not on an arbitrary block element — a <div> nested inside an open
+        <li> is legal HTML and must stay nested (proven structurally via a
+        tracked <b> inside the <div>, since <div> itself isn't a tracked
+        empty-element tag)."""
+        head = "<ul><li>one<div><b></b></div></li></ul>"
+        records = ca._scan_empty_elements(head)
+        b_records = [r for r in records if r["tag"] == "b"]
+        self.assertEqual(len(b_records), 1)
+        self.assertEqual(b_records[0]["key"][2], "ul>li>div")
+
+        head2 = "<ul><li>one<li>two<b></b></ul>"
+        records2 = ca._scan_empty_elements(head2)
+        b_records2 = [r for r in records2 if r["tag"] == "b"]
+        self.assertEqual(len(b_records2), 1)
+        self.assertEqual(b_records2[0]["key"][2], "ul>li")
+
+    def test_tr_closes_open_td_and_previous_tr(self):
+        """Starting a new <tr> while a <td> (and its enclosing <tr>) are
+        still open closes BOTH — a table row can't nest inside the
+        previous row's cell — so a later empty element ends up parented
+        under the table, not under the stale row/cell."""
+        head = "<table><tr><td>one<tr><td><b></b></table>"
+        records = ca._scan_empty_elements(head)
+        b_records = [r for r in records if r["tag"] == "b"]
+        self.assertEqual(len(b_records), 1)
+        # Exactly one <tr> and one <td> deep — the stale first row/cell was
+        # closed by the implicit-close loop, not left as a phantom ancestor.
+        self.assertEqual(b_records[0]["key"][2], "table>tr>td")
+
+
 class SelfClosedTagTests(unittest.TestCase):
     def test_self_closed_svg_children_do_not_become_ancestors(self):
         """[HIGH] agy, tools/check_aeo.py:327 (full diff 5a62161..746cd77):
@@ -269,16 +353,28 @@ class SelfClosedTagTests(unittest.TestCase):
         self.assertIn("under span ", result[0])
         self.assertNotIn("path", result[0])
 
-    def test_self_closed_non_void_element_is_closed_immediately(self):
-        """A self-closed non-void element (`<i/>`) must be closed the
-        moment it is encountered, exactly like a real `<i></i>` pair —
-        the text that follows it belongs to its PARENT, not to the
-        (already-closed) `<i>` itself."""
+    def test_self_closed_non_void_element_is_not_closed_immediately(self):
+        """Finding 2 (tools/check_aeo.py:356): a self-closed non-void
+        element (`<i/>`) must NOT be closed the moment it is encountered —
+        browsers ignore the trailing "/" on a non-void tag and leave it
+        open exactly like a real `<i>`, so the text that follows belongs
+        INSIDE it, not to its parent. `<p><i/> text</p>` must not be
+        flagged as an empty <i> — the old immediate-close behaviour was a
+        false positive that would have blocked a legitimate PR."""
         main = "<p>t</p>"
         head = "<p>t</p><p><i/> text</p>"
         result = ca.new_empty_inline_elements(head, main)
-        self.assertEqual(len(result), 1)
-        self.assertIn("<i>", result[0])
+        self.assertEqual(result, [])
+
+    def test_self_closed_non_void_element_keeps_following_markup_nested(self):
+        """Structural proof for the finding-2 fix: since `<i/>` does not
+        close immediately, a `<b></b>` right after it is a CHILD of `<i>`,
+        not a sibling — parent_path "i", not "" (flat)."""
+        head = "<i/><b></b></i>"
+        records = ca._scan_empty_elements(head)
+        b_records = [r for r in records if r["tag"] == "b"]
+        self.assertEqual(len(b_records), 1)
+        self.assertEqual(b_records[0]["key"][2], "i")
 
     def test_self_closed_void_tag_still_never_pushed(self):
         """A self-closed void element (`<br/>`) must still never be
@@ -296,26 +392,33 @@ class SelfClosedTagTests(unittest.TestCase):
 
 
 class SelfClosedWhileSkippingTests(unittest.TestCase):
-    def test_self_closed_skip_tag_inside_skipped_subtree_does_not_stick(self):
-        """agy [HIGH] tools/check_aeo.py:336 (full diff 5a62161..4384894,
-        round-4 finding): handle_startendtag only calls handle_endtag when
-        `not was_skipping`, so a self-closed skip-subtree tag encountered
-        WHILE ALREADY SKIPPING (e.g. `<script/>` inside `<template>`) has
-        its handle_starttag push onto `_skip_stack` but never gets the
-        matching handle_endtag pop. The outer `</template>` then pops the
-        WRONG stack entry (by name, not by position) and the scanner stays
-        in skip mode for the rest of the document, silently swallowing
-        every element after it. Both a nested `<script/>` and a nested
-        `<template/>` must not stick."""
+    def test_self_closed_skip_tag_inside_skipped_subtree_sticks_documented(self):
+        """Finding 2 retires the special-case immediate-close for
+        self-closing tags: a self-closing tag is now ALWAYS just a start
+        tag, with no carve-out for skip-subtree tags (an earlier round had
+        added exactly that carve-out; finding 2 supersedes it). A
+        self-closed `<script/>` (or `<template/>`) encountered WHILE
+        ALREADY skipping therefore pushes onto `_skip_stack` like any
+        nested skip tag and is never popped — no matching end tag for it
+        exists in this markup — so the enclosing skip region stays stuck
+        open for the rest of the document. Documented, not "fixed": same
+        class of accepted limitation as
+        test_mismatched_nested_skip_tags_close_by_name_not_by_position
+        below — both the head and origin/main copies of a file run through
+        this SAME parser, so identical markup at the divergence point
+        produces identical (swallowed) output on both sides and never
+        surfaces as a false positive. This shape does not occur on the
+        real site: 0 self-closing non-void tags site-wide (verified
+        2026-09-19)."""
         main = "<template><script/></template>"
         head = "<template><script/></template><b></b>"
         result = ca.new_empty_inline_elements(head, main)
-        self.assertEqual(len(result), 1)
+        self.assertEqual(result, [])
 
         main2 = "<template><template/></template>"
         head2 = "<template><template/></template><b></b>"
         result2 = ca.new_empty_inline_elements(head2, main2)
-        self.assertEqual(len(result2), 1)
+        self.assertEqual(result2, [])
 
     def test_self_closed_other_tag_inside_skipped_subtree_is_ignored(self):
         """A self-closed NON-skip tag encountered while already skipping
@@ -389,6 +492,49 @@ class SelfClosedWhileSkippingTests(unittest.TestCase):
         result = ca.new_empty_inline_elements(head, main)
         self.assertEqual(len(result), 1)
         self.assertIn("under p ", result[0])
+
+
+class EofOpenElementTests(unittest.TestCase):
+    def test_element_still_open_at_eof_is_recorded(self):
+        """Finding 3 (tools/check_aeo.py:291): a page ending `<p>Supplier`
+        (perfectly valid HTML — `<p>` has an optional end tag) mechanically
+        deleted down to a page ending just `<p>` must still be caught.
+        Before the fix, an element still open when the document ends was
+        silently discarded and never evaluated for emptiness on either
+        side."""
+        main = "<p>Supplier"
+        head = "<p>"
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+        self.assertIn("<p>", result[0])
+
+    def test_inline_element_still_open_at_eof_is_recorded(self):
+        """Not only optional-end-tag block elements — ANY element left
+        open at EOF (e.g. a missing `</b>`) must be recorded too."""
+        main = "<b>Supplier"
+        head = "<b>"
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+        self.assertIn("<b>", result[0])
+
+    def test_element_open_at_eof_unchanged_both_sides_is_not_flagged(self):
+        """A page that has ALWAYS ended unclosed (no deletion happened)
+        must not be flagged just because the EOF-open element is now
+        evaluated — both sides produce the same (empty) record and net to
+        zero."""
+        main = "<p>"
+        head = "<p>"
+        self.assertEqual(ca.new_empty_inline_elements(head, main), [])
+
+    def test_unterminated_skip_subtree_at_eof_does_not_crash(self):
+        """An unterminated `<script>` at EOF must not crash the scanner
+        and must never itself produce a record (script is never a tracked
+        empty-element tag and its skip-root is exempt in `_close_top`),
+        even though the EOF flush now walks the whole remaining stack."""
+        main = "<script>var x = 1;"
+        head = "<script>var x = 1;<b></b>"
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(result, [])
 
 
 class CommaDashScanTextTests(unittest.TestCase):
@@ -498,6 +644,51 @@ class CommaDashArtifactTests(unittest.TestCase):
         head = "<p>Beans, — roasted weekly.</p><p>Beans are delivered weekly.</p>"
         result = ca.new_comma_dash_artifacts(head, main)
         self.assertEqual(len(result), 1)
+
+
+class CommentAndEntityTests(unittest.TestCase):
+    """Event-by-state table coverage for the two events _EmptyElementScanner
+    never overrides a handler for: comment and entity. `handle_comment` has
+    no override (HTMLParser's default is a no-op — a comment never opens,
+    closes, or marks text on anything), and the parser is constructed with
+    `convert_charrefs=True`, so entities are converted to their character
+    and folded into `handle_data` BEFORE handle_data is ever called —
+    `handle_entityref`/`handle_charref` are never invoked at all. Both
+    behaviours are state-independent (true regardless of what's open), so
+    one test per event, exercising it inside an open element, a skip
+    region, and at top level, is representative of every state column."""
+
+    def test_comment_is_a_no_op_everywhere(self):
+        head = (
+            "<!-- top level --><p><!-- inside p -->text</p>"
+            "<script><!-- inside script -->x</script>"
+            "<template><!-- inside template --><b></b></template>"
+        )
+        main = "<p>text</p><script>x</script><template><b></b></template>"
+        # A comment contributes no text and opens/closes nothing, so its
+        # presence or absence changes nothing structurally.
+        self.assertEqual(ca.new_empty_inline_elements(head, main), [])
+
+    def test_entity_folds_into_data_everywhere(self):
+        main = "<p>&mdash;</p><i>&amp;</i>"
+        head = "<p>&mdash;</p><i>&amp;</i><b>&nbsp;</b>"
+        # &nbsp; decodes to U+00A0, which handle_data's own
+        # `.replace("\xa0", " ").strip()` correctly treats as whitespace-
+        # only, so <b> is still empty and gets flagged like any other
+        # empty element — entities are not exempt from the whitespace rule.
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+        self.assertIn("<b>", result[0])
+
+    def test_named_entity_counts_as_real_text(self):
+        """A genuine (non-whitespace) named entity, e.g. &mdash;, must mark
+        its element as non-empty exactly like literal text — proven by
+        comparing against a head where the entity was deleted."""
+        main = "<p>&mdash;</p>"
+        head = "<p></p>"
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+        self.assertIn("<p>", result[0])
 
 
 if __name__ == "__main__":
