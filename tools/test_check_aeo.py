@@ -353,16 +353,28 @@ class SelfClosedTagTests(unittest.TestCase):
         self.assertIn("under span ", result[0])
         self.assertNotIn("path", result[0])
 
-    def test_self_closed_non_void_element_is_closed_immediately(self):
-        """A self-closed non-void element (`<i/>`) must be closed the
-        moment it is encountered, exactly like a real `<i></i>` pair —
-        the text that follows it belongs to its PARENT, not to the
-        (already-closed) `<i>` itself."""
+    def test_self_closed_non_void_element_is_not_closed_immediately(self):
+        """Finding 2 (tools/check_aeo.py:356): a self-closed non-void
+        element (`<i/>`) must NOT be closed the moment it is encountered —
+        browsers ignore the trailing "/" on a non-void tag and leave it
+        open exactly like a real `<i>`, so the text that follows belongs
+        INSIDE it, not to its parent. `<p><i/> text</p>` must not be
+        flagged as an empty <i> — the old immediate-close behaviour was a
+        false positive that would have blocked a legitimate PR."""
         main = "<p>t</p>"
         head = "<p>t</p><p><i/> text</p>"
         result = ca.new_empty_inline_elements(head, main)
-        self.assertEqual(len(result), 1)
-        self.assertIn("<i>", result[0])
+        self.assertEqual(result, [])
+
+    def test_self_closed_non_void_element_keeps_following_markup_nested(self):
+        """Structural proof for the finding-2 fix: since `<i/>` does not
+        close immediately, a `<b></b>` right after it is a CHILD of `<i>`,
+        not a sibling — parent_path "i", not "" (flat)."""
+        head = "<i/><b></b></i>"
+        records = ca._scan_empty_elements(head)
+        b_records = [r for r in records if r["tag"] == "b"]
+        self.assertEqual(len(b_records), 1)
+        self.assertEqual(b_records[0]["key"][2], "i")
 
     def test_self_closed_void_tag_still_never_pushed(self):
         """A self-closed void element (`<br/>`) must still never be
@@ -380,26 +392,33 @@ class SelfClosedTagTests(unittest.TestCase):
 
 
 class SelfClosedWhileSkippingTests(unittest.TestCase):
-    def test_self_closed_skip_tag_inside_skipped_subtree_does_not_stick(self):
-        """agy [HIGH] tools/check_aeo.py:336 (full diff 5a62161..4384894,
-        round-4 finding): handle_startendtag only calls handle_endtag when
-        `not was_skipping`, so a self-closed skip-subtree tag encountered
-        WHILE ALREADY SKIPPING (e.g. `<script/>` inside `<template>`) has
-        its handle_starttag push onto `_skip_stack` but never gets the
-        matching handle_endtag pop. The outer `</template>` then pops the
-        WRONG stack entry (by name, not by position) and the scanner stays
-        in skip mode for the rest of the document, silently swallowing
-        every element after it. Both a nested `<script/>` and a nested
-        `<template/>` must not stick."""
+    def test_self_closed_skip_tag_inside_skipped_subtree_sticks_documented(self):
+        """Finding 2 retires the special-case immediate-close for
+        self-closing tags: a self-closing tag is now ALWAYS just a start
+        tag, with no carve-out for skip-subtree tags (an earlier round had
+        added exactly that carve-out; finding 2 supersedes it). A
+        self-closed `<script/>` (or `<template/>`) encountered WHILE
+        ALREADY skipping therefore pushes onto `_skip_stack` like any
+        nested skip tag and is never popped — no matching end tag for it
+        exists in this markup — so the enclosing skip region stays stuck
+        open for the rest of the document. Documented, not "fixed": same
+        class of accepted limitation as
+        test_mismatched_nested_skip_tags_close_by_name_not_by_position
+        below — both the head and origin/main copies of a file run through
+        this SAME parser, so identical markup at the divergence point
+        produces identical (swallowed) output on both sides and never
+        surfaces as a false positive. This shape does not occur on the
+        real site: 0 self-closing non-void tags site-wide (verified
+        2026-09-19)."""
         main = "<template><script/></template>"
         head = "<template><script/></template><b></b>"
         result = ca.new_empty_inline_elements(head, main)
-        self.assertEqual(len(result), 1)
+        self.assertEqual(result, [])
 
         main2 = "<template><template/></template>"
         head2 = "<template><template/></template><b></b>"
         result2 = ca.new_empty_inline_elements(head2, main2)
-        self.assertEqual(len(result2), 1)
+        self.assertEqual(result2, [])
 
     def test_self_closed_other_tag_inside_skipped_subtree_is_ignored(self):
         """A self-closed NON-skip tag encountered while already skipping
