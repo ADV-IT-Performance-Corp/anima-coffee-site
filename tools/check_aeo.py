@@ -270,6 +270,20 @@ _P_CLOSING_TAGS = frozenset((
     "nav", "ol", "p", "pre", "section", "table", "ul",
     "li", "dd", "dt", "td", "th", "tr",
 ))
+# HTML5 foreign-content elements: inside these, self-closing syntax ("/>")
+# is real XML-style self-close (finding 1). Outside them, a trailing "/" on
+# a non-void tag is not a real self-close — browsers ignore it and leave
+# the element open (round-2 finding 2, which must still hold for ordinary
+# HTML content).
+_FOREIGN_CONTENT_ROOTS = frozenset(("svg", "math"))
+# HTML5 table-section tokens (finding 2): these only get table-insertion
+# semantics — including implicitly closing an open <p> — when a <table> is
+# actually open. Outside a table, real browsers ignore these tokens
+# entirely (not even inserted into the DOM), so <p><td>x</td></p> is
+# equivalent to <p>x</p>.
+_TABLE_CONTEXT_TAGS = frozenset(
+    ("td", "th", "tr", "tbody", "thead", "tfoot", "caption", "col")
+)
 
 
 def _should_implicit_close(open_tag: str, new_tag: str) -> bool:
@@ -341,6 +355,11 @@ class _EmptyElementScanner(HTMLParser):
             if tag in _SKIP_SUBTREE_TAGS:
                 self._skip_stack.append(tag)
             return
+        if tag in _TABLE_CONTEXT_TAGS and not self._in_table():
+            # Finding 2: outside a real table, browsers ignore td/th/tr/
+            # tbody/thead/tfoot/caption/col outright — no element is
+            # created, so nothing here to implicitly close or push.
+            return
         while self.stack and _should_implicit_close(self.stack[-1]["tag"], tag):
             self._close_top()
         if tag in _MEDIA_DESCENDANT_TAGS:
@@ -360,18 +379,35 @@ class _EmptyElementScanner(HTMLParser):
         self.stack.append(node)
 
     def handle_startendtag(self, tag, attrs):
-        # HTML parsing (finding 2): a trailing "/" on a non-void element's
-        # start tag (`<i/>`, `<path/>`) is not a real self-close — browsers
-        # ignore it and leave the element open exactly as `<i>` would, so
-        # the markup/text that follows becomes its CHILD, not its sibling.
-        # Only `_VOID_TAGS` (already never pushed by handle_starttag) are
-        # actually "closed" by a self-closing tag. So a self-closing tag is
-        # simply a start tag; nothing here ever calls handle_endtag.
+        # HTML parsing (finding 2, round 2): a trailing "/" on a non-void
+        # HTML element's start tag (`<i/>`) is not a real self-close —
+        # browsers ignore it and leave the element open exactly as `<i>`
+        # would, so the markup/text that follows becomes its CHILD, not its
+        # sibling. Only `_VOID_TAGS` (already never pushed by
+        # handle_starttag) are actually "closed" by a self-closing tag.
         # Previously this method force-closed every non-void self-closed
         # tag immediately, which is why `<p><i/> text</p>` was falsely
         # flagged as an empty `<i>` — the text belongs inside `<i>` in real
         # browsers, so `<i>` is not empty at all.
+        #
+        # PR #42 finding 1: that rule is HTML-content-only. Inside SVG/
+        # MathML foreign content, `/>` IS real self-close syntax — a
+        # `<path/>` or a self-closed `<svg/>` really does close there and
+        # must not become an ancestor of whatever follows. Foreign-content
+        # status is decided BEFORE the push (an ancestor already being
+        # svg/math, or this tag itself being the svg/math root), so a
+        # self-closed `<svg/>` root closes itself too.
+        tag_l = tag.lower()
+        foreign = tag_l in _FOREIGN_CONTENT_ROOTS or self._in_foreign_content()
         self.handle_starttag(tag, attrs)
+        if foreign and self.stack and self.stack[-1]["tag"] == tag_l:
+            self._close_top()
+
+    def _in_table(self) -> bool:
+        return any(n["tag"] == "table" for n in self.stack)
+
+    def _in_foreign_content(self) -> bool:
+        return any(n["tag"] in _FOREIGN_CONTENT_ROOTS for n in self.stack)
 
     def handle_endtag(self, tag):
         tag = tag.lower()

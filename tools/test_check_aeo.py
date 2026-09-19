@@ -591,8 +591,8 @@ class TableContextTests(unittest.TestCase):
         """Round 1's fix must survive: INSIDE a real table, td/th/tr still
         get their table semantics and still close an open <p> (a <p> can
         never legally contain a <td>)."""
-        main = "<table><tr><td><p>Supplier</p></td></tr></table>"
-        head = "<table><tr><td><p></p></td></tr></table>"
+        main = "<table><tr><td>Item<p>Supplier</p></td></tr></table>"
+        head = "<table><tr><td>Item<p></p></td></tr></table>"
         result = ca.new_empty_inline_elements(head, main)
         self.assertEqual(len(result), 1)
         self.assertIn("<p>", result[0])
