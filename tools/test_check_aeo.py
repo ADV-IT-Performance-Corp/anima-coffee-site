@@ -251,6 +251,90 @@ class ImplicitCloseTests(unittest.TestCase):
         self.assertNotIn("under p>p", result[0])
 
 
+class ImplicitCloseOnBlockElementTests(unittest.TestCase):
+    def test_implicit_p_close_on_div_start(self):
+        """Finding 1 (tools/check_aeo.py:317): `<p>Supplier<div>Other</div>`
+        deleted down to `<p><div>Other</div>` must still be caught as a
+        deletion. Before the fix, opening <div> while <p> was open nested
+        the <div> INSIDE the <p> instead of closing it (no
+        _IMPLICIT_CLOSE_ON entry for p->div), so "Other" was misattributed
+        to the <p> (which then looked non-empty) and the emptied <p> was
+        never flagged. After the fix, <div> starting closes the open <p>
+        first, exactly like a real browser, so the now-empty <p> is a new
+        empty-element signature."""
+        main = "<p>Supplier<div>Other</div></p>"
+        head = "<p><div>Other</div></p>"
+        records = ca._scan_empty_elements(head)
+        p_records = [r for r in records if r["tag"] == "p"]
+        self.assertEqual(len(p_records), 1)
+        self.assertEqual(p_records[0]["key"][2], "")
+
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+        self.assertIn("<p>", result[0])
+
+    def test_implicit_p_close_realistic_variant_service_card(self):
+        """Realistic variant drawn from the site's own about.html card
+        markup (`<p>...</p><div class="go">...</div>` inside an `<a
+        class="svc-card">`): a mechanical deletion that removes a card's
+        paragraph text along with its own closing tag, leaving the
+        following <div> as what implicitly closes it, must still be
+        flagged."""
+        main = (
+            '<a class="svc-card" href="services.html">'
+            '<div class="sc-k">All services</div><h3>Six services</h3>'
+            '<p>Equipment, beans, people and support.</p>'
+            '<div class="go">See services &rarr;</div></a>'
+        )
+        head = (
+            '<a class="svc-card" href="services.html">'
+            '<div class="sc-k">All services</div><h3>Six services</h3>'
+            '<p><div class="go">See services &rarr;</div></a>'
+        )
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+        self.assertIn("<p>", result[0])
+
+    def test_p_does_not_close_on_inline_element_start(self):
+        """Only BLOCK elements trigger the implicit close — an inline
+        element (e.g. <b>) starting inside an open <p> must still nest
+        normally, not close the <p>."""
+        head = "<p>text <b>bold</b> more</p>"
+        records = ca._scan_empty_elements(head)
+        self.assertEqual(records, [])
+
+    def test_li_closes_on_li_not_on_div(self):
+        """<li> only closes on another <li> (per _should_implicit_close),
+        not on an arbitrary block element — a <div> nested inside an open
+        <li> is legal HTML and must stay nested (proven structurally via a
+        tracked <b> inside the <div>, since <div> itself isn't a tracked
+        empty-element tag)."""
+        head = "<ul><li>one<div><b></b></div></li></ul>"
+        records = ca._scan_empty_elements(head)
+        b_records = [r for r in records if r["tag"] == "b"]
+        self.assertEqual(len(b_records), 1)
+        self.assertEqual(b_records[0]["key"][2], "ul>li>div")
+
+        head2 = "<ul><li>one<li>two<b></b></ul>"
+        records2 = ca._scan_empty_elements(head2)
+        b_records2 = [r for r in records2 if r["tag"] == "b"]
+        self.assertEqual(len(b_records2), 1)
+        self.assertEqual(b_records2[0]["key"][2], "ul>li")
+
+    def test_tr_closes_open_td_and_previous_tr(self):
+        """Starting a new <tr> while a <td> (and its enclosing <tr>) are
+        still open closes BOTH — a table row can't nest inside the
+        previous row's cell — so a later empty element ends up parented
+        under the table, not under the stale row/cell."""
+        head = "<table><tr><td>one<tr><td><b></b></table>"
+        records = ca._scan_empty_elements(head)
+        b_records = [r for r in records if r["tag"] == "b"]
+        self.assertEqual(len(b_records), 1)
+        # Exactly one <tr> and one <td> deep — the stale first row/cell was
+        # closed by the implicit-close loop, not left as a phantom ancestor.
+        self.assertEqual(b_records[0]["key"][2], "table>tr>td")
+
+
 class SelfClosedTagTests(unittest.TestCase):
     def test_self_closed_svg_children_do_not_become_ancestors(self):
         """[HIGH] agy, tools/check_aeo.py:327 (full diff 5a62161..746cd77):
