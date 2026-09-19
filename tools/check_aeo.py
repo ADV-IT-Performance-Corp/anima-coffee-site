@@ -311,20 +311,22 @@ class _EmptyElementScanner(HTMLParser):
     outer's. Both the head and the origin/main version of a file go
     through this SAME parser, so any parsing quirk it has is applied
     identically to both sides and cancels out of the comparison. An
-    element still open at EOF (missing end tag) is never closed, so it
-    contributes no record on either side — this cancels out of the
-    comparison too, unless only one side introduces the unclosed element.
+    element still open at EOF (missing end tag) is flushed and evaluated
+    in `close()` (finding 3) exactly like a properly closed element, so a
+    deletion that leaves a page ending unclosed (e.g. `<p>Supplier` ->
+    `<p>`) is still compared instead of silently dropped on both sides.
 
-    Invariants (state-machine read-through, round 4): a void tag is NEVER
+    Invariants (state-machine read-through, round 5): a void tag is NEVER
     pushed onto `self.stack`, under any skip state or event type.
     `_skip_stack` is the single source of truth for "currently skipping" —
     every other method checks it, never a separate flag or depth counter.
-    Every node pushed onto `self.stack` (and every skip-subtree tag pushed
-    onto `_skip_stack`) is eventually popped by exactly one of: the
-    matching real end tag, an ancestor's end tag closing everything above
-    it, an implicit close from `_should_implicit_close()`, or its own
-    self-close in `handle_startendtag` — nothing else ever mutates either
-    stack.
+    A self-closing tag (`handle_startendtag`) is just a start tag — it
+    never self-closes (finding 2). Every node pushed onto `self.stack` (and
+    every skip-subtree tag pushed onto `_skip_stack`) is eventually popped
+    by exactly one of: the matching real end tag, an ancestor's end tag
+    closing everything above it, an implicit close from
+    `_should_implicit_close()`, or the end-of-document flush in `close()`
+    (finding 3) — nothing else ever mutates either stack.
     """
 
     def __init__(self):
@@ -387,6 +389,22 @@ class _EmptyElementScanner(HTMLParser):
         if idx is None:
             return  # stray end tag with no matching open element: ignored
         while len(self.stack) > idx:
+            self._close_top()
+
+    def close(self):
+        # HTML parsing (finding 3): an element with no closing tag at all
+        # is still valid HTML for tags with an optional end tag (a page can
+        # legally end in `<p>Supplier`), and even for a genuinely malformed
+        # document a real browser still materializes whatever is left open
+        # when input ends. Previously anything still on `self.stack` at EOF
+        # was silently dropped, so a page ending `<p>Supplier` -> `<p>`
+        # (the text mechanically deleted) produced zero records on EITHER
+        # side and the deletion went uncompared. Flushing the stack through
+        # the normal `_close_top()` path here means each survivor is
+        # evaluated for emptiness exactly like a properly closed element,
+        # innermost first (list order).
+        super().close()
+        while self.stack:
             self._close_top()
 
     def handle_data(self, data):
