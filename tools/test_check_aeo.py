@@ -494,6 +494,142 @@ class SelfClosedWhileSkippingTests(unittest.TestCase):
         self.assertIn("under p ", result[0])
 
 
+class ForeignContentSelfCloseTests(unittest.TestCase):
+    """Finding 1 (tools/check_aeo.py:374, PR #42 gate): a self-closing tag
+    is unconditionally treated as an unclosed start tag (finding-2 fix from
+    round 2), which is correct for HTML content but wrong for SVG/MathML
+    foreign content, where self-closing syntax IS real self-close syntax.
+    `<svg/><b></b>` and `<svg></svg><b></b>` must produce the SAME ancestor
+    signature for the trailing <b> — both leave <b> at top level, not
+    nested inside <svg>."""
+
+    def test_self_closed_svg_root_gives_same_signature_as_explicit_close(self):
+        head_selfclosed = '<svg/><b></b>'
+        head_explicit = '<svg></svg><b></b>'
+        recs_sc = ca._scan_empty_elements(head_selfclosed)
+        recs_ex = ca._scan_empty_elements(head_explicit)
+        b_sc = [r for r in recs_sc if r["tag"] == "b"]
+        b_ex = [r for r in recs_ex if r["tag"] == "b"]
+        self.assertEqual(len(b_sc), 1)
+        self.assertEqual(len(b_ex), 1)
+        self.assertEqual(b_sc[0]["key"][2], "")
+        self.assertEqual(b_sc[0]["key"][2], b_ex[0]["key"][2])
+
+    def test_self_closed_svg_root_does_not_falsely_flag_new_empty_b(self):
+        """The PR #42 finding's own repro: the two markup variants must not
+        acquire different (hence falsely-diffing) ancestor signatures."""
+        main = '<svg></svg><b></b>'
+        head = '<svg/><b></b>'
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(result, [])
+
+    def test_self_closed_math_root_closes_immediately_like_svg(self):
+        head_selfclosed = '<math/><b></b>'
+        head_explicit = '<math></math><b></b>'
+        recs_sc = ca._scan_empty_elements(head_selfclosed)
+        recs_ex = ca._scan_empty_elements(head_explicit)
+        b_sc = [r for r in recs_sc if r["tag"] == "b"]
+        b_ex = [r for r in recs_ex if r["tag"] == "b"]
+        self.assertEqual(b_sc[0]["key"][2], b_ex[0]["key"][2])
+
+    def test_self_closed_descendant_of_svg_closes_immediately_too(self):
+        """Inside foreign content, every self-closing descendant tag (not
+        just the svg/math root itself) really self-closes — `<path/>` must
+        not become an ancestor of the sibling `<b>` that follows it."""
+        main = "<p>t</p>"
+        head = '<p>t</p><span><svg><path d="M0 0"/><use href="#i"/></svg><b></b></span>'
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+        self.assertIn("under span ", result[0])
+        self.assertNotIn("path", result[0])
+
+    def test_self_closed_tag_outside_foreign_content_still_stays_open(self):
+        """Round-2 behaviour for ordinary HTML content must be unchanged by
+        the foreign-content fix: `<i/>` outside svg/math still does NOT
+        self-close (finding 2, round 2) — the following text nests inside
+        it."""
+        main = "<p>t</p>"
+        head = "<p>t</p><p><i/> text</p>"
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(result, [])
+
+    def test_svg_element_itself_not_flagged_empty_when_self_closed(self):
+        """<svg> is not in EMPTY_ELEMENT_TAGS, so a self-closed empty <svg>
+        must never itself produce a record, regardless of the foreign-
+        content self-close fix."""
+        head = '<svg/>'
+        records = ca._scan_empty_elements(head)
+        self.assertEqual(records, [])
+
+
+class TableContextTests(unittest.TestCase):
+    """Finding 2 (tools/check_aeo.py:271, PR #42 gate): td/th/tr (and the
+    rest of the table-section token set) implicitly close an open <p>
+    unconditionally, but real browsers only give those tokens table
+    semantics when a <table> is actually open — outside a table they are
+    ignored outright, not even inserted into the DOM."""
+
+    def test_td_outside_table_does_not_close_open_p(self):
+        main = "<p>Supplier</p>"
+        head = "<p><td>Supplier</td></p>"
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(result, [])
+
+    def test_th_outside_table_does_not_close_open_p(self):
+        main = "<p>Supplier</p>"
+        head = "<p><th>Supplier</th></p>"
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(result, [])
+
+    def test_tr_outside_table_does_not_close_open_p(self):
+        main = "<p>Supplier</p>"
+        head = "<p><tr>Supplier</tr></p>"
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(result, [])
+
+    def test_td_inside_table_still_closes_open_p_round1_behaviour(self):
+        """Round 1's fix must survive: INSIDE a real table, td/th/tr still
+        get their table semantics and still close an open <p> (a <p> can
+        never legally contain a <td>)."""
+        main = "<table><tr><td><p>Supplier</p></td></tr></table>"
+        head = "<table><tr><td><p></p></td></tr></table>"
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+        self.assertIn("<p>", result[0])
+
+    def test_tr_inside_table_still_closes_stale_row_and_cell(self):
+        """Existing test_tr_closes_open_td_and_previous_tr behaviour (inside
+        a real table) must be unaffected by gating on table context."""
+        head = "<table><tr><td>one<tr><td><b></b></table>"
+        records = ca._scan_empty_elements(head)
+        b_records = [r for r in records if r["tag"] == "b"]
+        self.assertEqual(len(b_records), 1)
+        self.assertEqual(b_records[0]["key"][2], "table>tr>td")
+
+    def test_tbody_thead_tfoot_caption_col_outside_table_are_ignored(self):
+        """The full table-section token set — not just td/th/tr — is only
+        meaningful inside a real table; outside one, tbody/thead/tfoot/
+        caption/col must not become ancestors of what follows either."""
+        for tag in ("tbody", "thead", "tfoot", "caption", "col"):
+            with self.subTest(tag=tag):
+                main = "<p>t</p>"
+                head = f"<p>t</p><{tag}><b></b></{tag}>"
+                result = ca.new_empty_inline_elements(head, main)
+                self.assertEqual(len(result), 1, f"{tag}: expected only the <b> to be flagged")
+                self.assertIn("<b>", result[0])
+                self.assertNotIn(tag, result[0])
+
+    def test_end_tag_for_never_opened_table_token_outside_table_is_ignored(self):
+        """A stray </td> outside a table (never opened, since the open tag
+        itself was ignored) must behave like any other stray end tag — no
+        crash, no effect on what follows."""
+        main = "<p>t</p>"
+        head = "<p>t</p></td><i></i>"
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+        self.assertIn("<i>", result[0])
+
+
 class EofOpenElementTests(unittest.TestCase):
     def test_element_still_open_at_eof_is_recorded(self):
         """Finding 3 (tools/check_aeo.py:291): a page ending `<p>Supplier`
