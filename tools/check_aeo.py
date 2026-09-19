@@ -358,27 +358,18 @@ class _EmptyElementScanner(HTMLParser):
         self.stack.append(node)
 
     def handle_startendtag(self, tag, attrs):
-        # Self-closed markup (`<img/>`, or foreign-content `<path/>`,
-        # `<use/>`): starts the element like a normal start tag, then
-        # immediately closes it, so a self-closed NON-void element never
-        # stays open on self.stack (or on _skip_stack, for a self-closed
-        # skip-subtree tag) for later siblings. handle_endtag is called
-        # UNCONDITIONALLY for every non-void tag, regardless of skip
-        # state -- it is itself skip-aware and always does the right
-        # thing given what handle_starttag just did: for a skip-subtree
-        # tag self-closed while already skipping, handle_starttag pushed
-        # it onto _skip_stack and handle_endtag pops that exact entry
-        # (top matches); for a non-skip tag self-closed while skipping,
-        # handle_starttag pushed nothing and handle_endtag is a no-op
-        # (top doesn't match). Skipping the handle_endtag call while
-        # already skipping (the earlier, wrong shape) left a self-closed
-        # skip-subtree tag's push unpopped, so the next real end tag
-        # matching THAT inner tag's name would resolve first and the
-        # scanner would never leave skip mode.
-        tag_lower = tag.lower()
+        # HTML parsing (finding 2): a trailing "/" on a non-void element's
+        # start tag (`<i/>`, `<path/>`) is not a real self-close — browsers
+        # ignore it and leave the element open exactly as `<i>` would, so
+        # the markup/text that follows becomes its CHILD, not its sibling.
+        # Only `_VOID_TAGS` (already never pushed by handle_starttag) are
+        # actually "closed" by a self-closing tag. So a self-closing tag is
+        # simply a start tag; nothing here ever calls handle_endtag.
+        # Previously this method force-closed every non-void self-closed
+        # tag immediately, which is why `<p><i/> text</p>` was falsely
+        # flagged as an empty `<i>` — the text belongs inside `<i>` in real
+        # browsers, so `<i>` is not empty at all.
         self.handle_starttag(tag, attrs)
-        if tag_lower not in _VOID_TAGS:
-            self.handle_endtag(tag)
 
     def handle_endtag(self, tag):
         tag = tag.lower()
