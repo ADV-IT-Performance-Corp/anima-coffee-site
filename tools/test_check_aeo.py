@@ -646,5 +646,50 @@ class CommaDashArtifactTests(unittest.TestCase):
         self.assertEqual(len(result), 1)
 
 
+class CommentAndEntityTests(unittest.TestCase):
+    """Event-by-state table coverage for the two events _EmptyElementScanner
+    never overrides a handler for: comment and entity. `handle_comment` has
+    no override (HTMLParser's default is a no-op — a comment never opens,
+    closes, or marks text on anything), and the parser is constructed with
+    `convert_charrefs=True`, so entities are converted to their character
+    and folded into `handle_data` BEFORE handle_data is ever called —
+    `handle_entityref`/`handle_charref` are never invoked at all. Both
+    behaviours are state-independent (true regardless of what's open), so
+    one test per event, exercising it inside an open element, a skip
+    region, and at top level, is representative of every state column."""
+
+    def test_comment_is_a_no_op_everywhere(self):
+        head = (
+            "<!-- top level --><p><!-- inside p -->text</p>"
+            "<script><!-- inside script -->x</script>"
+            "<template><!-- inside template --><b></b></template>"
+        )
+        main = "<p>text</p><script>x</script><template><b></b></template>"
+        # A comment contributes no text and opens/closes nothing, so its
+        # presence or absence changes nothing structurally.
+        self.assertEqual(ca.new_empty_inline_elements(head, main), [])
+
+    def test_entity_folds_into_data_everywhere(self):
+        main = "<p>&mdash;</p><i>&amp;</i>"
+        head = "<p>&mdash;</p><i>&amp;</i><b>&nbsp;</b>"
+        # &nbsp; decodes to U+00A0, which handle_data's own
+        # `.replace("\xa0", " ").strip()` correctly treats as whitespace-
+        # only, so <b> is still empty and gets flagged like any other
+        # empty element — entities are not exempt from the whitespace rule.
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+        self.assertIn("<b>", result[0])
+
+    def test_named_entity_counts_as_real_text(self):
+        """A genuine (non-whitespace) named entity, e.g. &mdash;, must mark
+        its element as non-empty exactly like literal text — proven by
+        comparing against a head where the entity was deleted."""
+        main = "<p>&mdash;</p>"
+        head = "<p></p>"
+        result = ca.new_empty_inline_elements(head, main)
+        self.assertEqual(len(result), 1)
+        self.assertIn("<p>", result[0])
+
+
 if __name__ == "__main__":
     unittest.main()
