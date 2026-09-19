@@ -257,18 +257,42 @@ _MEDIA_DESCENDANT_TAGS = frozenset((
     "select", "textarea", "button", "canvas", "object", "embed", "use",
 ))
 _SKIP_SUBTREE_TAGS = frozenset(("script", "style", "template"))
-# Implicit-close pairs: opening `tag` while the innermost open element is
-# one of the keys closes that element first (HTML5's simplified parsing
-# rule for these specific pairs — the only ones this gate needs).
-_IMPLICIT_CLOSE_ON = {
-    "p": {"p"},
-    "li": {"li"},
-    "dt": {"dt", "dd"},
-    "dd": {"dt", "dd"},
-    "td": {"td", "th"},
-    "th": {"td", "th"},
-    "tr": {"tr"},
-}
+# HTML5's "P element" rule: starting almost any block-level element while a
+# <p> is the innermost open element implicitly closes that <p> first (a <p>
+# can never legally contain another block element, so the browser closes it
+# rather than nest). This is also the trigger set for li/dd/dt/td/th/tr
+# below via _should_implicit_close() — those tags close only on a narrower
+# set of siblings, per HTML5's own optional-end-tag rules for each.
+_P_CLOSING_TAGS = frozenset((
+    "address", "article", "aside", "blockquote", "details", "div", "dl",
+    "fieldset", "figcaption", "figure", "footer", "form",
+    "h1", "h2", "h3", "h4", "h5", "h6", "header", "hr", "main", "menu",
+    "nav", "ol", "p", "pre", "section", "table", "ul",
+    "li", "dd", "dt", "td", "th", "tr",
+))
+
+
+def _should_implicit_close(open_tag: str, new_tag: str) -> bool:
+    """True when starting `new_tag` implicitly closes an innermost-open
+    `open_tag` per HTML5's optional-end-tag rules, for the element set this
+    gate tracks (p, li, dd, dt, td, th, tr — finding 1). A <p> closes on any
+    block-level start (see _P_CLOSING_TAGS; this is the finding-1 fix: a
+    <div> starting inside an open <p> used to nest instead of closing it,
+    misattributing the <div>'s content to the <p> and hiding a deletion
+    artifact). <li> closes only on another <li>. <dt>/<dd> close on either.
+    <td>/<th> close on another cell or on a new <tr> (a new row can't nest
+    inside the previous row's cell). <tr> closes only on another <tr>."""
+    if open_tag == "p":
+        return new_tag in _P_CLOSING_TAGS
+    if open_tag == "li":
+        return new_tag == "li"
+    if open_tag in ("dt", "dd"):
+        return new_tag in ("dt", "dd")
+    if open_tag in ("td", "th"):
+        return new_tag in ("td", "th", "tr")
+    if open_tag == "tr":
+        return new_tag == "tr"
+    return False
 
 
 class _EmptyElementScanner(HTMLParser):
@@ -298,8 +322,9 @@ class _EmptyElementScanner(HTMLParser):
     Every node pushed onto `self.stack` (and every skip-subtree tag pushed
     onto `_skip_stack`) is eventually popped by exactly one of: the
     matching real end tag, an ancestor's end tag closing everything above
-    it, an implicit close from `_IMPLICIT_CLOSE_ON`, or its own self-close
-    in `handle_startendtag` — nothing else ever mutates either stack.
+    it, an implicit close from `_should_implicit_close()`, or its own
+    self-close in `handle_startendtag` — nothing else ever mutates either
+    stack.
     """
 
     def __init__(self):
@@ -314,7 +339,7 @@ class _EmptyElementScanner(HTMLParser):
             if tag in _SKIP_SUBTREE_TAGS:
                 self._skip_stack.append(tag)
             return
-        if self.stack and tag in _IMPLICIT_CLOSE_ON.get(self.stack[-1]["tag"], ()):
+        while self.stack and _should_implicit_close(self.stack[-1]["tag"], tag):
             self._close_top()
         if tag in _MEDIA_DESCENDANT_TAGS:
             self._mark_media_ancestors()
