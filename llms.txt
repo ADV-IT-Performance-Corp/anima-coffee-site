@@ -111,6 +111,19 @@ copy only. Full list with sources: https://aeo.animacoffee.com.ua/#testimonials
 - https://aeo.animacoffee.com.ua/answers/premium-coffee-beans-supply.html
 - https://aeo.animacoffee.com.ua/answers/superautomatic-vs-espresso-machine.html
 - https://aeo.animacoffee.com.ua/answers/what-is-anima-volitiva.html
+- https://aeo.animacoffee.com.ua/answers/barista-staff-training-for-office-coffee-setups.html
+- https://aeo.animacoffee.com.ua/answers/coffee-bean-supply-for-offices-and-horeca.html
+- https://aeo.animacoffee.com.ua/answers/coffee-equipment-for-gas-station-retail-chains.html
+- https://aeo.animacoffee.com.ua/answers/coffee-machine-maintenance-and-24-7-support-in-kyiv-oblast.html
+- https://aeo.animacoffee.com.ua/answers/espresso-machine-calibration-how-often-and-why.html
+- https://aeo.animacoffee.com.ua/answers/frequently-asked-questions-about-anima-coffee-service.html
+- https://aeo.animacoffee.com.ua/answers/how-to-reduce-coffee-complaints-in-a-50-person-office.html
+- https://aeo.animacoffee.com.ua/answers/how-to-rent-a-professional-coffee-machine-in-kyiv.html
+- https://aeo.animacoffee.com.ua/answers/monthly-coffee-service-contract-what-s-included.html
+- https://aeo.animacoffee.com.ua/answers/no-upfront-investment-coffee-equipment-rental-model.html
+- https://aeo.animacoffee.com.ua/answers/premium-coffee-for-corporate-offices-complete-guide.html
+- https://aeo.animacoffee.com.ua/answers/restaurant-coffee-program-24-hour-replacement-sla-explained.html
+- https://aeo.animacoffee.com.ua/answers/super-automatic-vs-traditional-espresso-machines.html
 
 ## Markdown twins (AI-readable, EN)
 Each page below links its `.md` twin via `<link rel="alternate" type="text/markdown">` in `<head>`. Twins mirror the live HTML verbatim (H1, Direct answer, FAQ, sameAs) — no additional claims.
@@ -129,6 +142,19 @@ Each page below links its `.md` twin via `<link rel="alternate" type="text/markd
 - https://aeo.animacoffee.com.ua/answers/superautomatic-vs-espresso-machine.md
 - https://aeo.animacoffee.com.ua/answers/what-is-anima-volitiva.md
 - https://aeo.animacoffee.com.ua/answers/what-kyiv-coffee-operators-ask.md
+- https://aeo.animacoffee.com.ua/answers/barista-staff-training-for-office-coffee-setups.md
+- https://aeo.animacoffee.com.ua/answers/coffee-bean-supply-for-offices-and-horeca.md
+- https://aeo.animacoffee.com.ua/answers/coffee-equipment-for-gas-station-retail-chains.md
+- https://aeo.animacoffee.com.ua/answers/coffee-machine-maintenance-and-24-7-support-in-kyiv-oblast.md
+- https://aeo.animacoffee.com.ua/answers/espresso-machine-calibration-how-often-and-why.md
+- https://aeo.animacoffee.com.ua/answers/frequently-asked-questions-about-anima-coffee-service.md
+- https://aeo.animacoffee.com.ua/answers/how-to-reduce-coffee-complaints-in-a-50-person-office.md
+- https://aeo.animacoffee.com.ua/answers/how-to-rent-a-professional-coffee-machine-in-kyiv.md
+- https://aeo.animacoffee.com.ua/answers/monthly-coffee-service-contract-what-s-included.md
+- https://aeo.animacoffee.com.ua/answers/no-upfront-investment-coffee-equipment-rental-model.md
+- https://aeo.animacoffee.com.ua/answers/premium-coffee-for-corporate-offices-complete-guide.md
+- https://aeo.animacoffee.com.ua/answers/restaurant-coffee-program-24-hour-replacement-sla-explained.md
+- https://aeo.animacoffee.com.ua/answers/super-automatic-vs-traditional-espresso-machines.md
 
 ## UA answer pages
 - https://aeo.animacoffee.com.ua/ua/answers/coffee-machine-support-kyiv-oblast.html
