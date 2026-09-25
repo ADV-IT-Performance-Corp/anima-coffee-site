@@ -44,6 +44,13 @@ Checks, each printed as its own PASS/FAIL line with failing examples:
     never scanned. A file with no `origin/main` version (a new file) has no
     deletion history, so this rule is out of scope for it —
     new_empty_inline_elements() returns `[]` when `main_html is None`.
+11. No file (any HTML page incl. noindex/stubs, any Markdown twin, llms.txt,
+    llms-full.txt) contains the brand name "Fiorenzato" in any case or
+    script (Latin, Cyrillic "Фіоренцато"/"Фиоренцато") — unconfirmed per the
+    monorepo truth registry (`public_claims_registry.yaml`, semantic_key
+    equipment_brand: only Dr.Coffee and Necta are approved/publishable) as
+    of 2026-09-25; remove this rule only when the owner/registry confirms
+    the name.
 
 Known false negative (both checks 9's ", —" rule and check 10, documented
 here rather than "fixed" — see new_comma_dash_artifacts() and
@@ -78,6 +85,10 @@ REJECTED_TERMS = [
 ]
 UNCONFIRMED_ROASTER_PATTERN = re.compile(
     r"(?<![a-zA-Zа-яА-ЯіїєґІЇЄҐ])(covim|ков[іи]м)(?![a-zA-Zа-яА-ЯіїєґІЇЄҐ])",
+    re.IGNORECASE,
+)
+UNCONFIRMED_BRAND_FIORENZATO_PATTERN = re.compile(
+    r"(?<![a-zA-Zа-яА-ЯіїєґІЇЄҐ])(fiorenzato|ф[іи]оренцато)(?![a-zA-Zа-яА-ЯіїєґІЇЄҐ])",
     re.IGNORECASE,
 )
 
@@ -220,6 +231,24 @@ def check_no_unconfirmed_roaster_name():
             matches = UNCONFIRMED_ROASTER_PATTERN.findall(text)
             if matches:
                 fails.append(f"{p.relative_to(ROOT)}: {len(matches)} occurrence(s) of unconfirmed roaster name")
+    return fails
+
+
+def check_no_unconfirmed_fiorenzato_brand():
+    fails = []
+    patterns = ("*.html", "*.md", "*.txt")
+    seen = set()
+    for pattern in patterns:
+        for p in ROOT.rglob(pattern):
+            if "node_modules" in str(p) or "/.git/" in str(p) or "__pycache__" in str(p):
+                continue
+            if p in seen:
+                continue
+            seen.add(p)
+            text = p.read_text(encoding="utf-8", errors="ignore")
+            matches = UNCONFIRMED_BRAND_FIORENZATO_PATTERN.findall(text)
+            if matches:
+                fails.append(f"{p.relative_to(ROOT)}: {len(matches)} occurrence(s) of unconfirmed brand name Fiorenzato")
     return fails
 
 
@@ -727,6 +756,7 @@ CHECKS = [
     ("llms-full.txt in sync with generator", check_llms_full_sync),
     ("every old-slug stub is well-formed", check_redirect_stubs),
     ("no unconfirmed roaster name (Covim) anywhere", check_no_unconfirmed_roaster_name),
+    ("no unconfirmed brand name (Fiorenzato) anywhere", check_no_unconfirmed_fiorenzato_brand),
     ("no mechanical-deletion punctuation artifacts", check_punctuation_artifacts),
     ("no empty inline elements left by bulk text removal", check_empty_inline_elements),
 ]
