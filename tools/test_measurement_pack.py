@@ -39,13 +39,19 @@ def load_pack():
         return json.load(f)
 
 
+EVENT_PUSH_PATTERN = re.compile(r'event:\s*"([a-zA-Z0-9_]+)"')
+
+
+def extract_dataLayer_events(text):
+    """Every dataLayer.push({event: "..."}) or {event: '...'} literal in `text`."""
+    return set(EVENT_PUSH_PATTERN.findall(text))
+
+
 def dataLayer_push_events():
     """Every dataLayer.push({event: "..."}) literal found in assets/*.js."""
     events = set()
-    pattern = re.compile(r'event:\s*"([a-zA-Z0-9_]+)"')
     for js in (ROOT / "assets").glob("*.js"):
-        text = js.read_text(encoding="utf-8")
-        events.update(pattern.findall(text))
+        events.update(extract_dataLayer_events(js.read_text(encoding="utf-8")))
     return events
 
 
@@ -62,6 +68,38 @@ class PackStructureTests(unittest.TestCase):
 
     def _container(self):
         return self.pack["containerVersion"]
+
+    def test_variable_names_unique_and_no_builtin_collision(self):
+        container = self._container()
+        custom_names = [v.get("name") for v in container.get("variable", [])]
+        self.assertEqual(
+            len(custom_names),
+            len(set(custom_names)),
+            f"duplicate custom variable name(s): {[n for n in custom_names if custom_names.count(n) > 1]}",
+        )
+        builtin_names = [b.get("name") for b in container.get("builtInVariable", [])]
+        collisions = set(custom_names) & set(builtin_names)
+        self.assertFalse(
+            collisions,
+            f"custom variable name(s) collide with built-in variable name(s): {collisions} "
+            "— GTM's Merge import cannot resolve {{name}} references when a custom and a "
+            "built-in variable share a name",
+        )
+
+    def test_variable_references_resolve_to_exactly_one_definition(self):
+        container = self._container()
+        custom_names = {v.get("name") for v in container.get("variable", [])}
+        builtin_names = {b.get("name") for b in container.get("builtInVariable", [])}
+        blob = json.dumps(container)
+        refs = set(re.findall(r"\{\{([^}]+)\}\}", blob))
+        for ref in refs:
+            in_custom = ref in custom_names
+            in_builtin = ref in builtin_names
+            self.assertTrue(in_custom or in_builtin, f"{{{{{ref}}}}} resolves to no defined variable")
+            self.assertFalse(
+                in_custom and in_builtin,
+                f"{{{{{ref}}}}} resolves to both a custom and a built-in variable",
+            )
 
     def test_ga4_measurement_id_constant_variable(self):
         variables = self._container().get("variable", [])
@@ -180,6 +218,26 @@ class PackStructureTests(unittest.TestCase):
         self.assertTrue(found_host, "ai_referral variable does not reference the named AI hosts")
         for host in AI_REFERRAL_HOSTS:
             self.assertIn(host, json.dumps(self.pack), f"missing AI referral host {host}")
+
+
+class EventExtractionTests(unittest.TestCase):
+    """The event extractor must not be quote-style-fragile (inline fixtures,
+    not repo files — the repo only happens to use double quotes today)."""
+
+    def test_extracts_double_quoted_event(self):
+        js = 'dataLayer.push({ event: "cta_click", channel: "phone" });'
+        self.assertEqual(extract_dataLayer_events(js), {"cta_click"})
+
+    def test_extracts_single_quoted_event(self):
+        js = "dataLayer.push({ event: 'lead_accepted', source_page: sp });"
+        self.assertEqual(extract_dataLayer_events(js), {"lead_accepted"})
+
+    def test_extracts_both_quote_styles_together(self):
+        js = (
+            'dataLayer.push({ event: "cta_click" });\n'
+            "dataLayer.push({ event: 'lead_accepted' });\n"
+        )
+        self.assertEqual(extract_dataLayer_events(js), {"cta_click", "lead_accepted"})
 
 
 class EventWiringTests(unittest.TestCase):
