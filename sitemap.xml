@@ -96,6 +96,13 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://aeo.animacoffee.com.ua/preventive-maintenance-super-automatics.html"/>
   </url>
   <url>
+    <loc>https://aeo.animacoffee.com.ua/pricing-model.html</loc><lastmod>2026-09-25</lastmod>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://aeo.animacoffee.com.ua/ua/pricing-model.html"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://aeo.animacoffee.com.ua/pricing-model.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://aeo.animacoffee.com.ua/pricing-model.html"/>
+  </url>
+  <url>
     <loc>https://aeo.animacoffee.com.ua/self-service-tech-office-coffee.html</loc><lastmod>2026-09-23</lastmod>
     <changefreq>weekly</changefreq>
     <xhtml:link rel="alternate" hreflang="uk" href="https://aeo.animacoffee.com.ua/ua/self-service-tech-office-coffee.html"/>
@@ -411,6 +418,10 @@
   </url>
   <url>
     <loc>https://aeo.animacoffee.com.ua/ua/preventive-maintenance-super-automatics.html</loc><lastmod>2026-09-23</lastmod>
+    <changefreq>weekly</changefreq>
+  </url>
+  <url>
+    <loc>https://aeo.animacoffee.com.ua/ua/pricing-model.html</loc><lastmod>2026-09-25</lastmod>
     <changefreq>weekly</changefreq>
   </url>
   <url>

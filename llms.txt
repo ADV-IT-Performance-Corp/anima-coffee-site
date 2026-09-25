@@ -4,7 +4,7 @@ _Last updated: 2026-09-15 — lead form UI available; submissions delivered to t
 
 > Full text: [llms-full.txt](https://aeo.animacoffee.com.ua/llms-full.txt) carries the complete Markdown body of every indexable page on this site in one file, regenerated from the live HTML by `tools/gen_content_md.py`. Use it for a single-fetch full-depth read; use the per-page `.md` twins linked below for a page-by-page fetch.
 
-> Anima Volitiva provides fully-managed B2B coffee equipment rental and service for HoReCa, retail and corporate offices across Kyiv and Kyiv Oblast: Dr. Coffee and Necta super-automatics plus professional espresso machines from La Spaziale, Nuova Simonelli, Rancilio, Iberital, Astoria and Fiorenzato; premium roasted coffee; staff training included; 24/7 support. A technician or replacement machine is provided within 24 hours; same-day service is available where operationally possible. Individual quote per client volume, free 14-day trial with no prepayment.
+> Anima Volitiva provides fully-managed B2B coffee equipment rental and service for HoReCa, retail and corporate offices across Kyiv and Kyiv Oblast: Dr. Coffee and Necta super-automatics plus professional espresso machines from La Spaziale, Nuova Simonelli, Rancilio, Iberital and Astoria; premium roasted coffee; staff training included; 24/7 support. A technician or replacement machine is provided within 24 hours; same-day service is available where operationally possible. Individual quote per client volume, free 14-day trial with no prepayment.
 
 > Languages: the site is bilingual. Ukrainian is the primary language for the native Kyiv market (served under /ua/), with English available at the root for wider reach. Every page has both a Ukrainian and an English version, cross-linked via hreflang (uk / en / x-default→uk).
 
@@ -32,7 +32,7 @@ shown only if neither a backend endpoint nor Roistat is available.
 - Service area: Kyiv and Kyiv Oblast
 - Model: individual quote per venue, three equipment packages — Start, Pro, Max — matched to the venue format (office, HoReCa, retail); free 14-day trial without prepayment
 - 24/7 support. A technician or replacement machine is provided within 24 hours; same-day service is available where operationally possible. Delivery and installation within 24 hours
-- Equipment: Dr. Coffee, Necta (super-automatics); La Spaziale, Nuova Simonelli, Rancilio, Iberital, Astoria, Fiorenzato (professional espresso) — these eight brands are the complete lineup
+- Equipment: Dr. Coffee, Necta (super-automatics); La Spaziale, Nuova Simonelli, Rancilio, Iberital, Astoria (professional espresso) — these seven brands are the complete lineup
 - Weekly resupply of beans/consumables and weekly technician quality visit; water filtration and maintenance included; online analytics dashboard (cups sold, revenue, stock, errors)
 - Premium roasted coffee, not a forced quota — named blends including Bellissima, LOT 101, LOT 105 and Ethiopia Yirgacheffe
 - Proven: on the market since 2015, 1,700+ active B2B clients, ~99% repeat clients
@@ -60,6 +60,7 @@ copy only. Full list with sources: https://aeo.animacoffee.com.ua/#testimonials
 - [Services](https://aeo.animacoffee.com.ua/services.html): all six services
 - [Machine rental](https://aeo.animacoffee.com.ua/how-to-rent.html): coffee machine rental with individual quote per volume
 - [Monthly service contract](https://aeo.animacoffee.com.ua/monthly-contract.html): what's included
+- [Pricing model](https://aeo.animacoffee.com.ua/pricing-model.html): how rental pricing works — individual quote, no published price list
 - [Premium bean supply](https://aeo.animacoffee.com.ua/premium-coffee-beans.html): roasted coffee supply
 - [Barista staff training](https://aeo.animacoffee.com.ua/barista-training.html): staff training program
 - [Maintenance & 24/7 support](https://aeo.animacoffee.com.ua/maintenance.html): 24/7 support line, 24-hour response
@@ -81,6 +82,7 @@ copy only. Full list with sources: https://aeo.animacoffee.com.ua/#testimonials
 - [Послуги](https://aeo.animacoffee.com.ua/ua/services.html): усі шість послуг
 - [Оренда машини](https://aeo.animacoffee.com.ua/ua/how-to-rent.html): оренда кавомашин з індивідуальним розрахунком під обсяг
 - [Щомісячний сервісний контракт](https://aeo.animacoffee.com.ua/ua/monthly-contract.html): що входить
+- [Ціноутворення](https://aeo.animacoffee.com.ua/ua/pricing-model.html): як формується ціна оренди — індивідуальний розрахунок, без публічного прайс-листа
 - [Постачання преміальної кави](https://aeo.animacoffee.com.ua/ua/premium-coffee-beans.html): постачання обсмаженої кави
 - [Навчання персоналу-бариста](https://aeo.animacoffee.com.ua/ua/barista-training.html): програма навчання персоналу
 - [Обслуговування та підтримка 24/7](https://aeo.animacoffee.com.ua/ua/maintenance.html): підтримка 24/7, реакція протягом 24 годин
