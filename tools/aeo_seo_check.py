@@ -13,6 +13,20 @@ import json, pathlib, re, sys
 
 SITE = pathlib.Path(__file__).resolve().parent.parent
 
+# Named, closed debt list for EN answer pages that don't yet have a real
+# Ukrainian counterpart (a real hreflang="uk" link needs a real UA page to
+# point at — faking one would be a worse AEO signal than omitting it). Each
+# page still needs hreflang="en", and any answer page NOT on this list still
+# fails normally. Remove an entry only when its matching ua/answers/ page
+# ships — never add a page here to make the gate pass without the real page.
+#
+# The 13 EN answer pages landed by PR #43 ("13 EN answer pages from
+# truth-clean staged corpus") were listed here by PR #44 as a stopgap
+# (2026-09-24 AEO gap audit). All 13 now have real ua/answers/ translations
+# (2026-09-25), so the list is empty again — kept as a mechanism, not deleted,
+# for the next time a page lands ahead of its translation.
+EN_ONLY_ANSWER_PAGES = frozenset()
+
 def find_pages():
     pages = sorted(SITE.rglob("*.html"))
     # google*.html is the Search Console verification file — headless by
@@ -55,9 +69,11 @@ def check_page(path, all_h1s):
     if not re.search(r'<link rel="canonical" href="https://', html):
         errs.append("missing canonical")
 
-    is_ppc = "/ppc/" in str(path)
+    # path.parts, not str(path): str() renders with backslashes on Windows.
+    is_ppc = "ppc" in path.parts
     if not is_ppc:
-        for hl in ("en", "uk", "x-default"):
+        required_hreflangs = ("en",) if path.name in EN_ONLY_ANSWER_PAGES else ("en", "uk", "x-default")
+        for hl in required_hreflangs:
             if not re.search(rf'hreflang="{hl}"', html):
                 errs.append(f"missing hreflang={hl}")
 

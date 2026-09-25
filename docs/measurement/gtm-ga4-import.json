@@ -1,0 +1,208 @@
+{
+  "exportFormatVersion": 2,
+  "exportTime": "2026-09-25 00:00:00",
+  "_metadata": {
+    "note": "PLACEHOLDER pack — G-XXXXXXXXXX is not a real GA4 property. Owner replaces the GA4 Measurement ID constant's value after import; see README.md.",
+    "importInstructions": "GTM Admin > Import Container > choose this file > Workspace: New/existing > Merge (Rename conflicting tags/triggers/variables if any) > Confirm.",
+    "pendingEvents": ["cta_click"],
+    "pendingEventsNote": "cta_click is not yet pushed to dataLayer in this repo's JS — a separate slice is adding the sticky CTA that pushes it (channel in {phone, telegram, form}). This tag/trigger pair is wired ahead of that push so no second GTM import is needed."
+  },
+  "containerVersion": {
+    "name": "GA4 measurement pack (slice 4)",
+    "container": {
+      "name": "aeo.animacoffee.com.ua",
+      "publicId": "GTM-MQQNGFTV",
+      "usageContext": ["WEB"]
+    },
+    "variable": [
+      {
+        "name": "GA4 Measurement ID",
+        "type": "c",
+        "parameter": [
+          { "type": "template", "key": "value", "value": "G-XXXXXXXXXX" }
+        ],
+        "notes": "Owner: paste the real GA4 Measurement ID here after creating the GA4 property. Every tag below references this variable, never a hardcoded ID."
+      },
+      {
+        "name": "DLV - channel",
+        "type": "v",
+        "parameter": [
+          { "type": "template", "key": "name", "value": "channel" }
+        ],
+        "notes": "Reads dataLayer.channel pushed alongside the cta_click event (values: phone, telegram, form)."
+      },
+      {
+        "name": "DLV - source_page",
+        "type": "v",
+        "parameter": [
+          { "type": "template", "key": "name", "value": "source_page" }
+        ],
+        "notes": "Reads dataLayer.source_page, pushed by window.animaTrackLead() in assets/analytics.js."
+      },
+      {
+        "name": "DLV - lead_origin",
+        "type": "v",
+        "parameter": [
+          { "type": "template", "key": "name", "value": "lead_origin" }
+        ],
+        "notes": "Reads dataLayer.lead_origin ('human' or 'agent'), pushed by window.animaTrackLead() in assets/analytics.js."
+      },
+      {
+        "name": "JS - AI Referral Source",
+        "type": "jsm",
+        "parameter": [
+          {
+            "type": "template",
+            "key": "javascript",
+            "value": "function() {\n  var hosts = {\n    'chatgpt.com': 1, 'chat.openai.com': 1, 'perplexity.ai': 1,\n    'gemini.google.com': 1, 'copilot.microsoft.com': 1, 'claude.ai': 1\n  };\n  try {\n    var ref = document.referrer || '';\n    if (!ref) return '';\n    var host = new URL(ref).hostname.replace(/^www\\./, '');\n    return hosts[host] ? host : '';\n  } catch (e) { return ''; }\n}"
+          }
+        ],
+        "notes": "Empty string when document.referrer is missing or does not match one of the six named AI surfaces (chatgpt.com, chat.openai.com, perplexity.ai, gemini.google.com, copilot.microsoft.com, claude.ai). Used both as the ai_referral trigger condition and as the ai_source event parameter."
+      }
+    ],
+    "trigger": [
+      {
+        "triggerId": "1",
+        "name": "All Pages",
+        "type": "pageview"
+      },
+      {
+        "triggerId": "2",
+        "name": "CE - lead_accepted",
+        "type": "customEvent",
+        "customEventFilter": [
+          {
+            "type": "equals",
+            "parameter": [
+              { "type": "template", "key": "arg0", "value": "{{_event}}" },
+              { "type": "template", "key": "arg1", "value": "lead_accepted" }
+            ]
+          }
+        ]
+      },
+      {
+        "triggerId": "3",
+        "name": "CE - cta_click",
+        "type": "customEvent",
+        "customEventFilter": [
+          {
+            "type": "equals",
+            "parameter": [
+              { "type": "template", "key": "arg0", "value": "{{_event}}" },
+              { "type": "template", "key": "arg1", "value": "cta_click" }
+            ]
+          }
+        ],
+        "notes": "Pending: fires once the sticky-CTA slice pushes dataLayer.push({event: 'cta_click', channel: ...})."
+      },
+      {
+        "triggerId": "4",
+        "name": "PV - AI Referral",
+        "type": "pageview",
+        "filter": [
+          {
+            "type": "notEquals",
+            "parameter": [
+              { "type": "template", "key": "arg0", "value": "{{JS - AI Referral Source}}" },
+              { "type": "template", "key": "arg1", "value": "" }
+            ]
+          }
+        ],
+        "notes": "Fires on page view only when document.referrer host matches one of the six named AI surfaces."
+      }
+    ],
+    "tag": [
+      {
+        "tagId": "1",
+        "name": "GA4 Configuration",
+        "type": "gaawc",
+        "parameter": [
+          { "type": "template", "key": "measurementIdOverride", "value": "{{GA4 Measurement ID}}" }
+        ],
+        "firingTriggerId": ["1"]
+      },
+      {
+        "tagId": "2",
+        "name": "GA4 Event - lead_accepted",
+        "type": "gaawe",
+        "parameter": [
+          { "type": "template", "key": "eventName", "value": "lead_accepted" },
+          { "type": "template", "key": "measurementIdOverride", "value": "{{GA4 Measurement ID}}" },
+          { "type": "boolean", "key": "markAsConversion", "value": "true" },
+          {
+            "type": "list",
+            "key": "eventParameters",
+            "list": [
+              {
+                "type": "map",
+                "map": [
+                  { "type": "template", "key": "parameter", "value": "source_page" },
+                  { "type": "template", "key": "parameterValue", "value": "{{DLV - source_page}}" }
+                ]
+              },
+              {
+                "type": "map",
+                "map": [
+                  { "type": "template", "key": "parameter", "value": "lead_origin" },
+                  { "type": "template", "key": "parameterValue", "value": "{{DLV - lead_origin}}" }
+                ]
+              }
+            ]
+          }
+        ],
+        "firingTriggerId": ["2"],
+        "notes": "Mark as a key event in GA4 Admin > Events after import (markAsConversion mirrors the intent but the GA4 UI toggle is the source of truth for conversion reporting)."
+      },
+      {
+        "tagId": "3",
+        "name": "GA4 Event - cta_click",
+        "type": "gaawe",
+        "parameter": [
+          { "type": "template", "key": "eventName", "value": "cta_click" },
+          { "type": "template", "key": "measurementIdOverride", "value": "{{GA4 Measurement ID}}" },
+          {
+            "type": "list",
+            "key": "eventParameters",
+            "list": [
+              {
+                "type": "map",
+                "map": [
+                  { "type": "template", "key": "parameter", "value": "channel" },
+                  { "type": "template", "key": "parameterValue", "value": "{{DLV - channel}}" }
+                ]
+              }
+            ]
+          }
+        ],
+        "firingTriggerId": ["3"],
+        "notes": "Pending: see trigger 'CE - cta_click'. Safe to import now, no-ops until the sticky-CTA slice lands."
+      },
+      {
+        "tagId": "4",
+        "name": "GA4 Event - ai_referral",
+        "type": "gaawe",
+        "parameter": [
+          { "type": "template", "key": "eventName", "value": "ai_referral" },
+          { "type": "template", "key": "measurementIdOverride", "value": "{{GA4 Measurement ID}}" },
+          {
+            "type": "list",
+            "key": "eventParameters",
+            "list": [
+              {
+                "type": "map",
+                "map": [
+                  { "type": "template", "key": "parameter", "value": "ai_source" },
+                  { "type": "template", "key": "parameterValue", "value": "{{JS - AI Referral Source}}" }
+                ]
+              }
+            ]
+          }
+        ],
+        "firingTriggerId": ["4"]
+      }
+    ],
+    "builtInVariable": [
+      { "type": "PAGE_PATH", "name": "DLV - source_page" }
+    ]
+  }
+}
