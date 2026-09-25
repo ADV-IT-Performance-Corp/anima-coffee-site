@@ -60,6 +60,7 @@ copy only. Full list with sources: https://aeo.animacoffee.com.ua/#testimonials
 - [Services](https://aeo.animacoffee.com.ua/services.html): all six services
 - [Machine rental](https://aeo.animacoffee.com.ua/how-to-rent.html): coffee machine rental with individual quote per volume
 - [Monthly service contract](https://aeo.animacoffee.com.ua/monthly-contract.html): what's included
+- [Pricing model](https://aeo.animacoffee.com.ua/pricing-model.html): how rental pricing works — individual quote, no published price list
 - [Premium bean supply](https://aeo.animacoffee.com.ua/premium-coffee-beans.html): roasted coffee supply
 - [Barista staff training](https://aeo.animacoffee.com.ua/barista-training.html): staff training program
 - [Maintenance & 24/7 support](https://aeo.animacoffee.com.ua/maintenance.html): 24/7 support line, 24-hour response
@@ -81,6 +82,7 @@ copy only. Full list with sources: https://aeo.animacoffee.com.ua/#testimonials
 - [Послуги](https://aeo.animacoffee.com.ua/ua/services.html): усі шість послуг
 - [Оренда машини](https://aeo.animacoffee.com.ua/ua/how-to-rent.html): оренда кавомашин з індивідуальним розрахунком під обсяг
 - [Щомісячний сервісний контракт](https://aeo.animacoffee.com.ua/ua/monthly-contract.html): що входить
+- [Ціноутворення](https://aeo.animacoffee.com.ua/ua/pricing-model.html): як формується ціна оренди — індивідуальний розрахунок, без публічного прайс-листа
 - [Постачання преміальної кави](https://aeo.animacoffee.com.ua/ua/premium-coffee-beans.html): постачання обсмаженої кави
 - [Навчання персоналу-бариста](https://aeo.animacoffee.com.ua/ua/barista-training.html): програма навчання персоналу
 - [Обслуговування та підтримка 24/7](https://aeo.animacoffee.com.ua/ua/maintenance.html): підтримка 24/7, реакція протягом 24 годин
