@@ -1,0 +1,82 @@
+/* Sticky contact CTA bar (assets/sticky-cta.css)
+ * Shared across every indexable page — see tools/add_sticky_cta.py, which
+ * injects the matching #sticky-cta markup and this file's <link> tag.
+ *
+ * Mobile-first fixed bottom bar with three equal controls: phone
+ * (tel:), Telegram, and the page's lead form (#cta). Reuses the site's
+ * existing custom properties (--accent/--ink/--cream/--sans/--line-dark,
+ * see style.css :root) instead of introducing new colors.
+ *
+ * Never covers the lead-form submit button (.lf-submit) at 375px width:
+ * .lf-submit is a normal-flow element (never position:fixed/sticky —
+ * confirmed against style.css), so reserving BAR_HEIGHT of space at the
+ * bottom of the document via body.has-sticky-cta's padding-bottom is
+ * sufficient to guarantee the fixed bar can never overlap it, regardless
+ * of page length or viewport width.
+ */
+
+body.has-sticky-cta {
+  padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+}
+
+#sticky-cta {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 200;
+  display: flex;
+  align-items: stretch;
+  height: 60px;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: rgba(23, 16, 12, .97);
+  border-top: 1px solid rgba(246, 241, 233, .12);
+  backdrop-filter: blur(10px);
+}
+
+#sticky-cta a {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 8px;
+  color: var(--cream, #f6f1e9);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-right: 1px solid rgba(246, 241, 233, .1);
+}
+
+#sticky-cta a:last-child {
+  border-right: 0;
+}
+
+#sticky-cta a[data-cta-channel="form"] {
+  color: #1a120b;
+  background: var(--accent);
+}
+
+#sticky-cta a:hover,
+#sticky-cta a:active {
+  background: rgba(246, 241, 233, .08);
+}
+
+#sticky-cta a[data-cta-channel="form"]:hover,
+#sticky-cta a[data-cta-channel="form"]:active {
+  background: var(--accent-deep, var(--accent));
+}
+
+@media (max-width: 360px) {
+  #sticky-cta a {
+    font-size: 12px;
+    padding: 0 4px;
+  }
+}
