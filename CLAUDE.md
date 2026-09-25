@@ -15,8 +15,7 @@ products, brands, SLAs, statistics, prices or testimonials. Ever.
   Coffeebar, F12, Coffee Center, Coffee Zone, M12; Necta — Koro Prime,
   Korinto Prime, Krea Touch.
 - Professional espresso (HoReCa, barista-operated): La Spaziale S9,
-  Nuova Simonelli Appia II, Rancilio Classe 7, Iberital IB7, Astoria Start,
-  Fiorenzato F64.
+  Nuova Simonelli Appia II, Rancilio Classe 7, Iberital IB7, Astoria Start.
 - There are NO premium Swiss-brand super-automatics (the two majors buyers
   compare against) in the lineup — see `data/clients/anima-coffee/truth/entity.yaml`
   `forbidden_entities` for the exact names. Those brands may be mentioned only
@@ -119,10 +118,10 @@ phone/handle-only contacts line):**
 ## Canonical replacement language (use these, EN/UA)
 
 - Machines EN: "Dr. Coffee and Necta super-automatics, plus professional
-  espresso machines from La Spaziale, Nuova Simonelli, Rancilio, Iberital,
-  Astoria and Fiorenzato."
+  espresso machines from La Spaziale, Nuova Simonelli, Rancilio, Iberital
+  and Astoria."
   UA: "Суперавтомати Dr. Coffee та Necta, а також професійні еспресо-машини
-  La Spaziale, Nuova Simonelli, Rancilio, Iberital, Astoria та Fiorenzato."
+  La Spaziale, Nuova Simonelli, Rancilio, Iberital та Astoria."
 - Service EN: "24/7 support line, same-day replacement machine on any
   breakdown, delivery and installation within 24 hours."
   UA: "Підтримка 24/7, заміна апарата день у день у разі поломки, доставка
@@ -191,3 +190,16 @@ the specific lines cited above is unchanged and still binding.
 On 2026-09-15, the unconfirmed roaster name was removed site-wide (it had
 never been confirmed by the owner — see the "Coffee:" entry above); this is a
 removal, not a rule change on the still-undecided brand list.
+
+On 2026-09-25, a sixth professional-espresso grinder brand was removed
+site-wide — it had no approved claim in the monorepo truth registry
+(`data/clients/anima-coffee/truth/public_claims_registry.yaml`,
+semantic_key `equipment_brand`: only Dr.Coffee and Necta are
+`status: approved, publishable: true`); the truth registry wins over this
+file. Do not reintroduce it (in Latin or Cyrillic transliteration) from
+old commits, caches or LLM memory — see `tools/check_aeo.py`'s newest
+unconfirmed-brand check function for the exact scanner (brand name
+deliberately not spelled out here — same reason as the forbidden Swiss
+brands above: the literal name trips this file's own scanner). The
+professional-espresso lineup is now La Spaziale, Nuova Simonelli, Rancilio,
+Iberital, Astoria (five brands, not six).
