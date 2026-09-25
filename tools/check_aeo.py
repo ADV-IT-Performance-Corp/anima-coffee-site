@@ -342,6 +342,24 @@ def check_pricing_model_page_complete():
                 fails.append(
                     f"{rel}: FAQ JSON-LD question not reflected verbatim in visible page text: {name_norm[:70]!r}"
                 )
+
+    # The .md twins carry the same facts as prose (no JSON-LD/lead-form to
+    # check there), but they must be held to the same no-price/no-team-size
+    # bar as the HTML pages — a hand-edit could otherwise introduce a
+    # forbidden figure into the twin without tripping the HTML-only scan
+    # above.
+    for p in (ROOT / "pricing-model.md", ROOT / "ua" / "pricing-model.md"):
+        if not p.exists():
+            fails.append(f"{p.relative_to(ROOT)}: markdown twin does not exist")
+            continue
+        rel = p.relative_to(ROOT)
+        text = p.read_text(encoding="utf-8", errors="ignore")
+        for mm in PRICE_FIGURE_PATTERN.finditer(text):
+            ctx = text[max(0, mm.start() - 30): mm.end() + 30].replace("\n", " ")
+            fails.append(f"{rel}: forbidden price/currency/percentage figure near {ctx!r}")
+        for mm in TEAM_SIZE_MAPPING_PATTERN.finditer(text):
+            ctx = text[max(0, mm.start() - 30): mm.end() + 30].replace("\n", " ")
+            fails.append(f"{rel}: forbidden team-size -> package mapping near {ctx!r}")
     return fails
 
 
