@@ -48,16 +48,26 @@ class EnOnlyAnswerPageExemptionTests(unittest.TestCase):
         return p
 
     def test_listed_en_only_page_is_not_flagged_for_missing_uk(self):
-        """A page on EN_ONLY_ANSWER_PAGES must not fail for a missing
-        hreflang=uk/x-default — it still needs hreflang=en. RED before the
-        exemption list exists (every non-ppc page requires all three)."""
+        """A page named on EN_ONLY_ANSWER_PAGES must not fail for a missing
+        hreflang=uk/x-default — it still needs hreflang=en. Exercises the
+        exemption mechanism itself (via monkeypatch) independent of whether
+        the live list currently has any entries — see
+        test_exemption_list_is_empty_now_all_13_pages_translated below for
+        the live-list assertion."""
         with tempfile.TemporaryDirectory() as tmp:
             path = self._write(
                 tmp,
                 "barista-staff-training-for-office-coffee-setups.html",
                 MINIMAL_EN_ONLY_PAGE,
             )
-            errs = gate.check_page(path, all_h1s={})
+            original = gate.EN_ONLY_ANSWER_PAGES
+            gate.EN_ONLY_ANSWER_PAGES = frozenset(
+                {"barista-staff-training-for-office-coffee-setups.html"}
+            )
+            try:
+                errs = gate.check_page(path, all_h1s={})
+            finally:
+                gate.EN_ONLY_ANSWER_PAGES = original
             self.assertFalse(
                 any("hreflang" in e for e in errs),
                 f"expected no hreflang failures for an exempted EN-only page, got: {errs}",
@@ -84,10 +94,14 @@ class EnOnlyAnswerPageExemptionTests(unittest.TestCase):
             errs = gate.check_page(path, all_h1s={})
             self.assertFalse(any("hreflang" in e for e in errs), errs)
 
-    def test_exemption_list_matches_known_debt_count(self):
-        """Guards against silent list rot: exactly the 13 pages named in
-        the 2026-09-24 AEO gap audit are on the list, no more, no fewer."""
-        self.assertEqual(len(gate.EN_ONLY_ANSWER_PAGES), 13)
+    def test_exemption_list_is_empty_now_all_13_pages_translated(self):
+        """The 13 pages named in the 2026-09-24 AEO gap audit each shipped
+        a real ua/answers/ translation on 2026-09-25 (fix/aeo-gate-150),
+        so the debt list is empty again. Guards against silent list rot in
+        either direction: a future EN-only landing should add itself here,
+        not accumulate silently, and a shipped translation should be
+        removed from here, not left as a stale, unnecessary exemption."""
+        self.assertEqual(len(gate.EN_ONLY_ANSWER_PAGES), 0)
 
 
 if __name__ == "__main__":
