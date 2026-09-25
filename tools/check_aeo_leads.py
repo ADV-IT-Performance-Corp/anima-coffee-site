@@ -388,6 +388,11 @@ def service_node_problems(nodes) -> list[str]:
 def check_service_node_on_landing_pages():
     fails = []
     for rel, _p, text in landing_pages():
+        if rel in LEAD_FORM_EXEMPT:
+            # Same exempt set as the lead-form check: these aren't real
+            # content pages (e.g. a bare Search Console verification stub
+            # with no Organization node to provide a Service).
+            continue
         for msg in service_node_problems(_jsonld_nodes(text)):
             fails.append(f"{rel}: {msg}")
     return fails
