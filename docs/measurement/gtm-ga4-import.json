@@ -202,7 +202,8 @@
       }
     ],
     "builtInVariable": [
-      { "type": "PAGE_PATH", "name": "DLV - source_page" }
+      { "type": "PAGE_PATH", "name": "Page Path" },
+      { "type": "EVENT", "name": "Event" }
     ]
   }
 }
