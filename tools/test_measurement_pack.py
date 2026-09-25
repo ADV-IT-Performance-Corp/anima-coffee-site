@@ -106,9 +106,11 @@ class PackStructureTests(unittest.TestCase):
             for t in triggers
             if t.get("type") == "customEvent"
             and any(
-                f.get("value") == event_name
+                any(
+                    p.get("key") == "arg1" and p.get("value") == event_name
+                    for p in f.get("parameter", [])
+                )
                 for f in t.get("customEventFilter", [])
-                for f in [f.get("parameter", [{}])[0]] if f
             )
         ]
         self.assertTrue(matches, f"no Custom Event trigger for '{event_name}'")
