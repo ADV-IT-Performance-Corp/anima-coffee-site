@@ -39,6 +39,21 @@ def load_pack():
         return json.load(f)
 
 
+# GTM WEB container built-in variable types this pack is allowed to declare,
+# mapped to the exact display name GTM's own UI/export uses for each
+# (GTM API BuiltInVariableType `event` = "Event", "For web or mobile";
+# `eventName` is a DIFFERENT built-in type and is not used here).
+ALLOWED_BUILTIN_VARIABLE_TYPES = {
+    "PAGE_PATH": "Page Path",
+    "EVENT": "Event",
+}
+
+# {{_event}} is GTM's own reserved internal alias for the EVENT built-in
+# variable inside Custom Event trigger filters — it resolves automatically
+# whenever the EVENT built-in is declared and must never be declared as a
+# fake/separate variable of its own.
+RESERVED_ALIASES = {"_event": "EVENT"}
+
 EVENT_PUSH_PATTERN = re.compile(r'event:\s*["\']([a-zA-Z0-9_]+)["\']')
 
 
@@ -86,13 +101,45 @@ class PackStructureTests(unittest.TestCase):
             "built-in variable share a name",
         )
 
+    def test_builtin_variable_types_are_valid_gtm_web_types(self):
+        """Every builtInVariable entry must use a real GTM web-container
+        built-in type with its real display name — not a fabricated
+        declaration invented to satisfy a reference check. EVENT_NAME
+        (a different, non-web built-in type) must never appear here."""
+        container = self._container()
+        builtins = container.get("builtInVariable", [])
+        for b in builtins:
+            btype = b.get("type")
+            self.assertIn(
+                btype,
+                ALLOWED_BUILTIN_VARIABLE_TYPES,
+                f"builtInVariable type {btype!r} is not an allowed GTM web built-in type",
+            )
+            self.assertNotEqual(btype, "EVENT_NAME", "EVENT_NAME is not a valid web built-in type here")
+            self.assertEqual(
+                b.get("name"),
+                ALLOWED_BUILTIN_VARIABLE_TYPES[btype],
+                f"builtInVariable {btype!r} must be named "
+                f"{ALLOWED_BUILTIN_VARIABLE_TYPES[btype]!r} (GTM's own display name), got {b.get('name')!r}",
+            )
+
     def test_variable_references_resolve_to_exactly_one_definition(self):
         container = self._container()
         custom_names = {v.get("name") for v in container.get("variable", [])}
         builtin_names = {b.get("name") for b in container.get("builtInVariable", [])}
+        declared_builtin_types = {b.get("type") for b in container.get("builtInVariable", [])}
         blob = json.dumps(container)
         refs = set(re.findall(r"\{\{([^}]+)\}\}", blob))
         for ref in refs:
+            if ref in RESERVED_ALIASES:
+                required_type = RESERVED_ALIASES[ref]
+                self.assertIn(
+                    required_type,
+                    declared_builtin_types,
+                    f"{{{{{ref}}}}} is GTM's reserved alias for the {required_type} built-in, "
+                    "but that built-in is not declared",
+                )
+                continue
             in_custom = ref in custom_names
             in_builtin = ref in builtin_names
             self.assertTrue(in_custom or in_builtin, f"{{{{{ref}}}}} resolves to no defined variable")
