@@ -191,7 +191,7 @@ On 2026-09-15, the unconfirmed roaster name was removed site-wide (it had
 never been confirmed by the owner — see the "Coffee:" entry above); this is a
 removal, not a rule change on the still-undecided brand list.
 
-On 2026-09-25, a sixth professional-espresso grinder brand was removed
+On 2026-09-25, a sixth professional-espresso machine brand was removed
 site-wide — it had no approved claim in the monorepo truth registry
 (`data/clients/anima-coffee/truth/public_claims_registry.yaml`,
 semantic_key `equipment_brand`: only Dr.Coffee and Necta are
