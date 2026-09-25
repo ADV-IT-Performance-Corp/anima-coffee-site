@@ -203,7 +203,7 @@
     ],
     "builtInVariable": [
       { "type": "PAGE_PATH", "name": "Page Path" },
-      { "type": "EVENT_NAME", "name": "_event" }
+      { "type": "EVENT", "name": "Event" }
     ]
   }
 }
