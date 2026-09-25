@@ -39,7 +39,7 @@ def load_pack():
         return json.load(f)
 
 
-EVENT_PUSH_PATTERN = re.compile(r'event:\s*"([a-zA-Z0-9_]+)"')
+EVENT_PUSH_PATTERN = re.compile(r'event:\s*["\']([a-zA-Z0-9_]+)["\']')
 
 
 def extract_dataLayer_events(text):
