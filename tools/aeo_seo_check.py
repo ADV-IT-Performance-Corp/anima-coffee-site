@@ -69,7 +69,8 @@ def check_page(path, all_h1s):
     if not re.search(r'<link rel="canonical" href="https://', html):
         errs.append("missing canonical")
 
-    is_ppc = "/ppc/" in str(path)
+    # path.parts, not str(path): str() renders with backslashes on Windows.
+    is_ppc = "ppc" in path.parts
     if not is_ppc:
         required_hreflangs = ("en",) if path.name in EN_ONLY_ANSWER_PAGES else ("en", "uk", "x-default")
         for hl in required_hreflangs:
