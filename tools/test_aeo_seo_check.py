@@ -104,5 +104,66 @@ class EnOnlyAnswerPageExemptionTests(unittest.TestCase):
         self.assertEqual(len(gate.EN_ONLY_ANSWER_PAGES), 0)
 
 
+
+# A ppc/ landing page: EN-only, noindex, no hreflang and no JSON-LD by design
+# (CLAUDE.md: "ppc/ = 13 noindex landing pages, EN only, stripped nav").
+MINIMAL_PPC_PAGE = """<!DOCTYPE html>
+<html><head>
+<title>Coffee machine rental in Kyiv</title>
+<meta name="description" content="A sufficiently long meta description for AEO gate purposes here.">
+<meta name="robots" content="noindex, follow">
+<link rel="canonical" href="https://aeo.animacoffee.com.ua/ppc/coffee-machine-rental-kyiv.html" />
+</head><body><h1>Coffee machine rental in Kyiv</h1></body></html>
+"""
+
+
+class _BackslashPath(type(pathlib.Path())):
+    """A real, readable Path whose str() renders with Windows backslashes,
+    so the Windows rendering can be reproduced on Linux CI too. File I/O
+    goes through __fspath__, which keeps the real separators."""
+
+    def __fspath__(self):
+        return super().__str__()
+
+    def __str__(self):
+        return super().__str__().replace("/", "\\")
+
+
+class PpcPathPortabilityTests(unittest.TestCase):
+    """The ppc/ exemption must not depend on the OS path separator: on
+    native Windows Python str(path) uses backslashes, so a "/ppc/"
+    substring match silently stopped exempting all 13 ppc/ pages there
+    (150/163 locally vs 163/163 on Linux/WSL)."""
+
+    def _write_ppc(self, tmp, content=MINIMAL_PPC_PAGE):
+        d = pathlib.Path(tmp) / "ppc"
+        d.mkdir()
+        p = d / "coffee-machine-rental-kyiv.html"
+        p.write_text(content, encoding="utf-8")
+        return p
+
+    def test_ppc_page_exempt_on_native_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            errs = gate.check_page(self._write_ppc(tmp), all_h1s={})
+            self.assertEqual(errs, [])
+
+    def test_ppc_page_exempt_when_path_renders_with_backslashes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = _BackslashPath(self._write_ppc(tmp))
+            self.assertIn("\\ppc\\", str(path))  # really Windows-style
+            errs = gate.check_page(path, all_h1s={})
+            self.assertEqual(errs, [])
+
+    def test_non_ppc_page_still_fails_when_path_renders_with_backslashes(self):
+        """The fix must not turn into a blanket exemption: a page outside
+        ppc/ with no hreflang still fails, whatever the separator."""
+        with tempfile.TemporaryDirectory() as tmp:
+            p = pathlib.Path(tmp) / "some-page.html"
+            p.write_text(MINIMAL_PPC_PAGE, encoding="utf-8")
+            errs = gate.check_page(_BackslashPath(p), all_h1s={})
+            self.assertIn("missing hreflang=uk", errs)
+            self.assertIn("missing JSON-LD", errs)
+
+
 if __name__ == "__main__":
     unittest.main()
