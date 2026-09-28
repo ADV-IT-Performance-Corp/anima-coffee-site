@@ -2,9 +2,44 @@
 /* D7 headless check — WebMCP wiring against a REAL rendered page.
  *
  * Serves the worktree over plain HTTP (python http.server), loads index.html
- * in headless Chromium, injects the upstream WebMCP polyfill (webmachine
- * learning/webmcp-tools demos/shared/webmcp-polyfill.js, vendored to
- * /tmp for this run — TEST HARNESS ONLY, never shipped in assets/), then:
+ * in headless Chromium, injects the upstream WebMCP polyfill (build
+ * dist/polyfill.js from a clone of webmachinelearning/webmcp-polyfill main --
+ * npm install, npx tsc, npx esbuild src/auto.ts --bundle --format=iife
+ * --outfile=dist/polyfill.js -- vendored to a local path for this run --
+ * TEST HARNESS ONLY, never shipped in assets/), then:
+ *
+ * 2026-09-28 correction: this header used to cite
+ * "webmachinelearning/webmcp-tools demos/shared/webmcp-polyfill.js" as the
+ * polyfill source (through commit 02f116f). That repo does not exist in the
+ * webmachinelearning org (checked via the GitHub API, 2026-09-28) and never
+ * has -- the org has exactly one polyfill, webmachinelearning/webmcp-polyfill,
+ * whose src/ had zero lines of code until commit cfa8609 (2026-09-22), eight
+ * days after this harness first reported "headless 20/20". The polyfill this
+ * harness actually ran against back then was a hand-authored stand-in, not
+ * the real reference implementation, and it diverged from the real one in
+ * two ways this file wrongly assumed were settled: (1) it apparently
+ * supported declarative toolname= form scanning, which the real upstream
+ * polyfill does not implement (see KNOWN LIMITATION below); (2) it
+ * apparently returned parsed objects from executeTool(), where the real
+ * polyfill (src/index.ts) resolves a JSON-serialized STRING per its
+ * Promise<string> return type -- TESTING.md: "Draft differences: results
+ * are JSON-serialized". Callers must JSON.parse() the resolved value.
+ *
+ * KNOWN LIMITATION (tracked, never silently skipped): as of
+ * webmachinelearning/webmcp-polyfill commit cfa8609 (2026-09-22,
+ * "feat(polyfill): add WebMCP tools across participating frames"), whose own
+ * commit message states "Declarative tools and lifecycle events remain
+ * unimplemented", and TESTING.md's Missing APIs section, which lists
+ * "declarative forms" -- document.modelContext.getTools() on that polyfill
+ * NEVER returns a tool derived from a toolname=-bearing form, no matter what
+ * the sites markup carries. This harness checks the declarative
+ * request_coffee_service_assessment tool the same way either way: if the
+ * loaded polyfill exposes it, the assertions run for real (so a future
+ * regression still fails loudly); if it does not, skip() prints a clearly
+ * labeled SKIP with this reason instead of a silent pass or a crash. Re-run
+ * this harness against a fresh webmcp-polyfill main periodically -- once
+ * upstream ships declarative forms, every guarded block below starts
+ * exercising its hard assertions automatically.
  *
  *   1. executeTool('get_anima_service_info', ...) for a published fact and
  *      an explicitly-unpublished topic -> asserts published:true/false.
@@ -42,6 +77,35 @@ const fs = require("fs");
 const POLYFILL_SRC = fs.readFileSync(POLYFILL_PATH, "utf8");
 
 let failures = 0;
+let skipped = 0;
+
+function skip(label, reason) {
+  skipped++;
+  console.log("SKIP " + label + (reason ? " — " + reason : ""));
+}
+
+function parseToolResult(raw) {
+  // webmcp-polyfill executeTool() resolves a JSON-serialized STRING (spec:
+  // Promise<string>; see the KNOWN LIMITATION / header note above), not a
+  // parsed object -- normalize it here so callers can keep testing
+  // .published/.answer/.status the way they always have.
+  if (typeof raw !== "string") return raw;
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    return raw;
+  }
+}
+
+async function toolExists(pg, name) {
+  return pg.evaluate(async (name) => {
+    var mc = document.modelContext || navigator.modelContext;
+    if (!mc) return false;
+    var tools = await mc.getTools();
+    return tools.some((t) => t.name === name);
+  }, name);
+}
+
 function check(label, cond, detail) {
   if (cond) {
     console.log(`PASS ${label}`);
@@ -108,13 +172,25 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
     return tools.map((t) => t.name);
   });
   check(
-    "both tools are discoverable via getTools()",
-    toolNames.includes("get_anima_service_info") && toolNames.includes("request_coffee_service_assessment"),
+    "imperative get_anima_service_info tool is discoverable via getTools()",
+    toolNames.includes("get_anima_service_info"),
     JSON.stringify(toolNames)
   );
+  if (toolNames.includes("request_coffee_service_assessment")) {
+    check(
+      "declarative request_coffee_service_assessment tool is discoverable via getTools()",
+      true,
+      JSON.stringify(toolNames)
+    );
+  } else {
+    skip(
+      "declarative request_coffee_service_assessment tool is discoverable via getTools()",
+      "webmcp-polyfill main (cfa8609, 2026-09-22) has not implemented declarative form scanning yet -- upstream gap, not a site defect; see KNOWN LIMITATION in the header"
+    );
+  }
 
   async function callTool(name, args) {
-    return page.evaluate(
+    const raw = await page.evaluate(
       async ({ name, args }) => {
         const tools = await document.modelContext.getTools();
         const tool = tools.find((t) => t.name === name);
@@ -123,6 +199,7 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
       },
       { name, args }
     );
+    return parseToolResult(raw);
   }
 
   // 1. Read-only tool: published fact
@@ -235,37 +312,43 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
   // (possibly synthetic, on the agent's behalf) confirm click before
   // e.respondWith() ever resolves. Start the tool call, then perform that
   // confirm click, then read back the resolved result.
-  await page.evaluate(async ({ name, args }) => {
-    const tools = await document.modelContext.getTools();
-    const tool = tools.find((t) => t.name === name);
-    window.__agentResultPromise = document.modelContext.executeTool(tool, args);
-  }, {
-    name: "request_coffee_service_assessment",
-    args: {
-      name: "Test Agent Buyer",
-      business: "Test Co",
-      city: "Kyiv",
-      machines: "1",
-      contact: "buyer@example.com",
-      message: "Office, ~10 people, prefers email."
-    }
-  });
-  await page.waitForTimeout(50);
-  await page.click('#leadForm button[type="submit"]');
-  const agentResult = await page.evaluate(() => window.__agentResultPromise);
-  check(
-    "agent form submit returns not_connected with contact facts",
-    agentResult &&
-      agentResult.status === "not_connected" &&
-      agentResult.phone === "+38 (073) 873 01 45" &&
-      agentResult.email === "animacoffeeco@gmail.com" &&
-      agentResult.telegram === "https://t.me/Animavolitiva",
-    JSON.stringify(agentResult)
-  );
-  check("agent submit with empty endpoint made no network POST", networkRequests.length === 0, JSON.stringify(networkRequests));
+  if (toolNames.includes("request_coffee_service_assessment")) {
+    await page.evaluate(async ({ name, args }) => {
+      const tools = await document.modelContext.getTools();
+      const tool = tools.find((t) => t.name === name);
+      window.__agentResultPromise = document.modelContext.executeTool(tool, args);
+    }, {
+      name: "request_coffee_service_assessment",
+      args: {
+        name: "Test Agent Buyer",
+        business: "Test Co",
+        city: "Kyiv",
+        machines: "1",
+        contact: "buyer@example.com",
+        message: "Office, ~10 people, prefers email."
+      }
+    });
+    await page.waitForTimeout(50);
+    await page.click('#leadForm button[type="submit"]');
+    const agentResult = parseToolResult(await page.evaluate(() => window.__agentResultPromise));
+    check(
+      "agent form submit returns not_connected with contact facts",
+      agentResult &&
+        agentResult.status === "not_connected" &&
+        agentResult.phone === "+38 (073) 873 01 45" &&
+        agentResult.email === "animacoffeeco@gmail.com" &&
+        agentResult.telegram === "https://t.me/Animavolitiva",
+      JSON.stringify(agentResult)
+    );
+    check("agent submit with empty endpoint made no network POST", networkRequests.length === 0, JSON.stringify(networkRequests));
 
-  const dataLayerAfterAgent = await page.evaluate(() => (window.dataLayer || []).filter((e) => e && e.event === "lead_accepted"));
-  check("agent not_connected path pushed no lead_accepted event", dataLayerAfterAgent.length === 0, JSON.stringify(dataLayerAfterAgent));
+    const dataLayerAfterAgent = await page.evaluate(() => (window.dataLayer || []).filter((e) => e && e.event === "lead_accepted"));
+    check("agent not_connected path pushed no lead_accepted event", dataLayerAfterAgent.length === 0, JSON.stringify(dataLayerAfterAgent));
+  } else {
+    skip("agent form submit returns not_connected with contact facts", "declarative tool not discoverable on this polyfill build");
+    skip("agent submit with empty endpoint made no network POST", "declarative tool not discoverable on this polyfill build");
+    skip("agent not_connected path pushed no lead_accepted event", "declarative tool not discoverable on this polyfill build");
+  }
 
   // 3. Human submit path unchanged: fill + click submit, expect fallback block
   await page.fill('#leadForm input[name="name"]', "Human Visitor");
@@ -302,10 +385,16 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
   await navPage.addInitScript({ content: SHORT_WAIT_SRC });
   await navPage.addInitScript({ content: POLYFILL_SRC });
   await navPage.addInitScript({
+    // webmcp-polyfill main defines modelContext as an accessor property on
+    // Document.prototype (matching the spec's partial-interface shape), not
+    // as an own property of each document instance -- delete
+    // document.modelContext on the instance is a documented JS no-op against
+    // an inherited property and silently leaves it in place. Delete from the
+    // prototype instead so this fixture actually relocates it.
     content: `(function () {
       var mc = document.modelContext;
       if (!mc) return;
-      delete document.modelContext;
+      delete Document.prototype.modelContext;
       Object.defineProperty(navigator, "modelContext", { value: mc, writable: false, configurable: true });
     })();`
   });
@@ -322,7 +411,7 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
   );
 
   async function callToolOn(pg, obj, name, args) {
-    return pg.evaluate(
+    const raw = await pg.evaluate(
       async ({ obj, name, args }) => {
         const mc = obj === "navigator" ? navigator.modelContext : document.modelContext;
         const tools = await mc.getTools();
@@ -332,6 +421,7 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
       },
       { obj, name, args }
     );
+    return parseToolResult(raw);
   }
 
   const navToolNames = await navPage.evaluate(async () => {
@@ -339,10 +429,22 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
     return tools.map((t) => t.name);
   });
   check(
-    "navigator-only: both tools are still discoverable via getTools()",
-    navToolNames.includes("get_anima_service_info") && navToolNames.includes("request_coffee_service_assessment"),
+    "navigator-only: imperative get_anima_service_info tool is still discoverable via getTools()",
+    navToolNames.includes("get_anima_service_info"),
     JSON.stringify(navToolNames)
   );
+  if (navToolNames.includes("request_coffee_service_assessment")) {
+    check(
+      "navigator-only: declarative request_coffee_service_assessment tool is still discoverable via getTools()",
+      true,
+      JSON.stringify(navToolNames)
+    );
+  } else {
+    skip(
+      "navigator-only: declarative request_coffee_service_assessment tool is still discoverable via getTools()",
+      "webmcp-polyfill main (cfa8609, 2026-09-22) has not implemented declarative form scanning yet -- see KNOWN LIMITATION in the header"
+    );
+  }
 
   const navTrialResult = await callToolOn(navPage, "navigator", "get_anima_service_info", {
     question: "Do you offer a free trial?",
@@ -354,31 +456,35 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
     JSON.stringify(navTrialResult)
   );
 
-  await navPage.evaluate(async ({ name, args }) => {
-    const tools = await navigator.modelContext.getTools();
-    const tool = tools.find((t) => t.name === name);
-    window.__navAgentResultPromise = navigator.modelContext.executeTool(tool, args);
-  }, {
-    name: "request_coffee_service_assessment",
-    args: {
-      name: "Nav Fallback Buyer",
-      business: "Nav Test Co",
-      city: "Kyiv",
-      machines: "1",
-      contact: "navtest@example.com",
-      message: "Office, prefers email."
-    }
-  });
-  await navPage.waitForTimeout(50);
-  await navPage.click('#leadForm button[type="submit"]');
-  const navAgentResult = await navPage.evaluate(() => window.__navAgentResultPromise);
-  check(
-    "navigator-only: declarative form tool still registers and answers (not_connected)",
-    navAgentResult &&
-      navAgentResult.status === "not_connected" &&
-      navAgentResult.phone === "+38 (073) 873 01 45",
-    JSON.stringify(navAgentResult)
-  );
+  if (navToolNames.includes("request_coffee_service_assessment")) {
+    await navPage.evaluate(async ({ name, args }) => {
+      const tools = await navigator.modelContext.getTools();
+      const tool = tools.find((t) => t.name === name);
+      window.__navAgentResultPromise = navigator.modelContext.executeTool(tool, args);
+    }, {
+      name: "request_coffee_service_assessment",
+      args: {
+        name: "Nav Fallback Buyer",
+        business: "Nav Test Co",
+        city: "Kyiv",
+        machines: "1",
+        contact: "navtest@example.com",
+        message: "Office, prefers email."
+      }
+    });
+    await navPage.waitForTimeout(50);
+    await navPage.click('#leadForm button[type="submit"]');
+    const navAgentResult = parseToolResult(await navPage.evaluate(() => window.__navAgentResultPromise));
+    check(
+      "navigator-only: declarative form tool still registers and answers (not_connected)",
+      navAgentResult &&
+        navAgentResult.status === "not_connected" &&
+        navAgentResult.phone === "+38 (073) 873 01 45",
+      JSON.stringify(navAgentResult)
+    );
+  } else {
+    skip("navigator-only: declarative form tool still registers and answers (not_connected)", "declarative tool not discoverable on this polyfill build");
+  }
 
   // 5. Roistat delivery (W2): stub window.roistatGoal.reach and re-navigate
   // on a fresh page so lead.js's readiness check finds it. data-endpoint
@@ -434,37 +540,43 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
   // Agent submit on the same stubbed page — reset the form's own call log
   // and dataLayer aren't reset, but the count check below only cares about
   // the delta being exactly one for the new call.
-  await roistatPage.evaluate(async ({ name, args }) => {
-    const tools = await document.modelContext.getTools();
-    const tool = tools.find((t) => t.name === name);
-    window.__agentReachPromise = document.modelContext.executeTool(tool, args);
-  }, {
-    name: "request_coffee_service_assessment",
-    args: {
-      name: "Roistat Agent Buyer",
-      business: "Roistat Agent Co",
-      city: "Kyiv",
-      machines: "2",
-      contact: "+380991234567",
-      message: "Retail kiosk."
-    }
-  });
-  await roistatPage.waitForTimeout(50);
-  await roistatPage.click('#leadForm button[type="submit"]');
-  const agentReachResult = await roistatPage.evaluate(() => window.__agentReachPromise);
-  check(
-    "agent submit with Roistat ready returns accepted with a lead_id",
-    agentReachResult && agentReachResult.status === "accepted" && !!agentReachResult.leadId,
-    JSON.stringify(agentReachResult)
-  );
-  const allRoistatCalls = await roistatPage.evaluate(() => window.__roistatCalls);
-  const agentReach = (allRoistatCalls || [])[1];
-  check(
-    "agent submit fired exactly one additional reach() call with lead_origin agent",
-    Array.isArray(allRoistatCalls) && allRoistatCalls.length === 2 && agentReach && agentReach.fields.lead_origin === "agent",
-    JSON.stringify(allRoistatCalls)
-  );
-  check("agent Roistat submit made no POST either", roistatPostRequests.length === 0, JSON.stringify(roistatPostRequests));
+  if (await toolExists(roistatPage, "request_coffee_service_assessment")) {
+    await roistatPage.evaluate(async ({ name, args }) => {
+      const tools = await document.modelContext.getTools();
+      const tool = tools.find((t) => t.name === name);
+      window.__agentReachPromise = document.modelContext.executeTool(tool, args);
+    }, {
+      name: "request_coffee_service_assessment",
+      args: {
+        name: "Roistat Agent Buyer",
+        business: "Roistat Agent Co",
+        city: "Kyiv",
+        machines: "2",
+        contact: "+380991234567",
+        message: "Retail kiosk."
+      }
+    });
+    await roistatPage.waitForTimeout(50);
+    await roistatPage.click('#leadForm button[type="submit"]');
+    const agentReachResult = parseToolResult(await roistatPage.evaluate(() => window.__agentReachPromise));
+    check(
+      "agent submit with Roistat ready returns accepted with a lead_id",
+      agentReachResult && agentReachResult.status === "accepted" && !!agentReachResult.leadId,
+      JSON.stringify(agentReachResult)
+    );
+    const allRoistatCalls = await roistatPage.evaluate(() => window.__roistatCalls);
+    const agentReach = (allRoistatCalls || [])[1];
+    check(
+      "agent submit fired exactly one additional reach() call with lead_origin agent",
+      Array.isArray(allRoistatCalls) && allRoistatCalls.length === 2 && agentReach && agentReach.fields.lead_origin === "agent",
+      JSON.stringify(allRoistatCalls)
+    );
+    check("agent Roistat submit made no POST either", roistatPostRequests.length === 0, JSON.stringify(roistatPostRequests));
+  } else {
+    skip("agent submit with Roistat ready returns accepted with a lead_id", "declarative tool not discoverable on this polyfill build");
+    skip("agent submit fired exactly one additional reach() call with lead_origin agent", "declarative tool not discoverable on this polyfill build");
+    skip("agent Roistat submit made no POST either", "declarative tool not discoverable on this polyfill build");
+  }
 
   // 5b. "ТЕСТ" marker in the name prefixes leadName — fresh page + fresh stub.
   const testMarkerPage = await browser.newPage();
@@ -604,7 +716,7 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
   // without requiring any particular button to be enabled, so it lands
   // deterministically INSIDE the guarded window instead of waiting it out.
   async function agentSubmit(pg, args) {
-    return pg.evaluate(async ({ name, args }) => {
+    const raw = await pg.evaluate(async ({ name, args }) => {
       const tools = await document.modelContext.getTools();
       const tool = tools.find((t) => t.name === name);
       // executeTool()'s Promise executor attaches the form's 'submit'
@@ -614,6 +726,7 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
       document.getElementById("leadForm").requestSubmit();
       return resultPromise;
     }, { name: "request_coffee_service_assessment", args });
+    return parseToolResult(raw);
   }
 
   const dupArgs = {
@@ -624,25 +737,27 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
     contact: "dup@example.com",
     message: "Same submit twice."
   };
-  const dupResult1 = await agentSubmit(dupPage, dupArgs);
-  check("duplicate guard: first submit accepted", dupResult1 && dupResult1.status === "accepted", JSON.stringify(dupResult1));
-  // Second submit fires immediately after the first resolves — well inside
-  // the widened (400ms) deferred-reset window — so the sending guard must
-  // still be held: this must resolve as an in-flight error, never a
-  // second "accepted".
-  const dupResult2 = await agentSubmit(dupPage, dupArgs);
-  check(
-    "duplicate guard: second (racing) submit is rejected in-flight, not delivered",
-    dupResult2 && dupResult2.status === "error",
-    JSON.stringify(dupResult2)
-  );
-  await dupPage.waitForTimeout(500);
-  const dupCalls = await dupPage.evaluate(() => window.__roistatCalls);
-  check(
-    "duplicate guard: exactly one reach() call total for the two racing submits",
-    Array.isArray(dupCalls) && dupCalls.length === 1,
-    JSON.stringify(dupCalls)
-  );
+  if (await toolExists(dupPage, "request_coffee_service_assessment")) {
+    const dupResult1 = await agentSubmit(dupPage, dupArgs);
+    check("duplicate guard: first submit accepted", dupResult1 && dupResult1.status === "accepted", JSON.stringify(dupResult1));
+    const dupResult2 = await agentSubmit(dupPage, dupArgs);
+    check(
+      "duplicate guard: second (racing) submit is rejected in-flight, not delivered",
+      dupResult2 && dupResult2.status === "error",
+      JSON.stringify(dupResult2)
+    );
+    await dupPage.waitForTimeout(500);
+    const dupCalls = await dupPage.evaluate(() => window.__roistatCalls);
+    check(
+      "duplicate guard: exactly one reach() call total for the two racing submits",
+      Array.isArray(dupCalls) && dupCalls.length === 1,
+      JSON.stringify(dupCalls)
+    );
+  } else {
+    skip("duplicate guard: first submit accepted", "declarative tool not discoverable on this polyfill build");
+    skip("duplicate guard: second (racing) submit is rejected in-flight, not delivered", "declarative tool not discoverable on this polyfill build");
+    skip("duplicate guard: exactly one reach() call total for the two racing submits", "declarative tool not discoverable on this polyfill build");
+  }
 
   // 9. Fast-follow: a throwing Roistat counter snippet must never prevent
   // window.animaTrackLead from being defined, and must not take GA4/dataLayer
@@ -690,7 +805,7 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
 
   await browser.close();
 
-  console.log(`\nHeadless WebMCP check: ${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
+  console.log("\nHeadless WebMCP check: " + (failures === 0 ? "ALL PASS" : failures + " FAILURE(S)") + (skipped ? " (" + skipped + " SKIPPED -- see KNOWN LIMITATION in the header)" : ""));
   process.exit(failures === 0 ? 0 : 1);
 })().catch((e) => {
   console.error("ERROR", e);
