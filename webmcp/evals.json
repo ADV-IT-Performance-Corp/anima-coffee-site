@@ -2,48 +2,76 @@
   {
     "name": "buyer asks about the trial",
     "messages": [
-      { "role": "user", "type": "message", "content": "Do you offer a free trial before I commit?" }
+      {
+        "role": "user",
+        "type": "message",
+        "content": "Do you offer a free trial before I commit?"
+      }
     ],
     "expectedCall": [
       {
         "functionName": "get_anima_service_info",
-        "arguments": { "question": "Do you offer a free trial before I commit?", "language": "en" }
+        "arguments": {
+          "question": "Do you offer a free trial before I commit?",
+          "language": "en"
+        }
       }
     ]
   },
   {
     "name": "buyer asks about support SLA",
     "messages": [
-      { "role": "user", "type": "message", "content": "What happens if a machine breaks down over a weekend?" }
+      {
+        "role": "user",
+        "type": "message",
+        "content": "What happens if a machine breaks down over a weekend?"
+      }
     ],
     "expectedCall": [
       {
         "functionName": "get_anima_service_info",
-        "arguments": { "question": "What happens if a machine breaks down over a weekend?", "language": "en" }
+        "arguments": {
+          "question": "What happens if a machine breaks down over a weekend?",
+          "language": "en"
+        }
       }
     ]
   },
   {
-    "name": "buyer asks an unpublished question (machine brand list)",
+    "name": "buyer asks which machine brands and models (published lineup)",
     "messages": [
-      { "role": "user", "type": "message", "content": "Which exact machine brands and models will you install at my office?" }
+      {
+        "role": "user",
+        "type": "message",
+        "content": "Which exact machine brands and models will you install at my office?"
+      }
     ],
     "expectedCall": [
       {
         "functionName": "get_anima_service_info",
-        "arguments": { "question": "Which exact machine brands and models will you install at my office?", "language": "en" }
+        "arguments": {
+          "question": "Which exact machine brands and models will you install at my office?",
+          "language": "en"
+        }
       }
     ]
   },
   {
     "name": "buyer on the Ukrainian site asks about coverage",
     "messages": [
-      { "role": "user", "type": "message", "content": "Ви обслуговуєте Київську область?" }
+      {
+        "role": "user",
+        "type": "message",
+        "content": "Ви обслуговуєте Київську область?"
+      }
     ],
     "expectedCall": [
       {
         "functionName": "get_anima_service_info",
-        "arguments": { "question": "Ви обслуговуєте Київську область?", "language": "uk" }
+        "arguments": {
+          "question": "Ви обслуговуєте Київську область?",
+          "language": "uk"
+        }
       }
     ]
   },
@@ -66,6 +94,45 @@
           "machines": "2",
           "contact": "olena@brightstudio.example",
           "message": "Business type: office. Headcount: ~30. Role: office manager. City: Kyiv city. Package: Pro. Preferred contact: email."
+        }
+      }
+    ]
+  },
+  {
+    "name": "buyer asks for the product lineup",
+    "messages": [
+      {
+        "role": "user",
+        "type": "message",
+        "content": "What coffee machines and products do you offer?"
+      }
+    ],
+    "expectedCall": [
+      {
+        "functionName": "get_anima_products",
+        "arguments": {
+          "language": "en"
+        }
+      }
+    ]
+  },
+  {
+    "name": "buyer wants a quote prefilled",
+    "messages": [
+      {
+        "role": "user",
+        "type": "message",
+        "content": "I run a cafe called Test Cafe in Kyiv, please start a quote request for 2 machines; reach me at test@example.invalid."
+      }
+    ],
+    "expectedCall": [
+      {
+        "functionName": "prepare_coffee_quote_request",
+        "arguments": {
+          "business": "Test Cafe",
+          "city": "Kyiv",
+          "machines": "2",
+          "contact": "test@example.invalid"
         }
       }
     ]

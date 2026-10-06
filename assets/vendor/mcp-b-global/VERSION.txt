@@ -1,0 +1,8 @@
+package: @mcp-b/global
+version: 5.1.0 (exact pin; never @latest)
+license: MIT (see LICENSE)
+source: https://registry.npmjs.org/@mcp-b/global/-/global-5.1.0.tgz (file package/dist/index.iife.js, unmodified)
+homepage: https://docs.mcp-b.ai/packages/global/reference
+sha256: 78044647c9f36f8d62c9e22799ff96cbaf344c423f843576ae49211955d3efac
+loaded by: assets/webmcp.js, only when neither document.modelContext nor navigator.modelContext exists
+to update: npm pack @mcp-b/global@<exact>, replace index.iife.js + LICENSE, update this file and the tests

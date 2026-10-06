@@ -13,14 +13,29 @@ _Last updated: 2026-09-15 — lead form UI available; submissions delivered to t
 Every page carries a declarative WebMCP tool on its lead form —
 `toolname="request_coffee_service_assessment"` — so a WebMCP-capable agent
 can fill and submit it on a visitor's behalf (`toolautosubmit` is off: a
-human confirms the final submit). `assets/webmcp.js` also registers one
-read-only imperative tool, `get_anima_service_info`, that answers buyer
-questions (packages, trial, support/SLA, coverage area, company history,
-client count, contacts/hours) from facts already published on this site —
-anything not published (e.g. the exact machine brand list, water hardness,
-liability, contract length, multi-location billing, POS/cashless, exact
-maintenance cadence, staff-training duration) is answered as "not published"
-rather than invented. Submissions are delivered to the company's CRM: with
+human confirms the final submit). `assets/webmcp.js` also registers three
+imperative tools (when the browser has no native WebMCP, a pinned self-hosted
+copy of the MIT-licensed `@mcp-b/global` 5.1.0 polyfill under
+`assets/vendor/mcp-b-global/` is loaded first):
+- `get_anima_service_info` (read-only) — answers buyer questions (equipment
+  brands, packages, trial, support/SLA, coverage area, company history, client
+  count, contacts/hours) from facts already published on this site.
+- `get_anima_products` (read-only) — returns the published lineup: the eight
+  equipment brands by type (Dr. Coffee, Necta; La Spaziale, Nuova Simonelli,
+  Rancilio, Iberital, Astoria, Fiorenzato), premium roasted coffee, the
+  Start/Pro/Max packages (custom quote, prices not published), the free 14-day
+  trial with no prepayment, the Kyiv and Kyiv Oblast service area, and how to
+  request a quote. Optional `category`: super_automatic, professional_espresso,
+  coffee, packages; optional `language`: en, uk.
+- `prepare_coffee_quote_request` — prefills the on-page lead form from details
+  the visitor gave (name, business, city, machines, contact, message), scrolls
+  to it and focuses it. It never submits: the visitor reviews the fields and
+  presses "Get my custom assessment".
+
+Anything not published (e.g. water hardness, liability, contract length,
+multi-location billing, POS/cashless, exact maintenance cadence, staff-training
+duration, package contents and prices) is answered as "not published" rather
+than invented. Submissions are delivered to the company's CRM: with
 no backend endpoint configured (`data-endpoint` empty), the form sends a
 Roistat goal (`roistatGoal.reach()`) and Roistat's own AmoCRM integration
 opens the deal — both a human and an agent submission use this same path,
