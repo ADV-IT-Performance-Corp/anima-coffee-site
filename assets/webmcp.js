@@ -122,17 +122,17 @@
       en: "No forced minimum. Your quote is based on your real volume, across one of the three equipment packages, with no minimum monthly amount to hit.",
       uk: "Без обов'язкового мінімуму. Розрахунок базується на вашому реальному обсязі в межах одного з трьох пакетів обладнання, без мінімальної щомісячної кількості."
     },
-    // Brands / models / equipment lineup — published in llms.txt and on the
-    // site. Checked before the generic support/technician matcher.
-    {
-      re: /\bbrands?\b|\bmodels?\b|equipment|lineup|line-up|what machines|which machines|machines? (do you|you) (offer|install|have|rent)|do you (install|offer|rent|have)\b.*\b(machine|necta|dr\.? ?coffee|spaziale|simonelli|rancilio|iberital|astoria|fiorenzato)|necta|dr\.? ?coffee|spaziale|simonelli|rancilio|iberital|astoria|fiorenzato|бренд|модел[ьіїю]|обладнанн|які (кава)?машини|кавомашин/i,
-      en: T.en.brands,
-      uk: T.uk.brands
-    },
     {
       re: /water filtration|maintenance included|weekly (visit|resupply|service|technician)|фільтрація води|щотижнев/i,
       en: "Water filtration and maintenance are included with every machine, plus weekly resupply of beans/consumables and a weekly technician quality visit.",
       uk: "Фільтрація води та обслуговування входять у кожен апарат, а також щотижневе поповнення кави/витратних матеріалів і щотижневий технічний візит."
+    },
+    // Brands / models / equipment lineup — published in llms.txt and on the
+    // site. Checked before the generic support/technician matcher.
+    {
+      re: /\bbrands?\b|\bmodels?\b|equipment|lineup|line-up|what machines|which machines|machines? (do you|you) (offer|install|have|rent)|do you (install|offer|rent|have)\b.*\b(machine|\bnecta\b|dr\.? ?coffee|spaziale|simonelli|rancilio|iberital|astoria|fiorenzato)|\bnecta\b|dr\.? ?coffee|spaziale|simonelli|rancilio|iberital|astoria|fiorenzato|бренд|модел[ьіїю]|обладнанн|які (кава)?машини|кавомашин/i,
+      en: T.en.brands,
+      uk: T.uk.brands
     },
     {
       re: /phone number|contact (info|details|you)|email address|\baddress\b|opening hours|business hours|what (time|hours)|call you|reach you|телефон|адреса|пошта|години роботи|график роботи|зв'?язатися/i,

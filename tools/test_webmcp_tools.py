@@ -278,3 +278,17 @@ def test_llms_txt_lists_three_tools():
               "prepare_coffee_quote_request", "request_coffee_service_assessment"):
         assert n in t
     assert "exact machine brand list" not in t  # the old contradiction
+
+
+# --- review round 1 (codex unavailable; gstack-review fallback) -------------
+
+def test_maintenance_question_mentioning_equipment_is_not_hijacked_by_brands():
+    r = ask("Is maintenance included for the equipment?")
+    assert r["published"] is True
+    assert "filtration" in r["answer"].lower()
+    assert "Necta" not in r["answer"]
+
+
+def test_necta_keyword_is_word_bounded():
+    r = ask("Is the nectar syrup included?")
+    assert "Necta" not in r["answer"]
