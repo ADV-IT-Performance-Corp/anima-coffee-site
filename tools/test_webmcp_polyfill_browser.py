@@ -68,8 +68,11 @@ def _chromium_exe():
 @pytest.fixture(scope="module")
 def page():
     sync_api = pytest.importorskip("playwright.sync_api")
-    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(ROOT))
-    handler.log_message = lambda *a, **k: None
+    class Quiet(http.server.SimpleHTTPRequestHandler):
+        def log_message(self, *args, **kwargs):
+            pass
+
+    handler = functools.partial(Quiet, directory=str(ROOT))
     httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     port = httpd.server_address[1]
