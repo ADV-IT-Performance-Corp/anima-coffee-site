@@ -345,6 +345,46 @@
     });
   }
 
+  // ------------------------------------------------- polyfill call shim
+  // Root cause of the "executeTool hangs / never returns" report (2026-10-06):
+  // WebMCP's ModelContext.executeTool takes a RegisteredTool DESCRIPTOR (from
+  // `await getTools()`) plus the input as a JSON string
+  // (webmachinelearning.github.io/webmcp: executeTool(RegisteredTool tool,
+  // optional object inputObject) -> Promise<DOMString>; @mcp-b/global 5.1.0
+  // additionally JSON.parses the input and answers "Failed to parse input
+  // arguments" for a plain object). Agents and test drivers call it by tool
+  // NAME instead, which the polyfill rejects with a TypeError that a CDP
+  // driver can swallow and wait on forever. When the polyfill is in use we
+  // accept the by-name form (args as an object, a JSON string, or omitted)
+  // and reject unknown names at once instead of throwing a TypeError (a hung
+  // getTools() or a circular input are not guarded). Native Chrome
+  // contexts are never touched (this runs only on the injected polyfill).
+  function installCallShim(ctx) {
+    if (!ctx || ctx.__animaCallShim || typeof ctx.executeTool !== "function") return;
+    var orig = ctx.executeTool;
+    function toJson(input) {
+      if (typeof input === "string") return input;
+      return JSON.stringify(input === undefined || input === null ? {} : input);
+    }
+    try {
+      ctx.executeTool = function (tool, input, options) {
+        if (typeof tool === "string") {
+          return Promise.resolve(ctx.getTools()).then(function (tools) {
+            var found = null;
+            tools = Array.prototype.slice.call(tools || []);
+            for (var i = 0; i < tools.length; i++) {
+              if (tools[i] && tools[i].name === tool) { found = tools[i]; break; }
+            }
+            if (!found) throw new Error("Tool not found: " + tool);
+            return orig.call(ctx, found, toJson(input), options);
+          });
+        }
+        return orig.call(ctx, tool, input === undefined ? input : toJson(input), options);
+      };
+      ctx.__animaCallShim = true;
+    } catch (e) { /* frozen context: leave the polyfill API as shipped */ }
+  }
+
   // ------------------------------------------------------------- bootstrap
   var ctx = resolveContext();
   if (ctx) {
@@ -363,7 +403,7 @@
   s.async = true;
   s.onload = function () {
     var c = resolveContext();
-    if (c) register(c);
+    if (c) { installCallShim(c); register(c); }
   };
   s.onerror = function () { /* no WebMCP available; the page works as normal */ };
   (document.head || document.documentElement).appendChild(s);
