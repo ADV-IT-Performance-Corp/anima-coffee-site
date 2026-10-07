@@ -356,7 +356,8 @@
   // NAME instead, which the polyfill rejects with a TypeError that a CDP
   // driver can swallow and wait on forever. When the polyfill is in use we
   // accept the by-name form (args as an object, a JSON string, or omitted)
-  // and always settle: a bad call rejects, it never waits. Native Chrome
+  // and reject unknown names at once instead of throwing a TypeError (a hung
+  // getTools() or a circular input are not guarded). Native Chrome
   // contexts are never touched (this runs only on the injected polyfill).
   function installCallShim(ctx) {
     if (!ctx || ctx.__animaCallShim || typeof ctx.executeTool !== "function") return;
