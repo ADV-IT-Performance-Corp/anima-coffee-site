@@ -53,13 +53,13 @@
   var T = uk
     ? {
         sending: "Надсилаємо…",
-        sent: "Дякуємо! Ми зв'яжемося з вами протягом одного робочого дня.",
+        sent: "Дякуємо! Ми зв'яжемося з вами.",
         err: "Не вдалося надіслати через сайт. Скористайтесь контактами нижче — ми відповідаємо швидко.",
         noBackend: "Форма ще не підключена до нашої системи. Зв'яжіться з нами напряму — ми відповідаємо швидко:"
       }
     : {
         sending: "Sending…",
-        sent: "Thank you. We'll reply within one business day.",
+        sent: "Thank you.",
         err: "Could not send via the site. Please use the contacts below — we reply fast.",
         noBackend: "This form isn't wired to our system yet. Reach us directly — we reply fast:"
       };
