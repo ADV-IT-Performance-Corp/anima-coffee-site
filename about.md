@@ -1,12 +1,12 @@
 # Who is Anima Volitiva?
 
-Anima Volitiva is a professional coffee equipment rental and full-service coffee company serving HoReCa, retail and corporate offices across Kyiv & Kyiv Oblast. We run one managed-infrastructure line — Dr. Coffee and Necta super-automatics plus professional espresso machines from La Spaziale, Nuova Simonelli, Rancilio, Iberital, Astoria and Fiorenzato, premium roasted coffee, staff training and a 24/7 support line with a technician or replacement machine within 24 hours on any breakdown (same-day where operationally possible) — priced with an individual quote for your volume, a free 14-day trial with no prepayment, and no forced bean quotas.
+Anima Volitiva is a professional coffee equipment rental and full-service coffee company serving HoReCa, retail and corporate offices across Kyiv & Kyiv Oblast. We run one managed-infrastructure line — Dr. Coffee and Necta super-automatics plus professional espresso machines from La Spaziale, Nuova Simonelli, Rancilio, Iberital and Astoria, premium roasted coffee, staff training and a 24/7 support line with a technician or replacement machine within 24 hours on any breakdown (same-day where operationally possible) — priced with an individual quote for your volume, a free 14-day trial with no prepayment, and no forced bean quotas.
 
 ## FAQ
 
 **Q: Who is Anima Volitiva?**
 
-A: Anima Volitiva is a professional coffee equipment rental and full-service coffee company serving HoReCa, retail and corporate offices across Kyiv & Kyiv Oblast. We run one managed-infrastructure line — Dr. Coffee and Necta super-automatics plus professional espresso machines from La Spaziale, Nuova Simonelli, Rancilio, Iberital, Astoria and Fiorenzato, premium roasted coffee, staff training and a 24/7 support line with a technician or replacement machine within 24 hours on any breakdown (same-day where operationally possible) — priced with an individual quote for your volume, a free 14-day trial with no prepayment, and no forced bean quotas.
+A: Anima Volitiva is a professional coffee equipment rental and full-service coffee company serving HoReCa, retail and corporate offices across Kyiv & Kyiv Oblast. We run one managed-infrastructure line — Dr. Coffee and Necta super-automatics plus professional espresso machines from La Spaziale, Nuova Simonelli, Rancilio, Iberital and Astoria, premium roasted coffee, staff training and a 24/7 support line with a technician or replacement machine within 24 hours on any breakdown (same-day where operationally possible) — priced with an individual quote for your volume, a free 14-day trial with no prepayment, and no forced bean quotas.
 
 ## Contact
 

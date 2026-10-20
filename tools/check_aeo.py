@@ -44,6 +44,21 @@ Checks, each printed as its own PASS/FAIL line with failing examples:
     never scanned. A file with no `origin/main` version (a new file) has no
     deletion history, so this rule is out of scope for it —
     new_empty_inline_elements() returns `[]` when `main_html is None`.
+11. No file (any HTML page incl. noindex/stubs, any Markdown twin, llms.txt,
+    llms-full.txt) contains the brand name "Fiorenzato" in any case or
+    script (Latin, Cyrillic "Фіоренцато"/"Фиоренцато") — unconfirmed per the
+    monorepo truth registry (`public_claims_registry.yaml`, semantic_key
+    equipment_brand: only Dr.Coffee and Necta are approved/publishable) as
+    of 2026-09-25; remove this rule only when the owner/registry confirms
+    the name.
+12. `pricing-model.html` and `ua/pricing-model.html` both exist, each carries
+    a `<form class="lead-form"` lead-capture element, neither contains a
+    numeric price/currency/discount figure ($, ₴, €, грн, UAH, USD, or a
+    price-style %) or a digit-driven team-size -> package mapping (e.g.
+    "10-20 people", "до 50 співробітників") per
+    claim-anima-pricing-custom-quote's no_numeric_price qualifier, and every
+    FAQPage JSON-LD question/answer on each page is reflected verbatim in
+    that page's visible text (see check_pricing_model_page_complete()).
 
 Known false negative (both checks 9's ", —" rule and check 10, documented
 here rather than "fixed" — see new_comma_dash_artifacts() and
@@ -78,6 +93,10 @@ REJECTED_TERMS = [
 ]
 UNCONFIRMED_ROASTER_PATTERN = re.compile(
     r"(?<![a-zA-Zа-яА-ЯіїєґІЇЄҐ])(covim|ков[іи]м)(?![a-zA-Zа-яА-ЯіїєґІЇЄҐ])",
+    re.IGNORECASE,
+)
+UNCONFIRMED_BRAND_FIORENZATO_PATTERN = re.compile(
+    r"(?<![a-zA-Zа-яА-ЯіїєґІЇЄҐ])(fiorenzato|ф[іи]оренцато)(?![a-zA-Zа-яА-ЯіїєґІЇЄҐ])",
     re.IGNORECASE,
 )
 
@@ -220,6 +239,127 @@ def check_no_unconfirmed_roaster_name():
             matches = UNCONFIRMED_ROASTER_PATTERN.findall(text)
             if matches:
                 fails.append(f"{p.relative_to(ROOT)}: {len(matches)} occurrence(s) of unconfirmed roaster name")
+    return fails
+
+
+def check_no_unconfirmed_fiorenzato_brand():
+    fails = []
+    patterns = ("*.html", "*.md", "*.txt")
+    seen = set()
+    for pattern in patterns:
+        for p in ROOT.rglob(pattern):
+            if "node_modules" in str(p) or "/.git/" in str(p) or "__pycache__" in str(p):
+                continue
+            if p in seen:
+                continue
+            seen.add(p)
+            text = p.read_text(encoding="utf-8", errors="ignore")
+            matches = UNCONFIRMED_BRAND_FIORENZATO_PATTERN.findall(text)
+            if matches:
+                fails.append(f"{p.relative_to(ROOT)}: {len(matches)} occurrence(s) of unconfirmed brand name Fiorenzato")
+    return fails
+
+
+# check_pricing_model_page_complete(): the "pricing-model" answer page pair
+# (EN pricing-model.html + UA ua/pricing-model.html) must exist, carry the
+# lead form, expose FAQ JSON-LD that is actually reflected in visible copy,
+# and never state a numeric price, currency amount, or a price/discount
+# percentage — per claim-anima-pricing-custom-quote's no_numeric_price
+# qualifier in the monorepo public_claims_registry.yaml (Offer.price is
+# forbidden on this page, price:0 included). It also must not carry a
+# digit-driven team-size -> package mapping (e.g. "10-20 people", "до 50
+# співробітників") — the approved claim is only that three packages exist
+# (Start/Pro/Max) matched to venue *format*, never to a headcount number.
+PRICE_FIGURE_PATTERN = re.compile(r"[$₴€]|\bгрн\b|\bUAH\b|\bUSD\b|%", re.IGNORECASE)
+TEAM_SIZE_MAPPING_PATTERN = re.compile(
+    r"(?:\d+\s*[-–—]\s*\d+|\bдо\s*\d+|\bup to\s*\d+)\s*"
+    r"(?:people|staff|employees|person|persons|headcount|workers|"
+    r"осіб|співробітник\w*|людей|чолов[іi]к\w*|працівник\w*)",
+    re.IGNORECASE,
+)
+
+
+def _faq_qa_pairs(html_src: str):
+    """(question, answer) pairs from every FAQPage node's mainEntity across
+    all JSON-LD <script> blocks on the page. A block that fails to parse is
+    skipped, never crashes the check."""
+    pairs = []
+    for m in re.finditer(r'<script type="application/ld\+json">(.*?)</script>', html_src, re.S):
+        try:
+            data = json.loads(m.group(1))
+        except Exception:
+            continue
+        nodes = data.get("@graph", [data]) if isinstance(data, dict) else data
+        if not isinstance(nodes, list):
+            nodes = [nodes]
+        for node in nodes:
+            if isinstance(node, dict) and node.get("@type") == "FAQPage":
+                for q in node.get("mainEntity", []) or []:
+                    if not isinstance(q, dict):
+                        continue
+                    name = q.get("name", "") or ""
+                    answer = ((q.get("acceptedAnswer") or {}).get("text", "")) or ""
+                    pairs.append((name, answer))
+    return pairs
+
+
+def check_pricing_model_page_complete():
+    fails = []
+    pages = [ROOT / "pricing-model.html", ROOT / "ua" / "pricing-model.html"]
+    missing = [p for p in pages if not p.exists()]
+    for p in missing:
+        fails.append(f"{p.relative_to(ROOT)}: page does not exist")
+    if missing:
+        return fails  # nothing else to check until both pages exist
+
+    for p in pages:
+        rel = p.relative_to(ROOT)
+        text = p.read_text(encoding="utf-8", errors="ignore")
+
+        if '<form class="lead-form"' not in text:
+            fails.append(f"{rel}: missing <form class=\"lead-form\"> element")
+
+        for mm in PRICE_FIGURE_PATTERN.finditer(text):
+            ctx = text[max(0, mm.start() - 30): mm.end() + 30].replace("\n", " ")
+            fails.append(f"{rel}: forbidden price/currency/percentage figure near {ctx!r}")
+
+        for mm in TEAM_SIZE_MAPPING_PATTERN.finditer(text):
+            ctx = text[max(0, mm.start() - 30): mm.end() + 30].replace("\n", " ")
+            fails.append(f"{rel}: forbidden team-size -> package mapping near {ctx!r}")
+
+        visible_norm = re.sub(r"\s+", " ", _visible_text_for_scan(text)).strip()
+        pairs = _faq_qa_pairs(text)
+        if not pairs:
+            fails.append(f"{rel}: no FAQPage JSON-LD mainEntity found")
+        for name, answer in pairs:
+            ans_norm = re.sub(r"\s+", " ", answer).strip()
+            if ans_norm and ans_norm not in visible_norm:
+                fails.append(
+                    f"{rel}: FAQ JSON-LD answer not reflected verbatim in visible page text: {ans_norm[:70]!r}"
+                )
+            name_norm = re.sub(r"\s+", " ", name).strip()
+            if name_norm and name_norm not in visible_norm:
+                fails.append(
+                    f"{rel}: FAQ JSON-LD question not reflected verbatim in visible page text: {name_norm[:70]!r}"
+                )
+
+    # The .md twins carry the same facts as prose (no JSON-LD/lead-form to
+    # check there), but they must be held to the same no-price/no-team-size
+    # bar as the HTML pages — a hand-edit could otherwise introduce a
+    # forbidden figure into the twin without tripping the HTML-only scan
+    # above.
+    for p in (ROOT / "pricing-model.md", ROOT / "ua" / "pricing-model.md"):
+        if not p.exists():
+            fails.append(f"{p.relative_to(ROOT)}: markdown twin does not exist")
+            continue
+        rel = p.relative_to(ROOT)
+        text = p.read_text(encoding="utf-8", errors="ignore")
+        for mm in PRICE_FIGURE_PATTERN.finditer(text):
+            ctx = text[max(0, mm.start() - 30): mm.end() + 30].replace("\n", " ")
+            fails.append(f"{rel}: forbidden price/currency/percentage figure near {ctx!r}")
+        for mm in TEAM_SIZE_MAPPING_PATTERN.finditer(text):
+            ctx = text[max(0, mm.start() - 30): mm.end() + 30].replace("\n", " ")
+            fails.append(f"{rel}: forbidden team-size -> package mapping near {ctx!r}")
     return fails
 
 
@@ -727,6 +867,8 @@ CHECKS = [
     ("llms-full.txt in sync with generator", check_llms_full_sync),
     ("every old-slug stub is well-formed", check_redirect_stubs),
     ("no unconfirmed roaster name (Covim) anywhere", check_no_unconfirmed_roaster_name),
+    ("no unconfirmed brand name (Fiorenzato) anywhere", check_no_unconfirmed_fiorenzato_brand),
+    ("pricing-model page pair exists, has lead form, no price figures, FAQ matches visible copy", check_pricing_model_page_complete),
     ("no mechanical-deletion punctuation artifacts", check_punctuation_artifacts),
     ("no empty inline elements left by bulk text removal", check_empty_inline_elements),
 ]
