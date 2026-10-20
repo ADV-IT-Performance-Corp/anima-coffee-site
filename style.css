@@ -381,3 +381,9 @@ footer .fcta:hover{background:var(--accent-deep)}
   color: var(--bg-surface);
   font-weight: 600;
 }
+
+/* hero update 2026-10-20 (client spec): photo instead of the price card, trigger badge */
+.hero-badge{display:inline-block;margin-top:22px;padding:10px 16px;border-radius:999px;background:rgba(194,128,60,.18);border:1px solid rgba(194,128,60,.45);color:var(--cream);font-size:15px;font-weight:600}
+.hero-photo{margin:0;border-radius:10px;overflow:hidden;background:#f3ece1;box-shadow:0 30px 60px -30px rgba(0,0,0,.6)}
+.hero-photo img{display:block;width:100%;height:auto}
+.hero .btn-ghost{border-color:rgba(246,241,233,.55)}
