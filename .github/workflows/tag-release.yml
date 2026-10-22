@@ -10,8 +10,13 @@ on:
         required: true
 permissions:
   contents: write
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   tag:
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     steps:
       - name: Create tag ref
