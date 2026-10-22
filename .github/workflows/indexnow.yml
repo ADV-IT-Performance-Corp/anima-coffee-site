@@ -8,8 +8,13 @@ on:
     paths: ["**.html", "sitemap.xml"]
   workflow_dispatch:
 permissions: {}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   submit:
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
