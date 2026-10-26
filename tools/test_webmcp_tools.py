@@ -292,3 +292,16 @@ def test_maintenance_question_mentioning_equipment_is_not_hijacked_by_brands():
 def test_necta_keyword_is_word_bounded():
     r = ask("Is the nectar syrup included?")
     assert "Necta" not in r["answer"]
+
+
+def test_prefill_tags_visit_as_ai_agent_and_never_submits():
+    r = run("document", [{"tool": "prepare_coffee_quote_request", "args": {"name": "x"}}])
+    assert json.loads(r["storage"]["anima_utm_v1"])["utm_source"] == "ai-agent"
+    assert r["submitAttempts"] == 0
+
+
+def test_tool_replies_stay_under_1500_chars():
+    calls = [{"tool": t, "args": {"language": lang}}
+             for t in ("get_anima_service_info", "get_anima_products") for lang in ("en", "uk")]
+    for res in run("document", calls)["results"]:
+        assert len(json.dumps(res, ensure_ascii=False)) <= 1500

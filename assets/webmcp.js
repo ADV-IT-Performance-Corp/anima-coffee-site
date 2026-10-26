@@ -230,6 +230,20 @@
   // ------------------------------------------------------- quote prefill
   var QUOTE_FIELDS = ["name", "business", "city", "machines", "contact", "message"];
 
+  // Attribution: a lead started through an agent tool is tagged
+  // utm_source=ai-agent in the same sessionStorage slot assets/lead.js reads
+  // (anima_utm_v1), unless the visit already carries a real utm_source. The
+  // tag travels to Roistat -> AmoCRM with the rest of the UTM payload.
+  function tagAiAgentVisit() {
+    try {
+      var stored = JSON.parse(sessionStorage.getItem("anima_utm_v1") || "{}");
+      if (stored.utm_source) return;
+      stored.utm_source = "ai-agent";
+      if (!stored.utm_medium) stored.utm_medium = "webmcp";
+      sessionStorage.setItem("anima_utm_v1", JSON.stringify(stored));
+    } catch (e) { /* storage blocked: attribution is best-effort */ }
+  }
+
   function prepareQuote(input, language) {
     var t = T[language === "uk" ? "uk" : "en"];
     var form = document.getElementById("leadForm");
@@ -259,6 +273,7 @@
       } catch (e) { /* events are a nicety; the value is already set */ }
       filled.push(name);
     });
+    tagAiAgentVisit();
     try { form.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) { /* ignore */ }
     // Focus the first required field still empty, else the submit button.
     // Focusing never submits; this tool never calls submit()/click().
