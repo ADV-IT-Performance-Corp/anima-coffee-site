@@ -428,6 +428,35 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
     /thank you|дякуємо/i.test(humanRoistatStatus || ""),
     JSON.stringify(humanRoistatStatus)
   );
+  // 2026-10-25: the success line used to sit under the consent text, so after
+  // form.reset() it landed at the viewport's bottom edge, half under the
+  // sticky CTA bar, and visitors never saw it. It must sit right under the
+  // submit button and end up fully visible above the sticky bar.
+  await roistatPage.waitForTimeout(2000);
+  const humanRoistatPlacement = await roistatPage.evaluate(() => {
+    const st = document.querySelector("#leadForm .lf-status");
+    const btn = document.querySelector("#leadForm .lf-submit");
+    const bar = document.getElementById("sticky-cta");
+    const r = st.getBoundingClientRect();
+    const barTop = bar ? bar.getBoundingClientRect().top : window.innerHeight;
+    return {
+      afterButton: btn.nextElementSibling === st,
+      ok: st.classList.contains("ok"),
+      top: r.top,
+      bottom: r.bottom,
+      barTop: barTop
+    };
+  });
+  check(
+    "human success message sits directly under the submit button",
+    humanRoistatPlacement.afterButton && humanRoistatPlacement.ok,
+    JSON.stringify(humanRoistatPlacement)
+  );
+  check(
+    "human success message is fully visible above the sticky CTA bar",
+    humanRoistatPlacement.top >= 0 && humanRoistatPlacement.bottom <= humanRoistatPlacement.barTop,
+    JSON.stringify(humanRoistatPlacement)
+  );
   const humanRoistatDataLayer = await roistatPage.evaluate(() => (window.dataLayer || []).filter((e) => e && e.event === "lead_accepted"));
   check("human Roistat submit pushed exactly one lead_accepted event", humanRoistatDataLayer.length === 1, JSON.stringify(humanRoistatDataLayer));
 

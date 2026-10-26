@@ -53,13 +53,13 @@
   var T = uk
     ? {
         sending: "Надсилаємо…",
-        sent: "Дякуємо! Ми зв'яжемося з вами.",
+        sent: "Дякуємо! Заявку отримано. Ми зв'яжемося з вами.",
         err: "Не вдалося надіслати через сайт. Скористайтесь контактами нижче — ми відповідаємо швидко.",
         noBackend: "Форма ще не підключена до нашої системи. Зв'яжіться з нами напряму — ми відповідаємо швидко:"
       }
     : {
         sending: "Sending…",
-        sent: "Thank you.",
+        sent: "Thank you! Your request has been received. We'll be in touch.",
         err: "Could not send via the site. Please use the contacts below — we reply fast.",
         noBackend: "This form isn't wired to our system yet. Reach us directly — we reply fast:"
       };
@@ -101,6 +101,29 @@
   function setStatus(el, msg, cls) {
     el.textContent = msg;
     el.className = "lf-status" + (cls ? " " + cls : "");
+  }
+
+  // Accepted-lead confirmation (2026-10-25): visitors never saw the old
+  // one-line "thank you", which sat at the bottom edge of the viewport under
+  // the sticky CTA bar. Render it as a panel and scroll it clear of the bar.
+  // An explicit window.scrollBy, because scrollIntoView() did not move the
+  // page at all at 375px (measured 2026-10-25).
+  function showSent(status) {
+    setStatus(status, T.sent, "ok");
+    status.setAttribute("tabindex", "-1");
+    try { status.focus({ preventScroll: true }); } catch (e) {}
+    var r = status.getBoundingClientRect();
+    var bar = document.getElementById("sticky-cta");
+    var limit = (bar ? bar.getBoundingClientRect().top : window.innerHeight) - 16;
+    // The top edge sits below the sticky nav (and .ppc-nav on PPC pages),
+    // which stays pinned over the page while scrolling (codex P2).
+    var top = 16;
+    Array.prototype.forEach.call(document.querySelectorAll("nav, .ppc-nav"), function (n) {
+      var nr = n.getBoundingClientRect();
+      if (nr.top <= 0 && nr.bottom > 0) top = Math.max(top, nr.bottom + 16);
+    });
+    var dy = r.top < top ? r.top - top : (r.bottom > limit ? r.bottom - limit : 0);
+    if (dy) window.scrollBy({ top: dy, behavior: "smooth" });
   }
 
   // No backend configured: never fake a conversion, never auto-navigate to
@@ -236,7 +259,7 @@
     if (leadId) {
       fireAccepted(data.source_page, leadId, origin);
       form.reset();
-      setStatus(status, T.sent, "ok");
+      showSent(status);
       return;
     }
     showFallbackContact(status);
@@ -313,7 +336,7 @@
       if (!body || !body.lead_id) { throw new Error("no_lead_id"); }
       fireAccepted(data.source_page, body.lead_id, "human");
       form.reset();
-      setStatus(status, T.sent, "ok");
+      showSent(status);
     }).catch(function () {
       setStatus(status, T.err, "err");
     }).then(function () {
@@ -387,6 +410,15 @@
   }
 
   function handle(form) {
+    // Keep the status line directly under the submit button (the markup puts
+    // it after the note and consent text), so the result shows where the
+    // visitor just clicked.
+    var statusEl = form.querySelector(".lf-status");
+    var submitBtn = form.querySelector(".lf-submit");
+    if (statusEl && submitBtn && submitBtn.nextElementSibling !== statusEl) {
+      submitBtn.parentNode.insertBefore(statusEl, submitBtn.nextSibling);
+    }
+
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       var isAgent = !!e.agentInvoked;
