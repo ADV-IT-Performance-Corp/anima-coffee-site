@@ -276,8 +276,8 @@ footer .brand{font-size:18px}
 .lead-form textarea{resize:vertical;min-height:52px}
 .lead-form .lf-submit{width:100%;justify-content:center;margin-top:4px;font-size:16px;padding:16px 26px}
 .lead-form .lf-note{margin-top:14px;font-size:13px;color:var(--ink-soft);text-align:center}
-.lead-form .lf-status{margin-top:12px;font-size:14.5px;font-weight:600;text-align:center;min-height:0}
-.lead-form .lf-status.ok{color:var(--accent-deep)}
+.lead-form .lf-status{margin-top:12px;font-size:14.5px;font-weight:600;text-align:center;min-height:0;scroll-margin:24px 0 96px}
+.lead-form .lf-status.ok{color:#2f5a2a;background:#e8f1e1;border:1px solid #9fc28f;border-radius:8px;padding:14px 16px;font-size:16px;outline:none}
 .lead-form .lf-status.err{color:#9a5b4b}
 .lead-form .lf-status a{color:inherit;text-decoration:underline}
 .lead-form .lf-consent{margin-top:12px;font-size:12px;line-height:1.5;color:var(--ink-soft);text-align:center}
