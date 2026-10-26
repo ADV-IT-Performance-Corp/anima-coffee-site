@@ -303,5 +303,6 @@ def test_prefill_tags_visit_as_ai_agent_and_never_submits():
 def test_tool_replies_stay_under_1500_chars():
     calls = [{"tool": t, "args": {"language": lang}}
              for t in ("get_anima_service_info", "get_anima_products") for lang in ("en", "uk")]
+    calls += [{"tool": "get_anima_products", "args": {"language": "en", "category": "super_automatic"}}]
     for res in run("document", calls)["results"]:
         assert len(json.dumps(res, ensure_ascii=False)) <= 1500

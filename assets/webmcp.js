@@ -202,16 +202,20 @@
     var out = { published: true, language: lang, category: category || "all" };
     var all = !category;
     if (all || category === "super_automatic") {
-      out.super_automatic = { brands: BRANDS_SUPER.slice(), models: MODELS_SUPER };
+      // Replies stay under 1500 chars: the full model list only for the
+      // single-category call, brands only for the all-categories overview.
+      out.super_automatic = all
+        ? { brands: BRANDS_SUPER.slice(), models_via: 'category="super_automatic"' }
+        : { brands: BRANDS_SUPER.slice(), models: MODELS_SUPER };
     }
     if (all || category === "professional_espresso") {
       out.professional_espresso = { brands: BRANDS_PRO.slice() };
     }
     if (all || category === "coffee") {
-      out.coffee = { summary: t.coffee, named_blends: BLENDS.slice() };
+      out.coffee = all ? { named_blends: BLENDS.slice() } : { summary: t.coffee, named_blends: BLENDS.slice() };
     }
     if (all || category === "packages") {
-      out.packages = { names: PACKAGES.slice(), summary: t.packages };
+      out.packages = all ? { names: PACKAGES.slice() } : { names: PACKAGES.slice(), summary: t.packages };
     }
     if (all) {
       out.brands_note = t.brands;
