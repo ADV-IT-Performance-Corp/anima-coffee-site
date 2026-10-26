@@ -115,7 +115,14 @@
     var r = status.getBoundingClientRect();
     var bar = document.getElementById("sticky-cta");
     var limit = (bar ? bar.getBoundingClientRect().top : window.innerHeight) - 16;
-    var dy = r.top < 16 ? r.top - 16 : (r.bottom > limit ? r.bottom - limit : 0);
+    // The top edge sits below the sticky nav (and .ppc-nav on PPC pages),
+    // which stays pinned over the page while scrolling (codex P2).
+    var top = 16;
+    Array.prototype.forEach.call(document.querySelectorAll("nav, .ppc-nav"), function (n) {
+      var nr = n.getBoundingClientRect();
+      if (nr.top <= 0 && nr.bottom > 0) top = Math.max(top, nr.bottom + 16);
+    });
+    var dy = r.top < top ? r.top - top : (r.bottom > limit ? r.bottom - limit : 0);
     if (dy) window.scrollBy({ top: dy, behavior: "smooth" });
   }
 
