@@ -241,7 +241,10 @@
   function tagAiAgentVisit() {
     try {
       var stored = JSON.parse(sessionStorage.getItem("anima_utm_v1") || "{}");
-      if (stored.utm_source) return;
+      // lead.js only persists UTM at submit time, so also honour the live URL:
+      // a paid or campaign click must not be relabelled as ai-agent.
+      var params = new URLSearchParams(location.search);
+      if (stored.utm_source || params.get("utm_source") || params.get("gclid")) return;
       stored.utm_source = "ai-agent";
       if (!stored.utm_medium) stored.utm_medium = "webmcp";
       sessionStorage.setItem("anima_utm_v1", JSON.stringify(stored));
