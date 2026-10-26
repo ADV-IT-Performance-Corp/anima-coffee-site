@@ -70,7 +70,11 @@ const nav = {};
 if (mode === "document" || mode === "nopage") doc.modelContext = makeContext();
 if (mode === "navigator") nav.modelContext = makeContext();
 
+const store = {};
+const loc = { search: process.env.HARNESS_SEARCH || "" };
 const sandbox = {
+  sessionStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } },
+  location: loc, URLSearchParams,
   document: doc, navigator: nav, console, setTimeout, Promise,
   Event: function (type, init) { this.type = type; Object.assign(this, init || {}); },
 };
@@ -91,6 +95,6 @@ vm.createContext(sandbox);
     results,
     form: Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, v.value])),
     submitAttempts: log.submitAttempts, scrolled: log.scrolled, focused: log.focused,
-    injectedScripts: log.injectedScripts,
+    injectedScripts: log.injectedScripts, storage: store,
   }));
 })();

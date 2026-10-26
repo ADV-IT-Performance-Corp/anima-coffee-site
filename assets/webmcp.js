@@ -202,16 +202,20 @@
     var out = { published: true, language: lang, category: category || "all" };
     var all = !category;
     if (all || category === "super_automatic") {
-      out.super_automatic = { brands: BRANDS_SUPER.slice(), models: MODELS_SUPER };
+      // Replies stay under 1500 chars: the full model list only for the
+      // single-category call, brands only for the all-categories overview.
+      out.super_automatic = all
+        ? { brands: BRANDS_SUPER.slice(), models_via: 'category="super_automatic"' }
+        : { brands: BRANDS_SUPER.slice(), models: MODELS_SUPER };
     }
     if (all || category === "professional_espresso") {
       out.professional_espresso = { brands: BRANDS_PRO.slice() };
     }
     if (all || category === "coffee") {
-      out.coffee = { summary: t.coffee, named_blends: BLENDS.slice() };
+      out.coffee = all ? { named_blends: BLENDS.slice() } : { summary: t.coffee, named_blends: BLENDS.slice() };
     }
     if (all || category === "packages") {
-      out.packages = { names: PACKAGES.slice(), summary: t.packages };
+      out.packages = all ? { names: PACKAGES.slice() } : { names: PACKAGES.slice(), summary: t.packages };
     }
     if (all) {
       out.brands_note = t.brands;
@@ -229,6 +233,23 @@
 
   // ------------------------------------------------------- quote prefill
   var QUOTE_FIELDS = ["name", "business", "city", "machines", "contact", "message"];
+
+  // Attribution: a lead started through an agent tool is tagged
+  // utm_source=ai-agent in the same sessionStorage slot assets/lead.js reads
+  // (anima_utm_v1), unless the visit already carries a real utm_source. The
+  // tag travels to Roistat -> AmoCRM with the rest of the UTM payload.
+  function tagAiAgentVisit() {
+    try {
+      var stored = JSON.parse(sessionStorage.getItem("anima_utm_v1") || "{}");
+      // lead.js only persists UTM at submit time, so also honour the live URL:
+      // a paid or campaign click must not be relabelled as ai-agent.
+      var params = new URLSearchParams(location.search);
+      if (stored.utm_source || params.get("utm_source") || params.get("gclid")) return;
+      stored.utm_source = "ai-agent";
+      if (!stored.utm_medium) stored.utm_medium = "webmcp";
+      sessionStorage.setItem("anima_utm_v1", JSON.stringify(stored));
+    } catch (e) { /* storage blocked: attribution is best-effort */ }
+  }
 
   function prepareQuote(input, language) {
     var t = T[language === "uk" ? "uk" : "en"];
@@ -259,6 +280,7 @@
       } catch (e) { /* events are a nicety; the value is already set */ }
       filled.push(name);
     });
+    tagAiAgentVisit();
     try { form.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) { /* ignore */ }
     // Focus the first required field still empty, else the submit button.
     // Focusing never submits; this tool never calls submit()/click().
