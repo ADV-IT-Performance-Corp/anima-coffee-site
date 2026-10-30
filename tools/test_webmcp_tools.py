@@ -371,3 +371,10 @@ def test_trial_prefill_ignores_invalid_enum_values():
 def test_answers_carry_registry_claim_id():
     assert ask("Is there a free trial?")["claim_id"] == "claim-anima-free-trial-14d"
     assert ask("How much does it cost?")["claim_id"] == "claim-anima-pricing-custom-quote"
+
+
+def test_answers_carry_source_url_to_answer_page():
+    r = ask("Is there a free trial?")
+    assert r["source_url"] == "https://aeo.animacoffee.com.ua/answers/free-14-day-trial-coffee-machine-kyiv.html"
+    r = ask("Which brands do you install?", "uk")
+    assert r["source_url"].endswith("/ua/answers/which-coffee-machine-brands-anima-installs.html")

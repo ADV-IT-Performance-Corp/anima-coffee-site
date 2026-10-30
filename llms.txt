@@ -124,6 +124,8 @@ copy only. Full list with sources: https://aeo.animacoffee.com.ua/#testimonials
 - https://aeo.animacoffee.com.ua/answers/free-14-day-trial-coffee-machine-kyiv.html
 - https://aeo.animacoffee.com.ua/answers/coffee-equipment-packages-start-pro-max.html
 - https://aeo.animacoffee.com.ua/answers/coffee-machine-rental-cost-kyiv.html
+- https://aeo.animacoffee.com.ua/answers/which-coffee-machine-brands-anima-installs.html
+- https://aeo.animacoffee.com.ua/answers/coffee-machine-service-area-kyiv-oblast.html
 - https://aeo.animacoffee.com.ua/answers/espresso-machine-calibration-frequency.html
 - https://aeo.animacoffee.com.ua/answers/gas-station-retail-coffee-equipment.html
 - https://aeo.animacoffee.com.ua/answers/monthly-coffee-service-contract.html
@@ -157,6 +159,8 @@ Each page below links its `.md` twin via `<link rel="alternate" type="text/markd
 - https://aeo.animacoffee.com.ua/answers/free-14-day-trial-coffee-machine-kyiv.md
 - https://aeo.animacoffee.com.ua/answers/coffee-equipment-packages-start-pro-max.md
 - https://aeo.animacoffee.com.ua/answers/coffee-machine-rental-cost-kyiv.md
+- https://aeo.animacoffee.com.ua/answers/which-coffee-machine-brands-anima-installs.md
+- https://aeo.animacoffee.com.ua/answers/coffee-machine-service-area-kyiv-oblast.md
 - https://aeo.animacoffee.com.ua/answers/espresso-machine-calibration-frequency.md
 - https://aeo.animacoffee.com.ua/answers/gas-station-retail-coffee-equipment.md
 - https://aeo.animacoffee.com.ua/answers/monthly-coffee-service-contract.md
@@ -190,6 +194,8 @@ Each page below links its `.md` twin via `<link rel="alternate" type="text/markd
 - https://aeo.animacoffee.com.ua/ua/answers/free-14-day-trial-coffee-machine-kyiv.html
 - https://aeo.animacoffee.com.ua/ua/answers/coffee-equipment-packages-start-pro-max.html
 - https://aeo.animacoffee.com.ua/ua/answers/coffee-machine-rental-cost-kyiv.html
+- https://aeo.animacoffee.com.ua/ua/answers/which-coffee-machine-brands-anima-installs.html
+- https://aeo.animacoffee.com.ua/ua/answers/coffee-machine-service-area-kyiv-oblast.html
 - https://aeo.animacoffee.com.ua/ua/answers/espresso-machine-calibration-frequency.html
 - https://aeo.animacoffee.com.ua/ua/answers/gas-station-retail-coffee-equipment.html
 - https://aeo.animacoffee.com.ua/ua/answers/monthly-coffee-service-contract.html
@@ -210,6 +216,8 @@ Each page below links its `.md` twin via `<link rel="alternate" type="text/markd
 - https://aeo.animacoffee.com.ua/ua/answers/free-14-day-trial-coffee-machine-kyiv.md
 - https://aeo.animacoffee.com.ua/ua/answers/coffee-equipment-packages-start-pro-max.md
 - https://aeo.animacoffee.com.ua/ua/answers/coffee-machine-rental-cost-kyiv.md
+- https://aeo.animacoffee.com.ua/ua/answers/which-coffee-machine-brands-anima-installs.md
+- https://aeo.animacoffee.com.ua/ua/answers/coffee-machine-service-area-kyiv-oblast.md
 - https://aeo.animacoffee.com.ua/ua/answers/espresso-machine-calibration-frequency.md
 - https://aeo.animacoffee.com.ua/ua/answers/gas-station-retail-coffee-equipment.md
 - https://aeo.animacoffee.com.ua/ua/answers/monthly-coffee-service-contract.md
