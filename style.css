@@ -390,3 +390,5 @@ footer .fcta:hover{background:var(--accent-deep)}
 .hero-photo img{display:block;width:100%;height:auto}
 .hero .btn-ghost{border-color:rgba(246,241,233,.55)}
 .hero .eyebrow.on-dark{color:#e3bd8a}
+.hero .tagline em{color:#f0cb97}
+@media(max-width:1100px){.hero::before{background:linear-gradient(105deg,rgba(20,13,9,.94) 0%,rgba(20,13,9,.9) 100%)}}
