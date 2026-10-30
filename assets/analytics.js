@@ -104,7 +104,7 @@
   // no PII: source_page + lead_id only.
   window.animaTrackLead = function (sourcePage, leadId, origin) {
     var sp = sourcePage || location.pathname;
-    var leadOrigin = origin === "agent" ? "agent" : "human";
+    var leadOrigin = origin === "agent" || origin === "chatkit" ? origin : "human";
     try { window.dataLayer = window.dataLayer || []; window.dataLayer.push({ event: "lead_accepted", source_page: sp, lead_id: leadId || "", lead_origin: leadOrigin }); } catch (e) {}
     try { if (GA4_LIVE) gtag("event", "lead_accepted", { source_page: sp, lead_id: leadId || "", lead_origin: leadOrigin }); } catch (e) {}
     try { if (METRICA_LIVE && window.ym) ym(METRICA_ID, "reachGoal", "lead_accepted"); } catch (e) {}

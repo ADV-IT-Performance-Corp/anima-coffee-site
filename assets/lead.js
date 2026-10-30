@@ -286,6 +286,7 @@
   function buildLeadName(data, origin) {
     var leadName = "Заявка з " + location.hostname;
     if (origin === "agent") leadName += " (AI-агент)";
+    if (origin === "chatkit") leadName += " (ChatKit)";
     if (isTestLead(data)) leadName = "ТЕСТ — " + leadName;
     return leadName;
   }
@@ -310,6 +311,7 @@
         details: data.details,
         source_page: data.source_page,
         lead_origin: origin,
+        lead_source: origin === "chatkit" ? "chatkit" : "form",
         lead_id: leadId
       }
     };
@@ -509,6 +511,71 @@
       showFallbackContact(status);
     });
   }
+
+  // ChatKit channel (assets/chat.js): the chat widget delivers through the
+  // SAME three-way path as the forms (first-party endpoint -> Roistat ->
+  // contact fallback), so the Roistat -> AmoCRM integration and the
+  // lead_accepted conversion stay identical; only lead_origin/lead_source
+  // say "chatkit". Resolves {status: "accepted", leadId} | {status:
+  // "not_connected", ...} | {status: "error"}; never claims success
+  // without a real accept/reach.
+  function chatEndpoint() {
+    var f = document.querySelector("form.lead-form[data-endpoint]");
+    return ((f && f.getAttribute("data-endpoint")) || "").trim();
+  }
+
+  function submitChat(data) {
+    var origin = "chatkit";
+    var endpoint = chatEndpoint();
+    data.lead_origin = origin;
+    data.lead_source = origin;
+    if (endpoint) {
+      return fetch(endpoint, {
+        method: "POST",
+        headers: { "Accept": "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      }).then(function (r) {
+        if (r.status !== 200) { throw new Error("lead_not_accepted"); }
+        return r.json();
+      }).then(function (body) {
+        if (!body || !body.lead_id) { throw new Error("no_lead_id"); }
+        fireAccepted(data.source_page, body.lead_id, origin);
+        return { status: "accepted", leadId: body.lead_id };
+      }).catch(function () {
+        return { status: "error", message: T.err };
+      });
+    }
+    function viaRoistat() {
+      var leadId = reachRoistat(data, origin);
+      if (!leadId) return notConnectedResult();
+      fireAccepted(data.source_page, leadId, origin);
+      return { status: "accepted", leadId: leadId };
+    }
+    if (roistatReady()) return Promise.resolve(viaRoistat());
+    if (roistatConfigured()) {
+      return waitForRoistat().then(function (ready) {
+        return ready ? viaRoistat() : notConnectedResult();
+      });
+    }
+    return Promise.resolve(notConnectedResult());
+  }
+
+  window.animaLead = {
+    submitChat: submitChat,
+    collectBase: function () {
+      var utm = captureUtm();
+      return {
+        source_page: location.pathname,
+        referrer: document.referrer || "",
+        utm_source: utm.utm_source || "",
+        utm_medium: utm.utm_medium || "",
+        utm_campaign: utm.utm_campaign || "",
+        utm_term: utm.utm_term || "",
+        utm_content: utm.utm_content || "",
+        gclid: utm.gclid || ""
+      };
+    }
+  };
 
   document.addEventListener("DOMContentLoaded", function () {
     Array.prototype.forEach.call(document.querySelectorAll("form.lead-form"), handle);
