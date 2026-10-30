@@ -151,6 +151,7 @@ phone/handle-only contacts line):**
 - One canonical header and footer per locale — do not fork nav variants.
 - Do not touch: CNAME, robots.txt, sitemap.xml URLs, google*.html.
 - llms.txt and JSON-LD must obey this file exactly like visible copy.
+- ChatKit lead concierge (`assets/chat.js`, patched in by `tools/add_chat_widget.py`): scripted, no LLM/keys; answers are fixed strings from this file only; leads go through `window.animaLead.submitChat` (same endpoint → Roistat → fallback path as the forms) tagged `lead_origin=lead_source=chatkit`. Extend answers only with facts in this file.
 - Lead form: mailto fallback to hello@animacoffee.com.ua; AmoCRM webhook slot
   in `data-endpoint` (empty until client provides URL). No online payments
   (UCP integration deferred — client decision 2026-08-14).
