@@ -231,13 +231,100 @@
     log.appendChild(box); log.scrollTop = log.scrollHeight;
   }
 
+  // ---- Live mode (Gemini ChatKit backend in Anima's GCP) -------------------
+  // Enabled only when <meta name="anima-chat-ws" content="wss://host"> is set.
+  // Protocol: ADV-Strategy-Core /api/v1/vcmo/ws/{session}?client_slug=anima-coffee
+  // (the backend allows only Anima's origins for this tenant). Any failure to
+  // open within 5 s, or a later drop before a lead is saved, falls back to the
+  // scripted flow above, so a visitor is never left without a way to leave a lead.
+  var metaWs = document.querySelector('meta[name="anima-chat-ws"]');
+  var WS_BASE = ((metaWs && metaWs.getAttribute("content")) || "").trim().replace(/\/+$/, "");
+  var live = { ws: null, up: false, consent: false, leadTracked: false, busy: false };
+
+  function sessionToken() {
+    try {
+      var t = sessionStorage.getItem("anima_chat_session");
+      if (!t) { t = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2); sessionStorage.setItem("anima_chat_session", t); }
+      return t;
+    } catch (e) { return String(Date.now()) + Math.random().toString(36).slice(2); }
+  }
+  function roistatVisit() {
+    var m = document.cookie.match(/roistat_visit=([^;]+)/);
+    return m ? m[1] : "";
+  }
+  function liveSend(o) { try { live.ws.send(JSON.stringify(o)); return true; } catch (e) { return false; } }
+
+  function startScripted() {
+    say(T.hello); stepVenue();
+  }
+
+  function liveUi() {
+    clearTray();
+    var cl = el("label", "ac-consent");
+    var cb = el("input"); cb.type = "checkbox"; cb.checked = live.consent;
+    cl.appendChild(cb);
+    var span = el("span", "", T.consent + " ");
+    var a = el("a", "", T.privacy); a.href = uk ? "/ua/privacy.html" : "/privacy.html"; a.target = "_blank"; a.rel = "noopener";
+    span.appendChild(a); cl.appendChild(span);
+    cb.addEventListener("change", function () { live.consent = cb.checked; liveSend({ type: "consent", granted: cb.checked }); });
+    var f = el("form", "ac-row");
+    var i = el("input"); i.type = "text"; i.maxLength = 500; i.placeholder = uk ? "Ваше повідомлення" : "Your message";
+    i.setAttribute("aria-label", i.placeholder);
+    var b = el("button", "ac-go", "→"); b.type = "submit";
+    f.appendChild(i); f.appendChild(b);
+    f.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var v = i.value.trim();
+      if (!v || live.busy) return;
+      if (liveSend({ type: "message", content: v })) { say(v, "me"); i.value = ""; live.busy = true; }
+    });
+    tray.appendChild(cl); tray.appendChild(f);
+    if (live.consent) liveSend({ type: "consent", granted: true });
+  }
+
+  function liveFail() {
+    if (live.failed) return;
+    live.failed = true;
+    live.up = false; live.busy = false;
+    if (live.leadTracked) return;
+    if (!state.liveShown) { state.liveShown = true; startScripted(); } else { say(T.nobackend); fallback(); clearTray(); }
+  }
+
+  function startLive() {
+    var url = WS_BASE + "/api/v1/vcmo/ws/" + encodeURIComponent(sessionToken()) + "?client_slug=anima-coffee";
+    var rv = roistatVisit();
+    if (rv) url += "&roistat_visit=" + encodeURIComponent(rv);
+    var timer = setTimeout(function () { try { live.ws.close(); } catch (e) {} if (!live.up) liveFail(); }, 5000);
+    try { live.ws = new WebSocket(url); } catch (e) { clearTimeout(timer); liveFail(); return; }
+    live.ws.onmessage = function (ev) {
+      var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+      if (!live.up && (m.type === "greeting" || m.type === "history")) {
+        clearTimeout(timer); live.up = true; state.liveShown = true; liveUi();
+        track("chatkit_open", { mode: "live" });
+      }
+      if (m.type === "greeting" && m.content) say(m.content);
+      else if (m.type === "history" && m.messages) m.messages.forEach(function (x) { say(x.content || "", x.role === "user" ? "me" : "bot"); });
+      else if (m.type === "chunk" && m.content) { say(m.content); live.busy = false; }
+      else if (m.type === "complete" || m.type === "error") { live.busy = false; if (m.type === "error" && m.content) say(m.content); }
+      else if (m.type === "tool_result" && m.tool === "save_anima_lead" && m.result && m.result.success && m.result.confirmed && !live.leadTracked) {
+        // Backend confirmed durable acceptance; mirror it into analytics.
+        live.leadTracked = true;
+        try { if (window.animaTrackLead) window.animaTrackLead(location.pathname, m.result.lead_id || "", "chatkit"); } catch (e) {}
+        track("chatkit_lead_sent", { mode: "live" });
+      }
+      else if (m.type === "session_end") { say(m.content || T.nobackend); fallback(); clearTray(); live.up = false; }
+    };
+    live.ws.onclose = function () { clearTimeout(timer); if (live.up || !state.liveShown) liveFail(); };
+    live.ws.onerror = function () {};
+  }
+
   function setOpen(o) {
     panel.hidden = !o;
     launcher.setAttribute("aria-expanded", o ? "true" : "false");
     launcher.classList.toggle("ac-off", o);
     if (o && !state.started) {
-      state.started = true; say(T.hello); stepVenue();
-      track("chatkit_open", {});
+      state.started = true;
+      if (WS_BASE) startLive(); else { startScripted(); track("chatkit_open", {}); }
     }
   }
   launcher.addEventListener("click", function () { setOpen(panel.hidden); });
