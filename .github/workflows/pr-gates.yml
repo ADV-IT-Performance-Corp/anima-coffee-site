@@ -19,11 +19,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
       - name: Install test deps
-        run: python3 -m pip install pytest
+        run: python3 -m pip install --user --break-system-packages pytest
       - name: AEO gate (truth registry / forbidden claims)
         run: python3 tools/check_aeo.py
       - name: AEO/SEO gate (schema, hreflang, meta)
