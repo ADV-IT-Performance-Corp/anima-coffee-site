@@ -1,0 +1,41 @@
+name: pr-gates
+# Content/lead-form/WebMCP gates on every PR and on main. merge = deploy, so
+# these must be green before merge (set as required checks on main).
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test deps
+        run: python3 -m pip install pytest
+      - name: AEO gate (truth registry / forbidden claims)
+        run: python3 tools/check_aeo.py
+      - name: AEO/SEO gate (schema, hreflang, meta)
+        run: python3 tools/aeo_seo_check.py
+      - name: WebMCP gate
+        run: python3 tools/check_webmcp.py
+      - name: Testimonials gate
+        run: python3 tools/check_testimonials.py
+      - name: Unit tests
+        run: python3 -m pytest tools -q --ignore=tools/test_webmcp_polyfill_browser.py
+      - name: No secrets / private keys committed
+        run: |
+          if git grep -InE -- '-----BEGIN [A-Z ]*PRIVATE KEY|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{32,}|xox[bap]-[A-Za-z0-9-]{10,}' -- . ':!assets/vendor'; then
+            echo "Possible secret found"; exit 1
+          fi
