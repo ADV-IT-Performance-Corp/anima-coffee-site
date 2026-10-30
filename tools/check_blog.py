@@ -5,7 +5,7 @@ scan every page for forbidden entities and broken links; this adds blog-specific
 Per post: Article JSON-LD with datePublished; canonical + reciprocal EN/UA twin on disk;
 Markdown twin; listed in sitemap.xml and in both blog indexes; a lead-form CTA; no price or
 percentage figures and no quoted testimonials (CLAUDE.md: invented stats/prices are banned);
-minimum length. Exit 0 if all pass.
+minimum length; at least 3 internal links, an external source link and a Sources section. Exit 0 if all pass.
 """
 import pathlib, re, sys
 
@@ -53,6 +53,13 @@ for p in posts:
     text = re.sub(r"<[^>]+>", " ", m.group(0)) if m else ""
     if len(text.split()) < MIN_WORDS:
         fail(rel, f"only {len(text.split())} words (< {MIN_WORDS})")
+    art = m.group(0) if m else ""
+    if len(re.findall(r'href="\.\./[^"]+\.html', art)) < 3:
+        fail(rel, "fewer than 3 internal links in the article")
+    if not re.search(r'href="https://(?:animacoffee\.com\.ua|www\.(?:instagram|facebook)\.com|t\.me)', art):
+        fail(rel, "no external source link (company site or channel)")
+    if 'id="sources"' not in art:
+        fail(rel, "no Sources section")
     for rx, label in BAD:
         if re.search(rx, text, re.I):
             fail(rel, f"{label}: /{rx}/")
