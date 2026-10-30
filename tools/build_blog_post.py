@@ -23,12 +23,45 @@ CARD = ('<a href="{slug}" style="display:block;border:1px solid var(--line);bord
         'font-size:20px">{title}</span><p style="margin:8px 0 0;color:var(--ink-soft)">{card}</p></a>')
 
 
+LINK = re.compile(r"\[([^\]]+)\]\(([^)\s]+)\)")
+TH = 'style="text-align:left;padding:10px 12px;border-bottom:2px solid var(--line)"'
+TD = 'style="padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top"'
+
+
+def inline(text):
+    """Escape, then **bold** and [text](url). Relative urls are site pages (same path from blog/ and ua/blog/)."""
+    t = html.escape(text, quote=False)
+    t = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", t)
+
+    def a(m):
+        url = m.group(2)
+        ext = ' target="_blank" rel="noopener"' if url.startswith("http") else ""
+        return f'<a href="{url}"{ext}>{m.group(1)}</a>'
+    return LINK.sub(a, t)
+
+
+def block_html(b):
+    if isinstance(b, str):
+        return f"<p {P}>{inline(b)}</p>"
+    if "ul" in b:
+        return ('<ul style="margin:0 0 18px;padding-left:22px;color:var(--ink-soft);line-height:1.8">'
+                + "".join(f"<li>{inline(i)}</li>" for i in b["ul"]) + "</ul>")
+    if "table" in b:
+        t = b["table"]
+        head = "".join(f"<th {TH}>{inline(h)}</th>" for h in t["head"])
+        rows = "".join("<tr>" + "".join(f"<td {TD}>{inline(c)}</td>" for c in r) + "</tr>" for r in t["rows"])
+        return (f'<div style="overflow-x:auto;margin:0 0 22px"><table style="border-collapse:collapse;width:100%;'
+                f'color:var(--ink-soft);font-size:15px;line-height:1.5"><thead><tr>{head}</tr></thead>'
+                f"<tbody>{rows}</tbody></table></div>")
+    raise ValueError(b)
+
+
 def body_html(c):
-    out = "".join(f"<p {P}>{p}</p>" for p in c["intro"])  # intro may carry <strong>, authored by us
-    for h, b in c["secs"]:
-        out += f"<h2 {H2}>{html.escape(h)}</h2><p {P}>{html.escape(b)}</p>"
-    out += f"<h2 {H2}>{html.escape(c['outro_h'])}</h2>"
-    out += "".join(f"<p {P}>{html.escape(p)}</p>" for p in c["outro"])
+    out = "".join(block_html(b) for b in c["intro"])
+    for h, blocks in c["secs"]:
+        out += f"<h2 {H2}>{html.escape(h)}</h2>" + "".join(block_html(b) for b in blocks)
+    out += f"<h2 {H2}>{html.escape(c['outro_h'])}</h2>" + "".join(block_html(b) for b in c["outro"])
+    out += f"<h2 {H2} id=\"sources\">{html.escape(c['sources_h'])}</h2>" + block_html({"ul": c["sources"]})
     return out
 
 
