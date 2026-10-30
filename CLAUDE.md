@@ -71,7 +71,7 @@ never quote USD/EUR price figures.
 
 **Proof points that are true and allowed:** on the market since 2015;
 1,700+ active B2B clients (owner questionnaire 2026-09-01, applied in PR
-#28 — supersedes the prior "1,300+ B2B partners" figure), ~99% repeat; serves
+#28 — supersedes the prior "1,300+ B2B partners" figure); the ~99% repeat rate is NOT publishable (registry: no metric definition or period) and was removed site-wide; serves
 HoReCa, offices, retail across Kyiv & Kyiv Oblast; free 14-day trial.
 FORBIDDEN invented stats: "40% fewer complaints", "100% SLA compliance",
 "3x revenue", "12% growth", "0 downtime", "94% retention", "15-30% revenue
