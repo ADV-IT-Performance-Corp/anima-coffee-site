@@ -194,8 +194,9 @@ def test_prepare_ignores_unknown_and_nonstring_args():
 def test_three_tools_registered_exactly_once(mode):
     r = run(mode)  # harness loads webmcp.js TWICE
     names = sorted(t["name"] for t in r["tools"])
-    assert names == ["get_anima_products", "get_anima_service_info",
-                     "prepare_coffee_quote_request"]
+    assert names == ["check_service_area", "get_anima_products",
+                     "get_anima_service_info", "prepare_coffee_quote_request",
+                     "prepare_free_trial_request"]
 
 
 def test_polyfill_not_loaded_when_native_exists():
@@ -209,7 +210,7 @@ def test_polyfill_loaded_once_from_self_hosted_pinned_path_when_missing():
     url = r["injectedScripts"][0]
     assert url.startswith("https://aeo.animacoffee.com.ua/assets/vendor/")
     assert "@latest" not in url and "cdn" not in url and "unpkg" not in url
-    assert len(r["tools"]) == 3  # registered after the polyfill came up
+    assert len(r["tools"]) == 5  # registered after the polyfill came up
 
 
 def test_vendored_polyfill_pinned_with_license():
@@ -317,3 +318,56 @@ def test_prefill_keeps_real_campaign_attribution():
         capture_output=True, text=True, check=True, cwd=ROOT, env=env,
     ).stdout
     assert "anima_utm_v1" not in json.loads(out)["storage"]
+
+
+# --- check_service_area + prepare_free_trial_request (2026-10-30) -------------
+
+def area(city, language="en"):
+    return run("document", [{"tool": "check_service_area",
+                             "args": {"city": city, "language": language}}])["results"][0]
+
+
+@pytest.mark.parametrize("city", ["Kyiv", "Київ", "Bila Tserkva", "Біла Церква", "Brovary"])
+def test_area_served(city):
+    r = area(city)
+    assert r["published"] is True and r["served"] is True
+    assert r["claim_id"] == "claim-anima-geography-kyiv-oblast-reconfirmed"
+
+
+@pytest.mark.parametrize("city", ["Lviv", "Cherkasy", "Odesa", ""])
+def test_area_other_cities_not_guessed(city):
+    r = area(city)
+    assert r["published"] is False and r.get("served") in (None, False)
+    assert "served" not in r or r["served"] is not True
+
+
+def test_area_tool_readonly():
+    r = run("document")
+    t = {x["name"]: x for x in r["tools"]}["check_service_area"]
+    assert t["annotations"]["readOnlyHint"] is True
+
+
+def test_trial_prefill_adds_qualification_and_never_submits():
+    args = dict(ARGS, venue_type="office", timeline="asap", package_interest="Pro")
+    r = run("document", [{"tool": "prepare_free_trial_request", "args": args}])
+    res = r["results"][0]
+    assert res["prefilled"] is True and res["submitted"] is False
+    assert res["claim_id"] == "claim-anima-free-trial-14d"
+    assert r["submitAttempts"] == 0
+    msg = r["form"]["message"]
+    assert "Free 14-day trial request" in msg
+    assert "venue type: office" in msg and "timeline: asap" in msg
+    assert "package interest: Pro" in msg and "TEST ONLY" in msg
+    assert json.loads(r["storage"]["anima_utm_v1"])["utm_source"] == "ai-agent"
+
+
+def test_trial_prefill_ignores_invalid_enum_values():
+    r = run("document", [{"tool": "prepare_free_trial_request",
+                          "args": {"name": "x", "venue_type": "<script>", "package_interest": "Platinum"}}])
+    msg = r["form"].get("message", "")
+    assert "script" not in msg and "Platinum" not in msg
+
+
+def test_answers_carry_registry_claim_id():
+    assert ask("Is there a free trial?")["claim_id"] == "claim-anima-free-trial-14d"
+    assert ask("How much does it cost?")["claim_id"] == "claim-anima-pricing-custom-quote"

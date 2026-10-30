@@ -1,6 +1,6 @@
 /* Anima Volitiva — WebMCP tools (D5, extended 2026-10-06).
  *
- * Registers THREE imperative tools so an agent visiting the site can answer
+ * Registers FIVE imperative tools (three originals + check_service_area, prepare_free_trial_request) so an agent visiting the site can answer
  * buyer questions and hand a quote request to the visitor, using ONLY facts
  * already VISIBLE on the live site / llms.txt. It never invents a fact:
  * anything not published (water hardness, liability, contract length,
@@ -103,16 +103,19 @@
 
     // --- published facts ---
     {
+      claim: "claim-anima-tariff-packages-start-pro-max",
       re: /\bpackage|start,? pro,? (and )?max|pricing tier|пакет/i,
       en: "Anima offers three equipment packages — Start, Pro, Max — matched to the venue format. Pricing is a custom quote per venue; package contents and prices are not published online.",
       uk: "Anima пропонує три пакети обладнання — Start, Pro, Max — під формат вашого об'єкта. Ціна розраховується індивідуально під об'єкт; вміст пакетів і ціни онлайн не публікуються."
     },
     {
+      claim: "claim-anima-pricing-custom-quote",
       re: /\bprice|cost|how much (does|will) it cost|quote\b|ціна|вартість|скільки коштує/i,
       en: "Pricing is an individual quote per venue based on your volume and number of locations — there is no published price list.",
       uk: "Ціна — індивідуальний розрахунок під об'єкт залежно від обсягу та кількості локацій — опублікованого прайс-листа немає."
     },
     {
+      claim: "claim-anima-free-trial-14d",
       re: /trial|14[- ]day|free trial|test period|тест|14.?денн/i,
       en: "Free 14-day trial with no prepayment.",
       uk: "Безкоштовний 14-денний тест без передоплати."
@@ -135,26 +138,31 @@
       uk: T.uk.brands
     },
     {
+      claim: "claim-anima-phone-main",
       re: /phone number|contact (info|details|you)|email address|\baddress\b|opening hours|business hours|what (time|hours)|call you|reach you|телефон|адреса|пошта|години роботи|график роботи|зв'?язатися/i,
       en: "Phone: +38 (073) 873 01 45. Email: animacoffeeco@gmail.com. Address: Kyiv Oblast, Bila Tserkva, 29a Pavlichenko St. Hours: Mon–Sat 09:00–17:00.",
       uk: "Телефон: +38 (073) 873 01 45. Email: animacoffeeco@gmail.com. Адреса: Київська обл., Біла Церква, вул. Павліченко 29а. Години роботи: Пн–Сб 09:00–17:00."
     },
     {
+      claim: "claim-anima-support-24-7-replacement-24h",
       re: /support|24\/7|break(s|ing)? ?down|breakdown|\bsla\b|response time|replacement machine|technician|поломк|підтримк|ремонт/i,
       en: "24/7 support line. On breakdown, a technician or a replacement machine is provided within 24 hours.",
       uk: "Лінія підтримки 24/7. У разі поломки технік або підмінний апарат надається протягом 24 годин."
     },
     {
+      claim: "claim-anima-geography-kyiv-oblast-reconfirmed",
       re: /coverage|service area|where do you operate|which (city|cities|region)|do you (cover|serve|operate in)|де ви (працюєте|обслуговуєте)|обслуговуєте|яку територію/i,
       en: "Service area is Kyiv city and Kyiv Oblast.",
       uk: "Зона обслуговування — місто Київ та Київська область."
     },
     {
+      claim: "claim-anima-founding-year-2015",
       re: /since when|how long have you (been|existed)|founded|established|(company|business) history|з якого року|скільки років на ринку/i,
       en: "Anima Volitiva has been on the market since 2015.",
       uk: "Anima Volitiva на ринку з 2015 року."
     },
     {
+      claim: "claim-anima-b2b-partners-1700",
       re: /how many (active )?client|client count|customer count|how many businesses|скільки клієнтів|кількість клієнтів/i,
       en: "1,700+ active B2B clients.",
       uk: "Понад 1 700 активних B2B-клієнтів."
@@ -180,7 +188,11 @@
         if (f.unpublished) {
           return { published: false, answer: uk ? NOT_PUBLISHED.uk : NOT_PUBLISHED.en };
         }
-        return { published: true, answer: uk ? f.uk : f.en };
+        var out = { published: true, answer: uk ? f.uk : f.en };
+        // claim_id: registry-backed fact (ADV-Strategy-Core truth/public_claims_registry.yaml);
+        // absent = published on the site but not yet in the registry (tracked in docs/webmcp-claims.md).
+        if (f.claim) out.claim_id = f.claim;
+        return out;
       }
     }
     return { published: false, answer: uk ? NOT_PUBLISHED.uk : NOT_PUBLISHED.en };
@@ -293,6 +305,64 @@
     return { prefilled: true, submitted: false, filled_fields: filled, next: t.next };
   }
 
+
+  // ------------------------------------------------- service-area check
+  // Geographic fact, not a business claim: towns that lie in Kyiv Oblast.
+  // The only published coverage claim is Kyiv city + Kyiv Oblast
+  // (claim-anima-geography-kyiv-oblast-reconfirmed). Anything else is "not
+  // published" and routed to the lead form, never guessed.
+  var KYIV_CITY = /^(kyiv|kiev|київ|киев)$/i;
+  var KYIV_OBLAST_TOWNS = /^(bila tserkva|біла церква|brovary|бровари|boryspil|бориспіль|irpin|ірпінь|bucha|буча|vyshhorod|вишгород|vasylkiv|васильків|fastiv|фастів|obukhiv|обухів|boyarka|боярка|hostomel|гостомель|ukrainka|українка|yahotyn|яготин|pereiaslav|переяслав|myronivka|миронівка|skvyra|сквира|vyshneve|вишневе|sviatopetrivske|святопетрівське)$/i;
+
+  function checkArea(city, language) {
+    var uk = language === "uk";
+    var c = String(city || "").trim().replace(/^(м\.|місто|city of)\s*/i, "").slice(0, 100);
+    var base = { claim_id: "claim-anima-geography-kyiv-oblast-reconfirmed", city: c };
+    if (!c) {
+      base.published = false;
+      base.answer = uk ? "Вкажіть місто." : "Please provide a city.";
+      return base;
+    }
+    if (KYIV_CITY.test(c) || KYIV_OBLAST_TOWNS.test(c)) {
+      base.published = true;
+      base.served = true;
+      base.answer = uk
+        ? "Так, це в зоні обслуговування: місто Київ та Київська область."
+        : "Yes, this is inside the service area: Kyiv city and Kyiv Oblast.";
+      return base;
+    }
+    base.published = false;
+    base.served = null;
+    base.answer = uk
+      ? "Опублікована зона обслуговування — місто Київ та Київська область. Для інших локацій підтвердження не опубліковане: вкажіть місто в запиті, і команда відповість напряму."
+      : "The published service area is Kyiv city and Kyiv Oblast. Coverage elsewhere is not published: put the city in the request and the team will confirm directly.";
+    return base;
+  }
+
+  // ------------------------------------------------ trial request prefill
+  var VENUE_TYPES = ["office", "horeca", "retail", "kiosk", "other"];
+  var TIMELINES = ["asap", "within_month", "later"];
+
+  function prepareTrial(input, language) {
+    var uk = language === "uk";
+    var inp = input || {};
+    var parts = [uk ? "Запит на безкоштовний 14-денний тест" : "Free 14-day trial request"];
+    function add(label, v) {
+      if (typeof v === "string" && v.trim()) parts.push(label + ": " + v.trim().slice(0, 200));
+    }
+    if (VENUE_TYPES.indexOf(inp.venue_type) >= 0) add(uk ? "тип об'єкта" : "venue type", inp.venue_type);
+    if (TIMELINES.indexOf(inp.timeline) >= 0) add(uk ? "терміни" : "timeline", inp.timeline);
+    if (PACKAGES.indexOf(inp.package_interest) >= 0) add(uk ? "інтерес до пакета" : "package interest", inp.package_interest);
+    add(uk ? "коментар" : "notes", inp.message);
+    var merged = {};
+    QUOTE_FIELDS.forEach(function (k) { if (inp[k] !== undefined) merged[k] = inp[k]; });
+    merged.message = parts.join("; ");
+    var r = prepareQuote(merged, language);
+    r.claim_id = "claim-anima-free-trial-14d";
+    r.trial = T[uk ? "uk" : "en"].trial;
+    return r;
+  }
+
   // -------------------------------------------------------- registration
   function register(ctx) {
     if (window.__animaWebmcpState === "registered") return;
@@ -363,6 +433,51 @@
       annotations: { readOnlyHint: false, consequentialHint: false, untrustedContentHint: false },
       execute: function (input) {
         return Promise.resolve(prepareQuote(input || {}, input && input.language === "uk" ? "uk" : "en"));
+      }
+    });
+
+    reg({
+      name: "check_service_area",
+      title: "Check whether Anima serves a city",
+      description:
+        "Check whether a city is inside Anima Volitiva's published service area (Kyiv city and Kyiv Oblast). Read-only. Use it BEFORE preparing a quote or trial request. If the city is not covered by a published claim the answer is published:false and the visitor should name the city in the request.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          city: { type: "string", description: "City or town of the venue." },
+          language: { type: "string", enum: ["en", "uk"], description: "Language to answer in." }
+        },
+        required: ["city"]
+      },
+      annotations: { readOnlyHint: true, untrustedContentHint: false },
+      execute: function (input) {
+        return Promise.resolve(checkArea(input && input.city, input && input.language === "uk" ? "uk" : "en"));
+      }
+    });
+
+    reg({
+      name: "prepare_free_trial_request",
+      title: "Prefill a free 14-day trial request",
+      description:
+        "Prefill the on-page request form for the free 14-day trial (no prepayment) from details the visitor gave you, adding venue type, timeline and package interest to the message so the sales team can qualify the lead. It NEVER submits: the visitor reviews the fields and presses the button.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Contact person's full name." },
+          business: { type: "string", description: "Business or venue name." },
+          city: { type: "string", description: "City. Service area is Kyiv city and Kyiv Oblast." },
+          machines: { type: "string", description: "Number of coffee machines needed, if known." },
+          contact: { type: "string", description: "Email or phone number to reach the visitor." },
+          venue_type: { type: "string", enum: VENUE_TYPES, description: "Kind of venue." },
+          timeline: { type: "string", enum: TIMELINES, description: "When the visitor wants to start." },
+          package_interest: { type: "string", enum: PACKAGES, description: "Package the visitor leans towards, if any (contents and prices are not published)." },
+          message: { type: "string", description: "Optional notes for the Anima team." },
+          language: { type: "string", enum: ["en", "uk"], description: "Language of the returned instructions." }
+        }
+      },
+      annotations: { readOnlyHint: false, consequentialHint: false, untrustedContentHint: false },
+      execute: function (input) {
+        return Promise.resolve(prepareTrial(input || {}, input && input.language === "uk" ? "uk" : "en"));
       }
     });
   }
