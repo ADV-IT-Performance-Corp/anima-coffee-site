@@ -13,7 +13,7 @@ _Last updated: 2026-09-15 — lead form UI available; submissions delivered to t
 Every page carries a declarative WebMCP tool on its lead form —
 `toolname="request_coffee_service_assessment"` — so a WebMCP-capable agent
 can fill and submit it on a visitor's behalf (`toolautosubmit` is off: a
-human confirms the final submit). `assets/webmcp.js` also registers three
+human confirms the final submit). `assets/webmcp.js` also registers five
 imperative tools (when the browser has no native WebMCP, a pinned self-hosted
 copy of the MIT-licensed `@mcp-b/global` 5.1.0 polyfill under
 `assets/vendor/mcp-b-global/` is loaded first):
@@ -27,6 +27,11 @@ copy of the MIT-licensed `@mcp-b/global` 5.1.0 polyfill under
   trial with no prepayment, the Kyiv and Kyiv Oblast service area, and how to
   request a quote. Optional `category`: super_automatic, professional_espresso,
   coffee, packages; optional `language`: en, uk.
+- `check_service_area` (read-only) — checks a city against the published
+  service area (Kyiv city and Kyiv Oblast); anything else is "not published".
+- `prepare_free_trial_request` — prefills the lead form for the free 14-day
+  trial (no prepayment), adding venue type, timeline and package interest to the
+  message so sales can qualify the lead. Never submits: a human confirms.
 - `prepare_coffee_quote_request` — prefills the on-page lead form from details
   the visitor gave (name, business, city, machines, contact, message), scrolls
   to it and focuses it. It never submits: the visitor reviews the fields and
