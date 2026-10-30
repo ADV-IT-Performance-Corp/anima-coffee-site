@@ -86,7 +86,7 @@ nav .wrap{display:flex;align-items:center;justify-content:space-between;height:7
 .page-hero .tagline{font-size:clamp(32px,4.2vw,50px);color:var(--cream);max-width:16ch}
 
 .stats{background:var(--accent);color:#1c130b}
-.stats .wrap{display:grid;grid-template-columns:repeat(6,1fr);gap:0;padding:0}
+.stats .wrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0;padding:0}
 .stat{padding:38px 20px;border-right:1px solid rgba(28,19,11,.14)}
 .stat:last-child{border-right:none}
 .stat .n{font-family:var(--serif);font-size:36px;font-weight:700;line-height:1}
