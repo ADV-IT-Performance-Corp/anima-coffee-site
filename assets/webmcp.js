@@ -133,6 +133,7 @@
     // Brands / models / equipment lineup — published in llms.txt and on the
     // site. Checked before the generic support/technician matcher.
     {
+      page: "answers/which-coffee-machine-brands-anima-installs.html",
       re: /\bbrands?\b|\bmodels?\b|equipment|lineup|line-up|what machines|which machines|machines? (do you|you) (offer|install|have|rent)|do you (install|offer|rent|have)\b.*\b(machine|\bnecta\b|dr\.? ?coffee|spaziale|simonelli|rancilio|iberital|astoria|fiorenzato)|\bnecta\b|dr\.? ?coffee|spaziale|simonelli|rancilio|iberital|astoria|fiorenzato|бренд|модел[ьіїю]|обладнанн|які (кава)?машини|кавомашин/i,
       en: T.en.brands,
       uk: T.uk.brands
@@ -179,6 +180,15 @@
     }
   ];
 
+  // Public answer page that carries the same registry-backed fact, so an agent
+  // can cite a URL (added with the registry-grounded answer pages).
+  var PAGE_BY_CLAIM = {
+    "claim-anima-free-trial-14d": "answers/free-14-day-trial-coffee-machine-kyiv.html",
+    "claim-anima-tariff-packages-start-pro-max": "answers/coffee-equipment-packages-start-pro-max.html",
+    "claim-anima-pricing-custom-quote": "answers/coffee-machine-rental-cost-kyiv.html",
+    "claim-anima-geography-kyiv-oblast-reconfirmed": "answers/coffee-machine-service-area-kyiv-oblast.html"
+  };
+
   function answer(question, language) {
     var uk = language === "uk";
     var q = String(question || "");
@@ -192,6 +202,8 @@
         // claim_id: registry-backed fact (ADV-Strategy-Core truth/public_claims_registry.yaml);
         // absent = published on the site but not yet in the registry (tracked in docs/webmcp-claims.md).
         if (f.claim) out.claim_id = f.claim;
+        var pg = f.page || (f.claim && PAGE_BY_CLAIM[f.claim]);
+        if (pg) out.source_url = "https://aeo.animacoffee.com.ua/" + (uk ? "ua/" : "") + pg;
         return out;
       }
     }
