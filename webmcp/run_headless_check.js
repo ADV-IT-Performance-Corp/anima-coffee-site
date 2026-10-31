@@ -796,6 +796,72 @@ async function clickOneTapButton(pg, label) {
   const oversizedOutbox = await oversizedPage.evaluate(() => JSON.parse(localStorage.getItem("anima_lead_outbox_v1") || "[]"));
   check("other fields oversized: the outbox entry is still saved", Array.isArray(oversizedOutbox) && oversizedOutbox.length === 1, JSON.stringify(oversizedOutbox));
 
+  // 12b. Honest-delivery (TDD case: emoji straddling a truncation
+  // boundary). A surrogate pair written across EVERY multiple-of-200
+  // boundary so the FIRST truncation step (6000 -> 5800 chars) cuts
+  // exactly at a high surrogate, by construction -- exercises
+  // safeTruncate's surrogate-preserving branch for real (not vacuously).
+  const emojiPage = await browser.newPage();
+  await blockRoistat(emojiPage);
+  await emojiPage.addInitScript({ content: `window.roistatGoal = { reach: function () { throw new Error("blocked"); } };` });
+  await emojiPage.addInitScript({ content: DRAFT_CAPTURE_SRC });
+  await emojiPage.addInitScript({ content: POLYFILL_SRC });
+  await emojiPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  var EMOJI_LEN = 6000;
+  var emojiChars = new Array(EMOJI_LEN).fill("a");
+  for (var ek = 1; ek <= EMOJI_LEN / 200 - 1; ek++) {
+    emojiChars[200 * ek - 1] = "\ud83d";
+    emojiChars[200 * ek] = "\ude00";
+  }
+  var emojiDetails = emojiChars.join("");
+  var emojiFirstCutLen = EMOJI_LEN - 200;
+  var emojiBoundaryCode = emojiDetails.charCodeAt(emojiFirstCutLen - 1);
+  check(
+    "emoji fixture sanity: the first truncation step boundary lands on a high surrogate (not vacuous)",
+    emojiBoundaryCode >= 0xd800 && emojiBoundaryCode <= 0xdbff,
+    JSON.stringify({ index: emojiFirstCutLen - 1, code: emojiBoundaryCode.toString(16) })
+  );
+  await emojiPage.fill('#leadForm input[name="name"]', "Emoji Boundary Human");
+  await emojiPage.fill('#leadForm input[name="business"]', "Emoji Co");
+  await emojiPage.fill('#leadForm input[name="city"]', "Kyiv");
+  await emojiPage.fill('#leadForm input[name="contact"]', "emoji@example.com");
+  await emojiPage.fill('#leadForm textarea[name="message"]', emojiDetails);
+  var emojiPageErrored = false;
+  emojiPage.on("pageerror", function () { emojiPageErrored = true; });
+  await emojiPage.click('#leadForm button[type="submit"]');
+  await emojiPage.waitForTimeout(200);
+  check("emoji straddling a truncation boundary: no throw, honest message still shown", emojiPageErrored === false, JSON.stringify(emojiPageErrored));
+  const emojiDraft = await clickOneTapButton(emojiPage, T_VIA_EMAIL);
+  check(
+    "emoji straddling a truncation boundary: mailto href stays within the ~1800-char bound",
+    emojiDraft && emojiDraft.url.length <= 1900,
+    JSON.stringify({ length: emojiDraft ? emojiDraft.url.length : null })
+  );
+  var emojiDecodeOk = false;
+  var emojiDecodedBody = null;
+  try {
+    var eq = emojiDraft.url.indexOf("&body=");
+    emojiDecodedBody = decodeURIComponent(emojiDraft.url.slice(eq + 6));
+    emojiDecodeOk = true;
+  } catch (e) {}
+  check("emoji straddling a truncation boundary: the captured href decodes cleanly", emojiDecodeOk === true, String(emojiDecodeOk));
+  function hasLoneSurrogate(s) {
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charCodeAt(i);
+      if (c >= 0xd800 && c <= 0xdbff) {
+        var next = s.charCodeAt(i + 1);
+        if (!(next >= 0xdc00 && next <= 0xdfff)) return true;
+        i++;
+      } else if (c >= 0xdc00 && c <= 0xdfff) { return true; }
+    }
+    return false;
+  }
+  check(
+    "emoji straddling a truncation boundary: decoded body contains no lone surrogate",
+    emojiDecodeOk === true && hasLoneSurrogate(emojiDecodedBody) === false,
+    JSON.stringify({ decodeOk: emojiDecodeOk })
+  );
+
   // 13. Honest-delivery (TDD case: flushOutbox re-delivery). A stale outbox
   // entry from a prior failed submit must be re-sent via reach() once
   // Roistat becomes available on a later page view, fire lead_accepted with
