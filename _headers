@@ -1,0 +1,19 @@
+# Security headers for hosts that honour a `_headers` file (Cloudflare Pages, Netlify).
+# GitHub Pages (current host) ignores this file, so it is inert until the host
+# is switched. Steps: docs/security-headers-cloudflare-pages.md
+#
+# CSP and Connection-Allowlist ship in REPORT-ONLY mode first: nothing is blocked,
+# violations show in DevTools (Console / Issues). Enforce only after a clean week.
+# Allowed destinations = what assets/analytics.js, lead.js, chat.js load today
+# (GTM, Google Analytics, Yandex Metrica, Roistat EU, Telegram links).
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://mc.yandex.ru https://mc.yandex.com https://yastatic.net https://cloud-eu.roistat.com; connect-src 'self' https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://mc.yandex.ru https://mc.yandex.com https://cloud-eu.roistat.com wss:; img-src 'self' data: https://www.googletagmanager.com https://*.google-analytics.com https://mc.yandex.ru https://mc.yandex.com https://cloud-eu.roistat.com; style-src 'self' 'unsafe-inline'; frame-src https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; form-action 'self' mailto:
+  Connection-Allowlist-Report-Only: ("https://www.googletagmanager.com/*" "https://*.google-analytics.com/*" "https://*.analytics.google.com/*" "https://mc.yandex.ru/*" "https://mc.yandex.com/*" "https://cloud-eu.roistat.com/*" response-origin)
+
+/assets/*
+  Cache-Control: public, max-age=3600
