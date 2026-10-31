@@ -1,0 +1,4 @@
+Contact: mailto:animacoffeeco@gmail.com
+Expires: 2027-10-31T00:00:00.000Z
+Preferred-Languages: uk, en
+Canonical: https://aeo.animacoffee.com.ua/.well-known/security.txt
