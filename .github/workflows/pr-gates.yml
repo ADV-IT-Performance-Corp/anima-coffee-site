@@ -1,0 +1,35 @@
+name: pr-gates
+# Runs the repository's content/lead/WebMCP gates on every pull request, because
+# merging to main deploys the live site. Read-only: no secrets, no deploy.
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: AEO gate
+        run: python3 tools/check_aeo.py
+      - name: AEO/SEO gate
+        run: python3 tools/aeo_seo_check.py
+      - name: WebMCP gate
+        run: python3 tools/check_webmcp.py
+      - name: Testimonials gate
+        run: python3 tools/check_testimonials.py
+      - name: Blog gate
+        run: python3 tools/check_blog.py
+      - name: Markdown twin gate
+        run: python3 tools/check_md_twin_subset.py
+      - name: Chat widget guards
+        run: python3 -m unittest tools.test_chat_widget
