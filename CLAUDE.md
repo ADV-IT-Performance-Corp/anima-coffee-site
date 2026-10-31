@@ -130,9 +130,9 @@ phone/handle-only contacts line):**
 - Coffee EN: "Premium roasted coffee — blends like Bellissima, LOT 101 and Ethiopia
   Yirgacheffe." UA: "Преміальна кава — бленди Bellissima, LOT 101, Ethiopia Yirgacheffe."
 - Terms EN: "Individual quote for your volume, free 14-day trial with no
-  prepayment; free first rental month for HoReCa."
+  prepayment."
   UA: "Індивідуальний розрахунок під ваш обсяг, безкоштовний 14-денний тест
-  без передоплати; для HoReCa — перший місяць оренди безкоштовно."
+  без передоплати."
 
 ## Site rules
 
