@@ -57,7 +57,8 @@
         err: "Не вдалося надіслати через сайт. Скористайтесь контактами нижче — ми відповідаємо швидко.",
         noBackend: "Форма ще не підключена до нашої системи. Зв'яжіться з нами напряму — ми відповідаємо швидко:",
         deliveryFailed: "Не вдалося надіслати заявку автоматично. Можливо, її блокує ваше з'єднання або браузер. Надішліть її готовим листом або зв'яжіться з нами напряму:",
-        openDraft: "Відкрити готовий лист"
+        openDraft: "Відкрити готовий лист",
+        labels: { name: "Ім'я", company: "Компанія", city: "Місто", machines: "Скільки машин", contact: "Email або телефон", details: "Додаткова інформація" }
       }
     : {
         sending: "Sending…",
@@ -65,7 +66,8 @@
         err: "Could not send via the site. Please use the contacts below — we reply fast.",
         noBackend: "This form isn't wired to our system yet. Reach us directly — we reply fast:",
         deliveryFailed: "We couldn't send your request automatically. Your connection or browser may be blocking it. Send it with the prepared email, or contact us directly:",
-        openDraft: "Open prepared email"
+        openDraft: "Open prepared email",
+        labels: { name: "Name", company: "Company", city: "City", machines: "Machines", contact: "Contact", details: "Details" }
       };
 
   // Published contact facts (CLAUDE.md "Contacts & business info", canonical
@@ -130,28 +132,38 @@
     if (dy) window.scrollBy({ top: dy, behavior: "smooth" });
   }
 
-  // No backend configured: never fake a conversion, never auto-navigate to
-  // mailto. Surface the site's own contact block (tel/mailto links, already
-  // rendered in the page footer) as the fallback CTA.
-  function showFallbackContact(status) {
-    var block = document.querySelector(".contact-block");
+  // Shared by showFallbackContact and showDeliveryFailed: clones the page's
+  // own tel/mailto contact links (never hardcoded here) into `status`, and
+  // flashes the source contact-block so the visitor sees where they came
+  // from. Neither caller duplicates this DOM-building/highlight logic.
+  function cloneContactLinks(status, block) {
     var tel = block && block.querySelector('a[href^="tel:"]');
     var mail = block && block.querySelector('a[href^="mailto:"]');
-
-    status.textContent = "";
-    status.appendChild(document.createTextNode(T.noBackend + " "));
     if (tel) {
       status.appendChild(tel.cloneNode(true));
       if (mail) status.appendChild(document.createTextNode(" · "));
     }
     if (mail) status.appendChild(mail.cloneNode(true));
-    status.className = "lf-status err";
+    return mail;
+  }
 
-    if (block) {
-      block.classList.add("lf-highlight");
-      block.scrollIntoView({ behavior: "smooth", block: "center" });
-      setTimeout(function () { block.classList.remove("lf-highlight"); }, 2600);
-    }
+  function highlightContactBlock(block) {
+    if (!block) return;
+    block.classList.add("lf-highlight");
+    block.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(function () { block.classList.remove("lf-highlight"); }, 2600);
+  }
+
+  // No backend configured: never fake a conversion, never auto-navigate to
+  // mailto. Surface the site's own contact block (tel/mailto links, already
+  // rendered in the page footer) as the fallback CTA.
+  function showFallbackContact(status) {
+    var block = document.querySelector(".contact-block");
+    status.textContent = "";
+    status.appendChild(document.createTextNode(T.noBackend + " "));
+    cloneContactLinks(status, block);
+    status.className = "lf-status err";
+    highlightContactBlock(block);
   }
 
   function fireAccepted(sourcePage, leadId, origin, deliveryStatus) {
@@ -172,8 +184,8 @@
   }
   function buildDraftBody(fields) {
     var labels = [
-      ["name", "Name"], ["company", "Company"], ["city", "City"],
-      ["machines", "Machines"], ["contact", "Contact"], ["details", "Details"]
+      ["name", T.labels.name], ["company", T.labels.company], ["city", T.labels.city],
+      ["machines", T.labels.machines], ["contact", T.labels.contact], ["details", T.labels.details]
     ];
     var lines = [];
     labels.forEach(function (l) {
@@ -181,47 +193,91 @@
     });
     return lines.join("\n");
   }
+  // Cuts `str` to at most `maxLen` UTF-16 code units without splitting a
+  // surrogate pair -- a naive slice() can leave a lone high surrogate at the
+  // cut point, which encodeURIComponent() then throws a URIError on.
+  function safeTruncate(str, maxLen) {
+    if (maxLen <= 0) return "";
+    if (str.length <= maxLen) return str;
+    var cut = str.slice(0, maxLen);
+    var lastCode = cut.charCodeAt(cut.length - 1);
+    if (lastCode >= 0xd800 && lastCode <= 0xdbff) cut = cut.slice(0, -1);
+    return cut;
+  }
+  // Builds the mailto URL, or returns null when no honest draft can be
+  // offered: a lone surrogate anywhere in the visitor's fields makes
+  // encodeURIComponent throw (caught here, never left to propagate out of
+  // the submit handler), and the ~1800-char bound is enforced on the FINAL
+  // url -- if truncating `details` all the way to empty still can't meet
+  // it (an oversized name/company/etc.), this gives up rather than ship an
+  // unbounded link.
   function buildDraftHref(address, data) {
-    var subject = buildLeadName(data, "human");
-    var details = data.details || "";
-    var href;
-    for (;;) {
-      var body = buildDraftBody({
-        name: data.name, company: data.company, city: data.city,
-        machines: data.machines, contact: data.contact, details: details
-      });
-      href = "mailto:" + address + "?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
-      if (href.length <= DRAFT_MAX_LEN || !details) break;
-      details = details.slice(0, Math.max(0, details.length - 200));
+    try {
+      var subject = buildLeadName(data, "human");
+      var details = data.details || "";
+      for (;;) {
+        var body = buildDraftBody({
+          name: data.name, company: data.company, city: data.city,
+          machines: data.machines, contact: data.contact, details: details
+        });
+        var href = "mailto:" + address + "?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
+        if (href.length <= DRAFT_MAX_LEN) return href;
+        if (!details) return null;
+        details = safeTruncate(details, details.length - 200);
+      }
+    } catch (e) {
+      return null;
     }
-    return href;
   }
 
   // Roistat configured but delivery could not be attempted (the (2b) wait
   // timed out, the device went offline, or reach() itself threw) -- unlike
   // showFallbackContact above, T.noBackend would be FALSE here (a backend
   // IS configured), so this shows an honest message, keeps the visitor's
-  // typed values (no form.reset()), and offers a prefilled mailto draft
-  // built from DOM APIs only (the values are visitor input). Never fires
-  // lead_accepted -- callers only reach this when delivery was not
-  // confirmed.
-  function showDeliveryFailed(form, status, data) {
+  // typed values (no form.reset()), and offers a prefilled mailto draft.
+  // Never fires lead_accepted -- callers only reach this when delivery was
+  // not confirmed.
+  //
+  // The draft control is a <button type="button">, never an <a>: analytics
+  // (clickmap/trackLinks in assets/analytics.js, plus any GA4/GTM link-click
+  // listener) can observe a real anchor's href on click, and that href would
+  // carry the visitor's name/phone/details -- privacy.html promises those
+  // tools see nothing but the anonymous lead_accepted signal. The button's
+  // DOM carries no href/data-* attribute at all; the mailto URL lives only
+  // in this closure and is read on click, via window.location, never by
+  // auto-navigating on render. window.__LEAD_DRAFT_CAPTURE is a harness-only
+  // hook (window.__ROISTAT_TEST_WAIT_MS convention) letting tests observe
+  // the URL without a real mail-client navigation.
+  function showDeliveryFailed(status, data) {
     var block = document.querySelector(".contact-block");
     var mail = block && block.querySelector('a[href^="mailto:"]');
+    var address = mail && mailtoAddress(mail);
+    var href = address ? buildDraftHref(address, data) : null;
 
+    // No usable mailto, or no draft could be built (finding 2): the honest
+    // deliveryFailed copy promises a prepared email that doesn't exist, so
+    // fall back to T.err with whatever contacts remain and no draft control.
     status.textContent = "";
-    status.appendChild(document.createTextNode(T.deliveryFailed + " "));
+    status.appendChild(document.createTextNode((href ? T.deliveryFailed : T.err) + " "));
+    cloneContactLinks(status, block);
 
-    if (mail) {
-      var address = mailtoAddress(mail);
-      if (address) {
-        var link = document.createElement("a");
-        link.href = buildDraftHref(address, data);
-        link.textContent = T.openDraft;
-        status.appendChild(link);
-      }
+    if (href) {
+      status.appendChild(document.createTextNode(" "));
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "lf-draft-btn";
+      btn.textContent = T.openDraft;
+      btn.addEventListener("click", function () {
+        if (typeof window.__LEAD_DRAFT_CAPTURE === "function") {
+          try { window.__LEAD_DRAFT_CAPTURE(href); } catch (e) {}
+        }
+        window.location.href = href;
+      });
+      status.appendChild(btn);
     }
+
     status.className = "lf-status err";
+    highlightContactBlock(block);
   }
 
   // Double-submit guard: disables the submit button AND marks the form
@@ -332,7 +388,7 @@
       showSent(status);
       return;
     }
-    showDeliveryFailed(form, status, data);
+    showDeliveryFailed(status, data);
   }
 
   // No phone-vs-email validation exists elsewhere in this file (the
@@ -569,7 +625,7 @@
               deliverRoistatHuman(form, status, data, origin);
             } else {
               setSending(form, false);
-              showDeliveryFailed(form, status, data);
+              showDeliveryFailed(status, data);
             }
           });
         }
