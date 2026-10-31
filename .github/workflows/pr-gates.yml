@@ -1,0 +1,39 @@
+name: pr-gates
+# Runs the repo's content/AEO/WebMCP gates on every pull request, so that a
+# merge to main (= deploy to the live client site) never ships a failing gate.
+# check_aeo_leads.py is intentionally NOT listed: it is red on main today
+# (sticky CTA / ContactPoint backlog) and would block every PR.
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install pytest
+      - name: Content and AEO gates
+        run: |
+          set -e
+          python tools/check_aeo.py
+          python tools/aeo_seo_check.py
+          python tools/check_webmcp.py
+          python tools/check_testimonials.py
+          python tools/check_md_twin_subset.py
+          python tools/check_blog.py
+          python tools/test_chat_widget.py
+      - name: Unit tests
+        run: python -m pytest tools -q --ignore=tools/test_chat_widget.py
