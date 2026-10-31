@@ -55,13 +55,17 @@
         sending: "Надсилаємо…",
         sent: "Дякуємо! Заявку отримано. Ми зв'яжемося з вами.",
         err: "Не вдалося надіслати через сайт. Скористайтесь контактами нижче — ми відповідаємо швидко.",
-        noBackend: "Форма ще не підключена до нашої системи. Зв'яжіться з нами напряму — ми відповідаємо швидко:"
+        noBackend: "Форма ще не підключена до нашої системи. Зв'яжіться з нами напряму — ми відповідаємо швидко:",
+        deliveryFailed: "Не вдалося надіслати заявку автоматично. Можливо, її блокує ваше з'єднання або браузер. Надішліть її готовим листом або зв'яжіться з нами напряму:",
+        openDraft: "Відкрити готовий лист"
       }
     : {
         sending: "Sending…",
         sent: "Thank you! Your request has been received. We'll be in touch.",
         err: "Could not send via the site. Please use the contacts below — we reply fast.",
-        noBackend: "This form isn't wired to our system yet. Reach us directly — we reply fast:"
+        noBackend: "This form isn't wired to our system yet. Reach us directly — we reply fast:",
+        deliveryFailed: "We couldn't send your request automatically. Your connection or browser may be blocking it. Send it with the prepared email, or contact us directly:",
+        openDraft: "Open prepared email"
       };
 
   // Published contact facts (CLAUDE.md "Contacts & business info", canonical
@@ -150,8 +154,74 @@
     }
   }
 
-  function fireAccepted(sourcePage, leadId, origin) {
-    try { if (window.animaTrackLead) window.animaTrackLead(sourcePage, leadId, origin); } catch (e) {}
+  function fireAccepted(sourcePage, leadId, origin, deliveryStatus) {
+    try { if (window.animaTrackLead) window.animaTrackLead(sourcePage, leadId, origin, deliveryStatus); } catch (e) {}
+  }
+
+  // Mailto draft for the honest-delivery fallback below: address comes from
+  // the page's own .contact-block mailto (never hardcoded), subject reuses
+  // the same leadName convention as reachRoistat() for consistency, and the
+  // body lists the form's visible fields (honeypot already excluded by
+  // collectData). Bounded to ~1800 chars by truncating `details` in 200-char
+  // steps -- mail clients and some OSes cap mailto: URL length.
+  var DRAFT_MAX_LEN = 1800;
+  function mailtoAddress(mailLink) {
+    var href = (mailLink.getAttribute("href") || "").replace(/^mailto:/i, "");
+    var q = href.indexOf("?");
+    return q === -1 ? href : href.slice(0, q);
+  }
+  function buildDraftBody(fields) {
+    var labels = [
+      ["name", "Name"], ["company", "Company"], ["city", "City"],
+      ["machines", "Machines"], ["contact", "Contact"], ["details", "Details"]
+    ];
+    var lines = [];
+    labels.forEach(function (l) {
+      if (fields[l[0]]) lines.push(l[1] + ": " + fields[l[0]]);
+    });
+    return lines.join("\n");
+  }
+  function buildDraftHref(address, data) {
+    var subject = buildLeadName(data, "human");
+    var details = data.details || "";
+    var href;
+    for (;;) {
+      var body = buildDraftBody({
+        name: data.name, company: data.company, city: data.city,
+        machines: data.machines, contact: data.contact, details: details
+      });
+      href = "mailto:" + address + "?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
+      if (href.length <= DRAFT_MAX_LEN || !details) break;
+      details = details.slice(0, Math.max(0, details.length - 200));
+    }
+    return href;
+  }
+
+  // Roistat configured but delivery could not be attempted (the (2b) wait
+  // timed out, the device went offline, or reach() itself threw) -- unlike
+  // showFallbackContact above, T.noBackend would be FALSE here (a backend
+  // IS configured), so this shows an honest message, keeps the visitor's
+  // typed values (no form.reset()), and offers a prefilled mailto draft
+  // built from DOM APIs only (the values are visitor input). Never fires
+  // lead_accepted -- callers only reach this when delivery was not
+  // confirmed.
+  function showDeliveryFailed(form, status, data) {
+    var block = document.querySelector(".contact-block");
+    var mail = block && block.querySelector('a[href^="mailto:"]');
+
+    status.textContent = "";
+    status.appendChild(document.createTextNode(T.deliveryFailed + " "));
+
+    if (mail) {
+      var address = mailtoAddress(mail);
+      if (address) {
+        var link = document.createElement("a");
+        link.href = buildDraftHref(address, data);
+        link.textContent = T.openDraft;
+        status.appendChild(link);
+      }
+    }
+    status.className = "lf-status err";
   }
 
   // Double-submit guard: disables the submit button AND marks the form
@@ -234,7 +304,7 @@
   function deliverRoistatAgent(form, data, origin) {
     var leadId = reachRoistat(data, origin);
     if (leadId) {
-      fireAccepted(data.source_page, leadId, origin);
+      fireAccepted(data.source_page, leadId, origin, "unconfirmed");
       // Deferred to the next tick: resetting the form synchronously, in the
       // same turn as respondWith(), was observed to break the WebMCP
       // polyfill's resolution of the returned promise (it never delivered
@@ -257,12 +327,12 @@
     var leadId = reachRoistat(data, origin);
     setSending(form, false);
     if (leadId) {
-      fireAccepted(data.source_page, leadId, origin);
+      fireAccepted(data.source_page, leadId, origin, "unconfirmed");
       form.reset();
       showSent(status);
       return;
     }
-    showFallbackContact(status);
+    showDeliveryFailed(form, status, data);
   }
 
   // No phone-vs-email validation exists elsewhere in this file (the
@@ -336,7 +406,7 @@
       return r.json();
     }).then(function (body) {
       if (!body || !body.lead_id) { throw new Error("no_lead_id"); }
-      fireAccepted(data.source_page, body.lead_id, "human");
+      fireAccepted(data.source_page, body.lead_id, "human", "confirmed");
       form.reset();
       showSent(status);
     }).catch(function () {
@@ -358,7 +428,7 @@
       return r.json();
     }).then(function (body) {
       if (!body || !body.lead_id) { throw new Error("no_lead_id"); }
-      fireAccepted(data.source_page, body.lead_id, "agent");
+      fireAccepted(data.source_page, body.lead_id, "agent", "confirmed");
       form.reset();
       return { status: "accepted", leadId: body.lead_id };
     }).catch(function () {
@@ -499,7 +569,7 @@
               deliverRoistatHuman(form, status, data, origin);
             } else {
               setSending(form, false);
-              showFallbackContact(status);
+              showDeliveryFailed(form, status, data);
             }
           });
         }
@@ -539,7 +609,7 @@
         return r.json();
       }).then(function (body) {
         if (!body || !body.lead_id) { throw new Error("no_lead_id"); }
-        fireAccepted(data.source_page, body.lead_id, origin);
+        fireAccepted(data.source_page, body.lead_id, origin, "confirmed");
         return { status: "accepted", leadId: body.lead_id };
       }).catch(function () {
         return { status: "error", message: T.err };
@@ -548,7 +618,7 @@
     function viaRoistat() {
       var leadId = reachRoistat(data, origin);
       if (!leadId) return notConnectedResult();
-      fireAccepted(data.source_page, leadId, origin);
+      fireAccepted(data.source_page, leadId, origin, "unconfirmed");
       return { status: "accepted", leadId: leadId };
     }
     if (roistatReady()) return Promise.resolve(viaRoistat());

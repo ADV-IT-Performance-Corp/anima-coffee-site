@@ -27,6 +27,13 @@
  * silently stop reporting conversions against the goal already configured
  * in Metrica; `lead_origin` segmentation lives in dataLayer/GA4 only.
  *
+ * Honest-delivery fallback (2026-10-31): animaTrackLead() takes a fourth
+ * argument, `deliveryStatus` ("confirmed" | "unconfirmed"), pushed to
+ * dataLayer/GA4 as `delivery_status` — "confirmed" when a first-party
+ * endpoint returned a lead_id, "unconfirmed" when delivery went through
+ * Roistat's fire-and-forget reach(). The event name and Metrica goal stay
+ * unchanged; only this new param lets analytics tell the two apart.
+ *
  * Roistat (W2, 2026-09-14): the counter snippet below is the documented
  * Roistat installation code (help-en.roistat.com/settings/project/
  * tracking_code/installing/), adapted to read the project id/host from the
@@ -102,11 +109,12 @@
   // API returns HTTP 200 with a lead_id (never on mailto: open, never
   // speculatively). No currency/value — this is a non-revenue event — and
   // no PII: source_page + lead_id only.
-  window.animaTrackLead = function (sourcePage, leadId, origin) {
+  window.animaTrackLead = function (sourcePage, leadId, origin, deliveryStatus) {
     var sp = sourcePage || location.pathname;
     var leadOrigin = origin === "agent" || origin === "chatkit" ? origin : "human";
-    try { window.dataLayer = window.dataLayer || []; window.dataLayer.push({ event: "lead_accepted", source_page: sp, lead_id: leadId || "", lead_origin: leadOrigin }); } catch (e) {}
-    try { if (GA4_LIVE) gtag("event", "lead_accepted", { source_page: sp, lead_id: leadId || "", lead_origin: leadOrigin }); } catch (e) {}
+    var ds = deliveryStatus === "confirmed" || deliveryStatus === "unconfirmed" ? deliveryStatus : "";
+    try { window.dataLayer = window.dataLayer || []; window.dataLayer.push({ event: "lead_accepted", source_page: sp, lead_id: leadId || "", lead_origin: leadOrigin, delivery_status: ds }); } catch (e) {}
+    try { if (GA4_LIVE) gtag("event", "lead_accepted", { source_page: sp, lead_id: leadId || "", lead_origin: leadOrigin, delivery_status: ds }); } catch (e) {}
     try { if (METRICA_LIVE && window.ym) ym(METRICA_ID, "reachGoal", "lead_accepted"); } catch (e) {}
   };
 })();

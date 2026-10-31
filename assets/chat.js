@@ -309,7 +309,7 @@
       else if (m.type === "tool_result" && m.tool === "save_anima_lead" && m.result && m.result.success && m.result.confirmed && !live.leadTracked) {
         // Backend confirmed durable acceptance; mirror it into analytics.
         live.leadTracked = true;
-        try { if (window.animaTrackLead) window.animaTrackLead(location.pathname, m.result.lead_id || "", "chatkit"); } catch (e) {}
+        try { if (window.animaTrackLead) window.animaTrackLead(location.pathname, m.result.lead_id || "", "chatkit", "confirmed"); } catch (e) {}
         track("chatkit_lead_sent", { mode: "live" });
       }
       else if (m.type === "session_end") { say(m.content || T.nobackend); fallback(); clearTray(); live.up = false; }
