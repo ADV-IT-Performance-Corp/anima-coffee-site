@@ -43,3 +43,19 @@ Redirects and WebRTC are blocked by default under the allowlist; the site uses n
 tested in a live Chrome 152 from this environment; report-only mode makes a mistake safe.
 CSP keeps `'unsafe-inline'` because the GTM snippet and style attributes are inline;
 moving to nonces/hashes is a separate task.
+
+## Deploy without connecting GitHub to Cloudflare (chosen 2026-10-31)
+
+Cloudflare belongs to Anima, the repo to the agency, so Cloudflare is NOT given access to
+GitHub. Instead `.github/workflows/deploy-cloudflare-pages.yml` pushes the site with an API token.
+
+1. Cloudflare (Anima account) -> Workers & Pages -> Create -> Pages -> **Upload assets**,
+   project name `anima-coffee-site`, upload any placeholder file once.
+2. My Profile -> API Tokens -> Create Token -> Custom: permission **Account / Cloudflare Pages / Edit**,
+   resource: Anima's account only. Copy the token. Copy the Account ID from the account home page.
+3. GitHub repo -> Settings -> Secrets and variables -> Actions: add `CLOUDFLARE_API_TOKEN`
+   and `CLOUDFLARE_ACCOUNT_ID`.
+4. Actions -> deploy-cloudflare-pages -> Run workflow. Then continue from step 3 above
+   (check the `pages.dev` URL) before touching DNS.
+
+GitHub Actions in the org must be working for this (the gates currently fail within seconds).

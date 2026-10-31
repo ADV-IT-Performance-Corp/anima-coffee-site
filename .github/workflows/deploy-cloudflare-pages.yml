@@ -1,0 +1,46 @@
+name: deploy-cloudflare-pages
+
+# Deploys the static site to Cloudflare Pages (Anima's Cloudflare account) with a
+# narrowly scoped API token. No Cloudflare<->GitHub integration, no third-party
+# action: only wrangler via npx. Setup: docs/security-headers-cloudflare-pages.md
+#
+# Secrets (repo Settings -> Secrets and variables -> Actions):
+#   CLOUDFLARE_API_TOKEN   token with only "Cloudflare Pages: Edit" on Anima's account
+#   CLOUDFLARE_ACCOUNT_ID  Anima's Cloudflare account id
+# Skips cleanly while the secrets are absent, so merging this file is safe.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-cloudflare-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Check secrets
+        id: cfg
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Cloudflare secrets not set; skipping deploy."
+          fi
+      - uses: actions/checkout@v4
+        if: steps.cfg.outputs.ready == 'true'
+      - name: Deploy to Cloudflare Pages
+        if: steps.cfg.outputs.ready == 'true'
+        run: |
+          mkdir _site
+          rsync -a --exclude .git --exclude .github --exclude _site ./ _site/
+          npx --yes wrangler@3 pages deploy _site --project-name=anima-coffee-site --branch=main --commit-dirty=true
