@@ -47,6 +47,29 @@
  * same submit; and assets/analytics.js wraps the Roistat counter IIFE in
  * try/catch so a failure there can never prevent window.animaTrackLead
  * from being defined.
+ *
+ * Outbox (PR #87, main): a lead that could not be handed to Roistat is kept
+ * in localStorage (anima_lead_outbox_v1, 7-day TTL, cap 3) and re-delivered
+ * automatically on a later page view via flushOutbox() once Roistat becomes
+ * available. One-tap email + Telegram controls let the visitor send the
+ * same details themselves without waiting for that re-delivery.
+ *
+ * Honest-delivery fallback (2026-10-31, v2 — re-cut on top of the outbox):
+ * the one-tap controls are <button> elements whose destination URL lives
+ * only in a closure, never in a DOM attribute — assets/analytics.js runs
+ * Metrica with trackLinks: true, and privacy.html promises those tools see
+ * nothing but the anonymous lead_accepted signal; a real <a href> with the
+ * visitor's name/phone/details in the query string would leak that. When
+ * Roistat IS configured (window.roistatProjectId set) but delivery could
+ * not be attempted (the (2b) wait timed out, or reach() itself threw), the
+ * copy is T.deliveryFailed instead of the misleading T.noBackend, and the
+ * lead is still kept in the outbox for automatic re-send (saveOutbox is
+ * unconditional on every path that reaches here) — never T.sent, never
+ * lead_accepted, since nothing was actually delivered yet.
+ * window.animaTrackLead() takes a 4th `deliveryStatus` argument
+ * ("confirmed" | "unconfirmed") so lead_accepted can tell a first-party
+ * POST apart from a fire-and-forget Roistat reach() — including the
+ * reach() that flushOutbox() fires on a later page view.
  */
 (function () {
   var uk = (document.documentElement.lang || "en").toLowerCase().indexOf("uk") === 0;
@@ -56,6 +79,7 @@
         sent: "Дякуємо! Заявку отримано. Ми зв'яжемося з вами.",
         err: "Не вдалося надіслати через сайт. Скористайтесь контактами нижче — ми відповідаємо швидко.",
         noBackend: "Форма ще не підключена до нашої системи. Зв'яжіться з нами напряму — ми відповідаємо швидко:",
+        deliveryFailed: "Не вдалося надіслати заявку автоматично. Вона збережена і буде надіслана автоматично, щойно зв'язок відновиться. Можете також написати нам напряму зараз:",
         oneTap: "Надіслати ці дані в один дотик:",
         viaEmail: "Email",
         viaTelegram: "Telegram"
@@ -65,6 +89,7 @@
         sent: "Thank you! Your request has been received. We'll be in touch.",
         err: "Could not send via the site. Please use the contacts below — we reply fast.",
         noBackend: "This form isn't wired to our system yet. Reach us directly — we reply fast:",
+        deliveryFailed: "We couldn't send your request automatically. It's saved and will be sent automatically once the connection is back. You can also reach us directly right now:",
         oneTap: "Send these details in one tap:",
         viaEmail: "Email",
         viaTelegram: "Telegram"
@@ -112,10 +137,16 @@
   // Accepted-lead confirmation (2026-10-25): visitors never saw the old
   // one-line "thank you", which sat at the bottom edge of the viewport under
   // the sticky CTA bar. Render it as a panel and scroll it clear of the bar.
-  // An explicit window.scrollBy, because scrollIntoView() did not move the
-  // page at all at 375px (measured 2026-10-25).
   function showSent(status) {
     setStatus(status, T.sent, "ok");
+    scrollStatusIntoView(status);
+  }
+
+  // Brings `status` clear of the sticky nav and the sticky CTA bar. Shared
+  // by showSent and the fallback/delivery-failed renderers below. An
+  // explicit window.scrollBy, because scrollIntoView() did not move the
+  // page at all at 375px (measured 2026-10-25).
+  function scrollStatusIntoView(status) {
     status.setAttribute("tabindex", "-1");
     try { status.focus({ preventScroll: true }); } catch (e) {}
     var r = status.getBoundingClientRect();
@@ -132,10 +163,34 @@
     if (dy) window.scrollBy({ top: dy, behavior: "smooth" });
   }
 
+  function highlightContactBlock(block, noScroll) {
+    if (!block) return;
+    block.classList.add("lf-highlight");
+    if (!noScroll) block.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(function () { block.classList.remove("lf-highlight"); }, 2600);
+  }
+
+  // Clones the page's own tel/mailto contact links (never hardcoded here)
+  // into `status`. Shared by the never-configured and delivery-failed
+  // renderers.
+  function cloneContactLinks(status, block) {
+    var tel = block && block.querySelector('a[href^="tel:"]');
+    var mail = block && block.querySelector('a[href^="mailto:"]');
+    if (tel) {
+      status.appendChild(tel.cloneNode(true));
+      if (mail) status.appendChild(document.createTextNode(" · "));
+    }
+    if (mail) status.appendChild(mail.cloneNode(true));
+  }
+
+  function fireAccepted(sourcePage, leadId, origin, deliveryStatus) {
+    try { if (window.animaTrackLead) window.animaTrackLead(sourcePage, leadId, origin, deliveryStatus); } catch (e) {}
+  }
+
   // Backup lead channel (no server needed). A lead that could not be handed to
   // Roistat is kept in this browser (persist-first, 7 days, max 3) and is
-  // (a) offered as a prefilled email / Telegram message so the visitor does
-  // not retype it, and (b) re-delivered through Roistat on the next page view
+  // (a) offered as one-tap email/Telegram controls so the visitor does not
+  // retype it, and (b) re-delivered through Roistat on the next page view
   // where it is available. Never shown as "sent" until Roistat really takes it.
   var OUTBOX_KEY = "anima_lead_outbox_v1";
   var OUTBOX_TTL_MS = 7 * 24 * 3600 * 1000;
@@ -153,10 +208,12 @@
     } catch (e) {}
   }
   function saveOutbox(data, origin) {
-    if (!data || !data.contact) return;
-    var list = readOutbox();
-    list.push({ ts: Date.now(), origin: origin || "human", data: data });
-    writeOutbox(list);
+    try {
+      if (!data || !data.contact) return;
+      var list = readOutbox();
+      list.push({ ts: Date.now(), origin: origin || "human", data: data });
+      writeOutbox(list);
+    } catch (e) {}
   }
   function leadText(data) {
     var rows = [
@@ -167,61 +224,165 @@
       .map(function (r) { return r[0] + ": " + r[1]; }).join("\n");
   }
   function flushOutbox() {
-    var list = readOutbox();
-    if (!list.length || !roistatConfigured()) return;
-    waitForRoistat().then(function (ready) {
-      if (!ready) return;
-      var left = [];
-      readOutbox().forEach(function (item) {
-        var id = reachRoistat(item.data, item.origin);
-        if (id) fireAccepted(item.data.source_page, id, item.origin); else left.push(item);
+    try {
+      var list = readOutbox();
+      if (!list.length || !roistatConfigured()) return;
+      waitForRoistat().then(function (ready) {
+        if (!ready) return;
+        var left = [];
+        readOutbox().forEach(function (item) {
+          var id = reachRoistat(item.data, item.origin);
+          if (id) fireAccepted(item.data.source_page, id, item.origin, "unconfirmed"); else left.push(item);
+        });
+        writeOutbox(left);
       });
-      writeOutbox(left);
-    });
+    } catch (e) {}
   }
 
-  // No backend configured: never fake a conversion, never auto-navigate to
-  // mailto. Surface the site's own contact block (tel/mailto links, already
-  // rendered in the page footer) as the fallback CTA.
-  function showFallbackContact(status, data) {
-    var block = document.querySelector(".contact-block");
-    var tel = block && block.querySelector('a[href^="tel:"]');
-    var mail = block && block.querySelector('a[href^="mailto:"]');
+  // Cuts `str` to at most `maxLen` UTF-16 code units without splitting a
+  // surrogate pair -- a naive slice() can leave a lone high surrogate at the
+  // cut point, which encodeURIComponent() then throws a URIError on.
+  function safeTruncate(str, maxLen) {
+    if (maxLen <= 0) return "";
+    if (str.length <= maxLen) return str;
+    var cut = str.slice(0, maxLen);
+    var lastCode = cut.charCodeAt(cut.length - 1);
+    if (lastCode >= 0xd800 && lastCode <= 0xdbff) cut = cut.slice(0, -1);
+    return cut;
+  }
 
-    status.textContent = "";
-    status.appendChild(document.createTextNode(T.noBackend + " "));
-    if (tel) {
-      status.appendChild(tel.cloneNode(true));
-      if (mail) status.appendChild(document.createTextNode(" · "));
+  // Shared bound for both one-tap URLs (mailto has no spec-mandated cap;
+  // main's pre-existing Telegram link had no bound at all -- this applies
+  // one honest bound to both rather than leave either unbounded).
+  var ONE_TAP_MAX_LEN = 1800;
+
+  function mailtoAddress(mailLink) {
+    var href = (mailLink.getAttribute("href") || "").replace(/^mailto:/i, "");
+    var q = href.indexOf("?");
+    return q === -1 ? href : href.slice(0, q);
+  }
+
+  // Builds the mailto: or Telegram URL for one channel, bounded to
+  // ONE_TAP_MAX_LEN by truncating `details` in 200-char steps (never
+  // splitting a surrogate pair -- safeTruncate). Returns null when no URL
+  // within bound can be built at all (a lone surrogate anywhere else in the
+  // fields makes encodeURIComponent throw, caught here and never left to
+  // propagate out of the submit handler; an oversized non-details field can
+  // make the bound unreachable even with details truncated to empty).
+  function buildChannelUrl(kind, address, data) {
+    try {
+      var details = data.details || "";
+      for (;;) {
+        var text = leadText({
+          name: data.name, company: data.company, city: data.city,
+          machines: data.machines, contact: data.contact, details: details
+        });
+        var href = kind === "email"
+          ? "mailto:" + address + "?subject=" + encodeURIComponent("Заявка з " + location.hostname) + "&body=" + encodeURIComponent(text)
+          : address + "?text=" + encodeURIComponent(text);
+        if (href.length <= ONE_TAP_MAX_LEN) return href;
+        if (!details) return null;
+        details = safeTruncate(details, Math.max(0, details.length - 200));
+      }
+    } catch (e) {
+      return null;
     }
-    if (mail) status.appendChild(mail.cloneNode(true));
-    if (data && data.contact) {
-      var text = leadText(data);
-      var a1 = document.createElement("a");
-      a1.href = "mailto:" + CONTACT.email + "?subject=" + encodeURIComponent("Заявка з " + location.hostname) + "&body=" + encodeURIComponent(text);
-      a1.textContent = T.viaEmail;
-      var a2 = document.createElement("a");
-      a2.href = CONTACT.telegram + "?text=" + encodeURIComponent(text);
-      a2.target = "_blank"; a2.rel = "noopener";
-      a2.textContent = T.viaTelegram;
-      var br = document.createElement("div");
-      br.appendChild(document.createTextNode(T.oneTap + " "));
-      br.appendChild(a1);
-      br.appendChild(document.createTextNode(" · "));
-      br.appendChild(a2);
-      status.appendChild(br);
+  }
+
+  // Builds one <button type="button"> per working channel. The URL lives
+  // only in this closure -- never written to href/data-*/title, so no
+  // click-tracking listener can read it. On click: mailto via
+  // window.location.href; Telegram via window.open(..., "_blank",
+  // "noopener") with a window.location.href fallback if the popup was
+  // blocked (returns null). Neither ever auto-opens on render, and neither
+  // may submit the form (this is a plain <button>, no form submission is
+  // wired to it at all). window.__LEAD_DRAFT_CAPTURE(channel, url) is a
+  // harness-only test hook (window.__ROISTAT_TEST_WAIT_MS convention).
+  function buildOneTapButton(label, channel, url) {
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "lf-draft-btn";
+    btn.textContent = label;
+    btn.addEventListener("click", function () {
+      if (typeof window.__LEAD_DRAFT_CAPTURE === "function") {
+        try { window.__LEAD_DRAFT_CAPTURE(channel, url); } catch (e) {}
+      }
+      if (channel === "telegram") {
+        var w = window.open(url, "_blank", "noopener");
+        if (!w) window.location.href = url;
+      } else {
+        window.location.href = url;
+      }
+    });
+    return btn;
+  }
+
+  // Returns an array of 0-2 one-tap buttons (email, Telegram), each only
+  // included when its URL could actually be built within bound.
+  function buildOneTapControls(data) {
+    var controls = [];
+    var block = document.querySelector(".contact-block");
+    var mail = block && block.querySelector('a[href^="mailto:"]');
+    var address = mail && mailtoAddress(mail);
+    if (address) {
+      var mailUrl = buildChannelUrl("email", address, data);
+      if (mailUrl) controls.push(buildOneTapButton(T.viaEmail, "email", mailUrl));
+    }
+    var tgUrl = buildChannelUrl("telegram", CONTACT.telegram, data);
+    if (tgUrl) controls.push(buildOneTapButton(T.viaTelegram, "telegram", tgUrl));
+    return controls;
+  }
+
+  // Shared renderer for the never-configured (3) and configured-but-failed
+  // (2/2b) cases. `deliveryFailed` picks the copy: T.noBackend (unchanged,
+  // case 3) vs T.deliveryFailed (case 2/2b, honest about the outbox) --
+  // downgraded to T.err if NEITHER one-tap control could be built, since
+  // deliveryFailed's wording promises a path that doesn't exist without at
+  // least one working control.
+  function renderFallback(status, data, deliveryFailed) {
+    var controls = buildOneTapControls(data);
+    var message = deliveryFailed ? (controls.length ? T.deliveryFailed : T.err) : T.noBackend;
+    var block = document.querySelector(".contact-block");
+    status.textContent = "";
+    status.appendChild(document.createTextNode(message + " "));
+    cloneContactLinks(status, block);
+    if (controls.length) {
+      status.appendChild(document.createTextNode(" "));
+      status.appendChild(document.createTextNode(T.oneTap + " "));
+      controls.forEach(function (btn, i) {
+        if (i) status.appendChild(document.createTextNode(" · "));
+        status.appendChild(btn);
+      });
     }
     status.className = "lf-status err";
-
-    if (block) {
-      block.classList.add("lf-highlight");
-      block.scrollIntoView({ behavior: "smooth", block: "center" });
-      setTimeout(function () { block.classList.remove("lf-highlight"); }, 2600);
+    if (deliveryFailed) {
+      // The contact block sits at the page bottom: scrolling to it pushed
+      // the one-tap controls off-screen above the viewport on phones
+      // (375x667), so keep the status in view instead and only flash the
+      // block.
+      highlightContactBlock(block, true);
+      scrollStatusIntoView(status);
+    } else {
+      highlightContactBlock(block);
     }
   }
 
-  function fireAccepted(sourcePage, leadId, origin) {
-    try { if (window.animaTrackLead) window.animaTrackLead(sourcePage, leadId, origin); } catch (e) {}
+  // No backend configured at all: never fake a conversion, never auto-open
+  // a channel. Unchanged copy (T.noBackend); the one-tap controls are the
+  // only thing that changed here (safe buttons replace the old real-href
+  // anchors).
+  function showFallbackContact(status, data) {
+    renderFallback(status, data, false);
+  }
+
+  // Roistat IS configured but delivery could not be attempted (the (2b)
+  // wait timed out, the device went offline, or reach() itself threw).
+  // T.noBackend would be false here (a backend IS configured), so this
+  // shows the honest deliveryFailed copy, keeps the visitor's typed values
+  // (no form.reset()), and the lead stays in the outbox for automatic
+  // re-send. Never fires lead_accepted.
+  function showDeliveryFailed(status, data) {
+    renderFallback(status, data, true);
   }
 
   // Double-submit guard: disables the submit button AND marks the form
@@ -299,12 +460,12 @@
   // Agent delivery: calls reach() once and resolves the respondWith result.
   // Keeps the sending guard held until the deferred form.reset() actually
   // runs (Codex fast-follow, 2026-09-14) — releasing it right after
-  // respondWith() let a second executeTool() call in that same window fire
-  // a second reach() for the same submit (double AmoCRM deal).
+  // respondWith() let a second executeTool() racing that window fire a
+  // second reach() for the same submit (double AmoCRM deal).
   function deliverRoistatAgent(form, data, origin) {
     var leadId = reachRoistat(data, origin);
     if (leadId) {
-      fireAccepted(data.source_page, leadId, origin);
+      fireAccepted(data.source_page, leadId, origin, "unconfirmed");
       // Deferred to the next tick: resetting the form synchronously, in the
       // same turn as respondWith(), was observed to break the WebMCP
       // polyfill's resolution of the returned promise (it never delivered
@@ -316,7 +477,8 @@
       }, LEAD_RESET_DELAY_MS);
       return { status: "accepted", leadId: leadId };
     }
-    // reach() threw (e.g. blocked mid-call) -> never claim success.
+    // reach() threw (e.g. blocked mid-call) -> never claim success; keep
+    // the lead for automatic re-delivery.
     setSending(form, false);
     saveOutbox(data, origin);
     return notConnectedResult();
@@ -328,13 +490,15 @@
     var leadId = reachRoistat(data, origin);
     setSending(form, false);
     if (leadId) {
-      fireAccepted(data.source_page, leadId, origin);
+      fireAccepted(data.source_page, leadId, origin, "unconfirmed");
       form.reset();
       showSent(status);
       return;
     }
+    // reach() threw mid-call -- Roistat IS configured, so this is the
+    // delivery-failed case, not the never-configured one.
     saveOutbox(data, origin);
-    showFallbackContact(status, data);
+    showDeliveryFailed(status, data);
   }
 
   // No phone-vs-email validation exists elsewhere in this file (the
@@ -408,7 +572,7 @@
       return r.json();
     }).then(function (body) {
       if (!body || !body.lead_id) { throw new Error("no_lead_id"); }
-      fireAccepted(data.source_page, body.lead_id, "human");
+      fireAccepted(data.source_page, body.lead_id, "human", "confirmed");
       form.reset();
       showSent(status);
     }).catch(function () {
@@ -430,7 +594,7 @@
       return r.json();
     }).then(function (body) {
       if (!body || !body.lead_id) { throw new Error("no_lead_id"); }
-      fireAccepted(data.source_page, body.lead_id, "agent");
+      fireAccepted(data.source_page, body.lead_id, "agent", "confirmed");
       form.reset();
       return { status: "accepted", leadId: body.lead_id };
     }).catch(function () {
@@ -444,7 +608,8 @@
   function notConnectedResult() {
     return {
       status: "not_connected",
-      message: T.noBackend,
+      // T.noBackend is false when Roistat is configured but delivery failed.
+      message: roistatConfigured() ? T.err : T.noBackend,
       phone: CONTACT.phone,
       email: CONTACT.email,
       telegram: CONTACT.telegram
@@ -557,6 +722,10 @@
       // fallback. Never wait when Roistat was never configured at all.
       if (roistatConfigured()) {
         setSending(form, true);
+        // Drop any stale previous-attempt controls/text for the duration of
+        // the wait, so a re-submit never leaves a prior failure's button
+        // visible while a new attempt is in flight.
+        if (!isAgent) setStatus(status, T.sending, "");
         if (isAgent) {
           e.respondWith(
             waitForRoistat().then(function (ready) {
@@ -573,14 +742,14 @@
             } else {
               setSending(form, false);
               saveOutbox(data, origin);
-              showFallbackContact(status, data);
+              showDeliveryFailed(status, data);
             }
           });
         }
         return;
       }
 
-      // (3) fallback — today's behaviour.
+      // (3) fallback — never configured, today's behaviour.
       if (isAgent) { saveOutbox(data, origin); e.respondWith(Promise.resolve(notConnectedResult())); return; }
       saveOutbox(data, origin);
       showFallbackContact(status, data);
@@ -614,7 +783,7 @@
         return r.json();
       }).then(function (body) {
         if (!body || !body.lead_id) { throw new Error("no_lead_id"); }
-        fireAccepted(data.source_page, body.lead_id, origin);
+        fireAccepted(data.source_page, body.lead_id, origin, "confirmed");
         return { status: "accepted", leadId: body.lead_id };
       }).catch(function () {
         return { status: "error", message: T.err };
@@ -623,7 +792,7 @@
     function viaRoistat() {
       var leadId = reachRoistat(data, origin);
       if (!leadId) { saveOutbox(data, origin); return notConnectedResult(); }
-      fireAccepted(data.source_page, leadId, origin);
+      fireAccepted(data.source_page, leadId, origin, "unconfirmed");
       return { status: "accepted", leadId: leadId };
     }
     if (roistatReady()) return Promise.resolve(viaRoistat());

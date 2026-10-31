@@ -84,7 +84,17 @@ const DRAFT_CAPTURE_SRC = `window.__capturedDraft = null; window.__LEAD_DRAFT_CA
 const T_VIA_EMAIL = "Email";
 const T_VIA_TELEGRAM = "Telegram";
 async function clickOneTapButton(pg, label) {
-  await pg.getByRole("button", { name: label }).click();
+  // Native DOM click (not Playwright's getByRole/actionability path):
+  // this is a plain functional check of the click handler's own logic
+  // (did it capture the right {channel, url}?), not a hit-testing check --
+  // that is covered separately by the real Playwright click in the
+  // viewport/sticky-bar test below.
+  await pg.evaluate((label) => {
+    var btns = document.querySelectorAll("#leadForm .lf-status button.lf-draft-btn");
+    var target = Array.prototype.find.call(btns, function (b) { return b.textContent.trim() === label; });
+    if (!target) throw new Error("one-tap button not found: " + label);
+    target.click();
+  }, label);
   return pg.evaluate(() => window.__capturedDraft);
 }
 
@@ -93,6 +103,15 @@ async function clickOneTapButton(pg, label) {
   const page = await browser.newPage();
   await blockRoistat(page);
   await page.addInitScript({ content: SHORT_WAIT_SRC });
+  // window.open() via a *programmatic* .click() (not a real user gesture)
+  // is popup-blocked in headless Chromium, which would otherwise exercise
+  // the Telegram button's "popup blocked" fallback (window.location.href,
+  // a real navigation) on every functional test -- stub it to always
+  // "succeed" so these tests check the click handler's own logic, not
+  // headless-Chromium popup-gesture quirks. The real click-target hit-test
+  // (sticky-bar coverage) uses a genuine Playwright click, separately,
+  // in the viewport checks below.
+  await page.addInitScript({ content: `window.open = function () { return { closed: false }; };` });
 
   // Third-party analytics beacons (GA4/GTM/Metrica, all live via real IDs
   // in assets/analytics.js) fire on page load and form interaction
@@ -330,12 +349,12 @@ async function clickOneTapButton(pg, label) {
     contactsAfterTimeout.tel && contactsAfterTimeout.mail,
     JSON.stringify(contactsAfterTimeout)
   );
-  const emailDraft = await clickOneTapButton(page, T_VIA_EMAIL);
-  check(
-    "configured+timeout: clicking Email yields a mailto draft to the page's own contact address, via the hook",
-    emailDraft && emailDraft.channel === "email" && emailDraft.url.indexOf("mailto:animacoffeeco@gmail.com") === 0,
-    JSON.stringify(emailDraft)
-  );
+  // Telegram click first (window.open -- does not navigate the current
+  // page). Email and outbox/dataLayer checks run BEFORE the email click
+  // because window.location.href = "mailto:..." is a real navigation
+  // attempt in headless Chromium (no mail client registered) and can take
+  // the page away from this origin, invalidating any later page.evaluate
+  // against this same localStorage/dataLayer.
   const telegramDraft = await clickOneTapButton(page, T_VIA_TELEGRAM);
   check(
     "configured+timeout: clicking Telegram yields a correctly encoded t.me URL, within the ~1800-char bound, via the hook",
@@ -353,6 +372,12 @@ async function clickOneTapButton(pg, label) {
     JSON.stringify(outboxAfterTimeout)
   );
   check("human submit made no network POST either", networkRequests.length === 0, JSON.stringify(networkRequests));
+  const emailDraft = await clickOneTapButton(page, T_VIA_EMAIL);
+  check(
+    "configured+timeout: clicking Email yields a mailto draft to the page's own contact address, via the hook",
+    emailDraft && emailDraft.channel === "email" && emailDraft.url.indexOf("mailto:animacoffeeco@gmail.com") === 0,
+    JSON.stringify(emailDraft)
+  );
 
   // 4. Round-4 fix: navigator.modelContext-only fallback. Some early Chrome
   // preview builds / older explainer drafts exposed the API on navigator
@@ -679,111 +704,6 @@ async function clickOneTapButton(pg, label) {
   const neverReadyDataLayer = await neverReadyPage.evaluate(() => (window.dataLayer || []).filter((e) => e && e.event === "lead_accepted"));
   check("roistatGoal never ready: no lead_accepted event was pushed", neverReadyDataLayer.length === 0, JSON.stringify(neverReadyDataLayer));
 
-  // 8. Fast-follow: two back-to-back agent submits with the SAME data must
-  // produce exactly one reach() call. window.__LEAD_RESET_DELAY_MS widens
-  // the deferred-reset window (normally a single macrotask) so the second
-  // submit deterministically lands inside it instead of depending on real
-  // event-loop timing.
-  const dupPage = await browser.newPage();
-  await blockRoistat(dupPage);
-  await dupPage.addInitScript({ content: `window.__LEAD_RESET_DELAY_MS = 400;` });
-  await dupPage.addInitScript({ content: ROISTAT_STUB_SRC });
-  await dupPage.addInitScript({ content: POLYFILL_SRC });
-  await dupPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
-
-  // Codex round-1 fix: a real Playwright click() waits for the submit
-  // button to become actionable (enabled) before landing, so by the time
-  // it fires the guard window has already closed and the "race" never
-  // actually happens — it just becomes a normal, later, legitimate
-  // submit. form.requestSubmit() (called with no submitter argument)
-  // fires the same 'submit' event the polyfill and lead.js listen for,
-  // without requiring any particular button to be enabled, so it lands
-  // deterministically INSIDE the guarded window instead of waiting it out.
-  async function agentSubmit(pg, args) {
-    return pg.evaluate(async ({ name, args }) => {
-      const tools = await document.modelContext.getTools();
-      const tool = tools.find((t) => t.name === name);
-      // executeTool()'s Promise executor attaches the form's 'submit'
-      // listener synchronously, so requestSubmit() right after this call
-      // (no await, no timeout) is guaranteed to be seen by it.
-      const resultPromise = document.modelContext.executeTool(tool, args);
-      document.getElementById("leadForm").requestSubmit();
-      return resultPromise;
-    }, { name: "request_coffee_service_assessment", args });
-  }
-
-  const dupArgs = {
-    name: "Duplicate Guard Buyer",
-    business: "Dup Co",
-    city: "Kyiv",
-    machines: "1",
-    contact: "dup@example.com",
-    message: "Same submit twice."
-  };
-  const dupResult1 = await agentSubmit(dupPage, dupArgs);
-  check("duplicate guard: first submit accepted", dupResult1 && dupResult1.status === "accepted", JSON.stringify(dupResult1));
-  // Second submit fires immediately after the first resolves — well inside
-  // the widened (400ms) deferred-reset window — so the sending guard must
-  // still be held: this must resolve as an in-flight error, never a
-  // second "accepted".
-  const dupResult2 = await agentSubmit(dupPage, dupArgs);
-  check(
-    "duplicate guard: second (racing) submit is rejected in-flight, not delivered",
-    dupResult2 && dupResult2.status === "error",
-    JSON.stringify(dupResult2)
-  );
-  await dupPage.waitForTimeout(500);
-  const dupCalls = await dupPage.evaluate(() => window.__roistatCalls);
-  check(
-    "duplicate guard: exactly one reach() call total for the two racing submits",
-    Array.isArray(dupCalls) && dupCalls.length === 1,
-    JSON.stringify(dupCalls)
-  );
-
-  // 9. Fast-follow: a throwing Roistat counter snippet must never prevent
-  // window.animaTrackLead from being defined, and must not take GA4/dataLayer
-  // or Metrica down with it. Targets the exact insertBefore() call the
-  // counter snippet makes (see assets/analytics.js), regardless of call
-  // order relative to GTM/Metrica's own script insertions.
-  const throwPage = await browser.newPage();
-  await blockRoistat(throwPage);
-  await throwPage.addInitScript({
-    content: `(function () {
-      var orig = Node.prototype.insertBefore;
-      Node.prototype.insertBefore = function (newNode, refNode) {
-        if (newNode && newNode.tagName === "SCRIPT" && typeof newNode.src === "string" && newNode.src.indexOf("roistat.com") !== -1) {
-          throw new Error("simulated roistat snippet failure");
-        }
-        return orig.call(this, newNode, refNode);
-      };
-    })();`
-  });
-  await throwPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
-  const throwPageState = await throwPage.evaluate(() => ({
-    hasAnimaTrackLead: typeof window.animaTrackLead === "function",
-    hasYm: typeof window.ym === "function",
-    hasDataLayer: Array.isArray(window.dataLayer)
-  }));
-  check(
-    "throwing Roistat snippet: window.animaTrackLead is still defined",
-    throwPageState.hasAnimaTrackLead,
-    JSON.stringify(throwPageState)
-  );
-  check(
-    "throwing Roistat snippet: Metrica (window.ym) is still initialized",
-    throwPageState.hasYm,
-    JSON.stringify(throwPageState)
-  );
-  const throwPageTrack = await throwPage.evaluate(() => {
-    window.animaTrackLead("/test", "lead_throw_test", "human");
-    return (window.dataLayer || []).filter((e) => e && e.event === "lead_accepted" && e.lead_id === "lead_throw_test");
-  });
-  check(
-    "throwing Roistat snippet: animaTrackLead still pushes lead_accepted to dataLayer",
-    Array.isArray(throwPageTrack) && throwPageTrack.length === 1,
-    JSON.stringify(throwPageTrack)
-  );
-
   // 10. Honest-delivery (TDD case: reach() itself throws, Roistat ready
   // immediately -- no (2b) wait needed). Same honest message, kept values,
   // one-tap controls, outbox saved, no lead_accepted as the timeout case.
@@ -975,6 +895,111 @@ async function clickOneTapButton(pg, label) {
   await checkViewportAfterDeliveryFailed(`${BASE_URL}/index.html`, "EN");
   await checkViewportAfterDeliveryFailed(`${BASE_URL}/ua/index.html`, "UA");
   await checkViewportAfterDeliveryFailed(`${BASE_URL}/pricing-model.html`, "EN-pricing-model(PR88-sticky)");
+
+  // 8. Fast-follow: two back-to-back agent submits with the SAME data must
+  // produce exactly one reach() call. window.__LEAD_RESET_DELAY_MS widens
+  // the deferred-reset window (normally a single macrotask) so the second
+  // submit deterministically lands inside it instead of depending on real
+  // event-loop timing.
+  const dupPage = await browser.newPage();
+  await blockRoistat(dupPage);
+  await dupPage.addInitScript({ content: `window.__LEAD_RESET_DELAY_MS = 400;` });
+  await dupPage.addInitScript({ content: ROISTAT_STUB_SRC });
+  await dupPage.addInitScript({ content: POLYFILL_SRC });
+  await dupPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+
+  // Codex round-1 fix: a real Playwright click() waits for the submit
+  // button to become actionable (enabled) before landing, so by the time
+  // it fires the guard window has already closed and the "race" never
+  // actually happens — it just becomes a normal, later, legitimate
+  // submit. form.requestSubmit() (called with no submitter argument)
+  // fires the same 'submit' event the polyfill and lead.js listen for,
+  // without requiring any particular button to be enabled, so it lands
+  // deterministically INSIDE the guarded window instead of waiting it out.
+  async function agentSubmit(pg, args) {
+    return pg.evaluate(async ({ name, args }) => {
+      const tools = await document.modelContext.getTools();
+      const tool = tools.find((t) => t.name === name);
+      // executeTool()'s Promise executor attaches the form's 'submit'
+      // listener synchronously, so requestSubmit() right after this call
+      // (no await, no timeout) is guaranteed to be seen by it.
+      const resultPromise = document.modelContext.executeTool(tool, args);
+      document.getElementById("leadForm").requestSubmit();
+      return resultPromise;
+    }, { name: "request_coffee_service_assessment", args });
+  }
+
+  const dupArgs = {
+    name: "Duplicate Guard Buyer",
+    business: "Dup Co",
+    city: "Kyiv",
+    machines: "1",
+    contact: "dup@example.com",
+    message: "Same submit twice."
+  };
+  const dupResult1 = await agentSubmit(dupPage, dupArgs);
+  check("duplicate guard: first submit accepted", dupResult1 && dupResult1.status === "accepted", JSON.stringify(dupResult1));
+  // Second submit fires immediately after the first resolves — well inside
+  // the widened (400ms) deferred-reset window — so the sending guard must
+  // still be held: this must resolve as an in-flight error, never a
+  // second "accepted".
+  const dupResult2 = await agentSubmit(dupPage, dupArgs);
+  check(
+    "duplicate guard: second (racing) submit is rejected in-flight, not delivered",
+    dupResult2 && dupResult2.status === "error",
+    JSON.stringify(dupResult2)
+  );
+  await dupPage.waitForTimeout(500);
+  const dupCalls = await dupPage.evaluate(() => window.__roistatCalls);
+  check(
+    "duplicate guard: exactly one reach() call total for the two racing submits",
+    Array.isArray(dupCalls) && dupCalls.length === 1,
+    JSON.stringify(dupCalls)
+  );
+
+  // 9. Fast-follow: a throwing Roistat counter snippet must never prevent
+  // window.animaTrackLead from being defined, and must not take GA4/dataLayer
+  // or Metrica down with it. Targets the exact insertBefore() call the
+  // counter snippet makes (see assets/analytics.js), regardless of call
+  // order relative to GTM/Metrica's own script insertions.
+  const throwPage = await browser.newPage();
+  await blockRoistat(throwPage);
+  await throwPage.addInitScript({
+    content: `(function () {
+      var orig = Node.prototype.insertBefore;
+      Node.prototype.insertBefore = function (newNode, refNode) {
+        if (newNode && newNode.tagName === "SCRIPT" && typeof newNode.src === "string" && newNode.src.indexOf("roistat.com") !== -1) {
+          throw new Error("simulated roistat snippet failure");
+        }
+        return orig.call(this, newNode, refNode);
+      };
+    })();`
+  });
+  await throwPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  const throwPageState = await throwPage.evaluate(() => ({
+    hasAnimaTrackLead: typeof window.animaTrackLead === "function",
+    hasYm: typeof window.ym === "function",
+    hasDataLayer: Array.isArray(window.dataLayer)
+  }));
+  check(
+    "throwing Roistat snippet: window.animaTrackLead is still defined",
+    throwPageState.hasAnimaTrackLead,
+    JSON.stringify(throwPageState)
+  );
+  check(
+    "throwing Roistat snippet: Metrica (window.ym) is still initialized",
+    throwPageState.hasYm,
+    JSON.stringify(throwPageState)
+  );
+  const throwPageTrack = await throwPage.evaluate(() => {
+    window.animaTrackLead("/test", "lead_throw_test", "human");
+    return (window.dataLayer || []).filter((e) => e && e.event === "lead_accepted" && e.lead_id === "lead_throw_test");
+  });
+  check(
+    "throwing Roistat snippet: animaTrackLead still pushes lead_accepted to dataLayer",
+    Array.isArray(throwPageTrack) && throwPageTrack.length === 1,
+    JSON.stringify(throwPageTrack)
+  );
 
   await browser.close();
 
