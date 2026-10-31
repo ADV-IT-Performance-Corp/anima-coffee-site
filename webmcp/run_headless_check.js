@@ -75,6 +75,19 @@ const ROISTAT_STUB_SRC = `(function () {
 // doesn't spend 4 real seconds per such page.
 const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
 
+// Honest-delivery v2 (2026-10-31): the one-tap controls are <button>s, not
+// <a>s (no visitor data may ever land in a real href attribute an analytics
+// click-listener could read). This hook captures {channel, url} on click
+// without navigating/opening a real client, following the
+// window.__ROISTAT_TEST_WAIT_MS convention.
+const DRAFT_CAPTURE_SRC = `window.__capturedDraft = null; window.__LEAD_DRAFT_CAPTURE = function (channel, url) { window.__capturedDraft = { channel: channel, url: url }; };`;
+const T_VIA_EMAIL = "Email";
+const T_VIA_TELEGRAM = "Telegram";
+async function clickOneTapButton(pg, label) {
+  await pg.getByRole("button", { name: label }).click();
+  return pg.evaluate(() => window.__capturedDraft);
+}
+
 (async () => {
   const browser = await chromium.launch();
   const page = await browser.newPage();
@@ -267,22 +280,77 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
   const dataLayerAfterAgent = await page.evaluate(() => (window.dataLayer || []).filter((e) => e && e.event === "lead_accepted"));
   check("agent not_connected path pushed no lead_accepted event", dataLayerAfterAgent.length === 0, JSON.stringify(dataLayerAfterAgent));
 
-  // 3. Human submit path unchanged: fill + click submit, expect fallback block
-  await page.fill('#leadForm input[name="name"]', "Human Visitor");
+  // 3. Honest-delivery (TDD case: failure with Roistat configured). Roistat
+  // IS configured (live ROISTAT_PROJECT_ID) but blockRoistat() means
+  // window.roistatGoal never appears, so this runs the (2b) wait path
+  // (SHORT_WAIT_SRC caps it at 250ms) then times out. T.noBackend ("isn't
+  // wired") would be FALSE here since a backend IS configured -- the honest
+  // deliveryFailed message + one-tap email/Telegram controls must show
+  // instead, the visitor's values must survive (no reset), the lead must be
+  // saved to the outbox, and no lead_accepted may fire.
+  await page.evaluate(() => localStorage.removeItem("anima_lead_outbox_v1"));
+  await page.evaluate(DRAFT_CAPTURE_SRC);
+  const SENTINEL_NAME = "Human Visitor SENTINEL_Q7x";
+  await page.fill('#leadForm input[name="name"]', SENTINEL_NAME);
   await page.fill('#leadForm input[name="business"]', "Human Co");
   await page.fill('#leadForm input[name="city"]', "Kyiv");
   await page.fill('#leadForm input[name="contact"]', "human@example.com");
   await page.click('#leadForm button[type="submit"]');
-  // Roistat is configured (live ROISTAT_PROJECT_ID) but blockRoistat()
-  // means window.roistatGoal never appears, so this now runs the (2b)
-  // wait path (SHORT_WAIT_SRC caps it at 250ms) before falling back.
   await page.waitForTimeout(400);
   const statusText = await page.textContent("#leadForm .lf-status");
-  const hasHighlight = await page.evaluate(() => !!document.querySelector(".contact-block.lf-highlight"));
   check(
-    "human submit with empty endpoint shows the fallback contact block",
-    /isn't wired|reach us directly/i.test(statusText || "") || hasHighlight,
-    JSON.stringify({ statusText, hasHighlight })
+    "configured+timeout: shows the honest delivery-failed message, not T.noBackend",
+    /couldn't send your request automatically/i.test(statusText || "") && !/isn't wired/i.test(statusText || ""),
+    JSON.stringify(statusText)
+  );
+  const nameFieldAfterTimeout = await page.inputValue('#leadForm input[name="name"]');
+  check(
+    "configured+timeout: the visitor's form values are kept, not reset",
+    nameFieldAfterTimeout === SENTINEL_NAME,
+    JSON.stringify(nameFieldAfterTimeout)
+  );
+  const statusHtmlAfterTimeout = await page.evaluate(() => document.querySelector("#leadForm .lf-status").outerHTML);
+  const anchorHrefsAfterTimeout = await page.evaluate(() =>
+    Array.prototype.map.call(document.querySelectorAll("#leadForm .lf-status a"), (a) => a.getAttribute("href") || "")
+  );
+  check(
+    "configured+timeout: both one-tap controls are real <button> elements, not <a>, and the sentinel appears in neither the status HTML nor any anchor href",
+    /<button[^>]*class="lf-draft-btn"[^>]*>Email<\/button>/.test(statusHtmlAfterTimeout) &&
+      /<button[^>]*class="lf-draft-btn"[^>]*>Telegram<\/button>/.test(statusHtmlAfterTimeout) &&
+      statusHtmlAfterTimeout.indexOf(SENTINEL_NAME) === -1 &&
+      anchorHrefsAfterTimeout.every((h) => h.indexOf(SENTINEL_NAME) === -1 && h.indexOf("?") === -1),
+    JSON.stringify({ anchorHrefsAfterTimeout })
+  );
+  const contactsAfterTimeout = await page.evaluate(() => ({
+    tel: !!document.querySelector('#leadForm .lf-status a[href^="tel:"]'),
+    mail: !!document.querySelector('#leadForm .lf-status a[href^="mailto:"]')
+  }));
+  check(
+    "configured+timeout: tel and mailto contacts are present alongside both buttons",
+    contactsAfterTimeout.tel && contactsAfterTimeout.mail,
+    JSON.stringify(contactsAfterTimeout)
+  );
+  const emailDraft = await clickOneTapButton(page, T_VIA_EMAIL);
+  check(
+    "configured+timeout: clicking Email yields a mailto draft to the page's own contact address, via the hook",
+    emailDraft && emailDraft.channel === "email" && emailDraft.url.indexOf("mailto:animacoffeeco@gmail.com") === 0,
+    JSON.stringify(emailDraft)
+  );
+  const telegramDraft = await clickOneTapButton(page, T_VIA_TELEGRAM);
+  check(
+    "configured+timeout: clicking Telegram yields a correctly encoded t.me URL, within the ~1800-char bound, via the hook",
+    telegramDraft && telegramDraft.channel === "telegram" &&
+      telegramDraft.url.indexOf("https://t.me/Animavolitiva?text=") === 0 &&
+      telegramDraft.url.length <= 1900,
+    JSON.stringify(telegramDraft)
+  );
+  const dataLayerAfterTimeout = await page.evaluate(() => (window.dataLayer || []).filter((e) => e && e.event === "lead_accepted"));
+  check("configured+timeout: no lead_accepted event was pushed", dataLayerAfterTimeout.length === 0, JSON.stringify(dataLayerAfterTimeout));
+  const outboxAfterTimeout = await page.evaluate(() => JSON.parse(localStorage.getItem("anima_lead_outbox_v1") || "[]"));
+  check(
+    "configured+timeout: the lead was saved to the outbox for automatic re-delivery",
+    Array.isArray(outboxAfterTimeout) && outboxAfterTimeout.length === 1 && outboxAfterTimeout[0].data.name === SENTINEL_NAME,
+    JSON.stringify(outboxAfterTimeout)
   );
   check("human submit made no network POST either", networkRequests.length === 0, JSON.stringify(networkRequests));
 
@@ -603,11 +671,10 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
   await neverReadyPage.click('#leadForm button[type="submit"]');
   await neverReadyPage.waitForTimeout(500);
   const neverReadyStatus = await neverReadyPage.textContent("#leadForm .lf-status");
-  const neverReadyHighlight = await neverReadyPage.evaluate(() => !!document.querySelector(".contact-block.lf-highlight"));
   check(
-    "roistatGoal never ready: falls back to the contact block after the wait times out",
-    /isn't wired|reach us directly/i.test(neverReadyStatus || "") || neverReadyHighlight,
-    JSON.stringify({ neverReadyStatus, neverReadyHighlight })
+    "roistatGoal never ready: shows the honest delivery-failed message (configured, not T.noBackend)",
+    /couldn't send your request automatically/i.test(neverReadyStatus || ""),
+    JSON.stringify(neverReadyStatus)
   );
   const neverReadyDataLayer = await neverReadyPage.evaluate(() => (window.dataLayer || []).filter((e) => e && e.event === "lead_accepted"));
   check("roistatGoal never ready: no lead_accepted event was pushed", neverReadyDataLayer.length === 0, JSON.stringify(neverReadyDataLayer));
@@ -716,6 +783,198 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
     Array.isArray(throwPageTrack) && throwPageTrack.length === 1,
     JSON.stringify(throwPageTrack)
   );
+
+  // 10. Honest-delivery (TDD case: reach() itself throws, Roistat ready
+  // immediately -- no (2b) wait needed). Same honest message, kept values,
+  // one-tap controls, outbox saved, no lead_accepted as the timeout case.
+  const throwsReachPage = await browser.newPage();
+  await blockRoistat(throwsReachPage);
+  await throwsReachPage.addInitScript({
+    content: `window.__reachCalls = 0; window.roistatGoal = { reach: function () { window.__reachCalls++; throw new Error("blocked"); } };`
+  });
+  await throwsReachPage.addInitScript({ content: DRAFT_CAPTURE_SRC });
+  await throwsReachPage.addInitScript({ content: POLYFILL_SRC });
+  await throwsReachPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  await throwsReachPage.evaluate(() => localStorage.removeItem("anima_lead_outbox_v1"));
+  await throwsReachPage.fill('#leadForm input[name="name"]', "Throws Reach Human");
+  await throwsReachPage.fill('#leadForm input[name="business"]', "Throws Co");
+  await throwsReachPage.fill('#leadForm input[name="city"]', "Kyiv");
+  await throwsReachPage.fill('#leadForm input[name="contact"]', "throws@example.com");
+  await throwsReachPage.click('#leadForm button[type="submit"]');
+  await throwsReachPage.waitForTimeout(200);
+  const throwsStatus = await throwsReachPage.textContent("#leadForm .lf-status");
+  check(
+    "reach() throws: shows the honest delivery-failed message",
+    /couldn't send your request automatically/i.test(throwsStatus || ""),
+    JSON.stringify(throwsStatus)
+  );
+  const throwsOutbox = await throwsReachPage.evaluate(() => JSON.parse(localStorage.getItem("anima_lead_outbox_v1") || "[]"));
+  check(
+    "reach() throws: the lead was saved to the outbox, and no lead_accepted fired",
+    Array.isArray(throwsOutbox) && throwsOutbox.length === 1,
+    JSON.stringify(throwsOutbox)
+  );
+  const throwsDataLayer = await throwsReachPage.evaluate(() => (window.dataLayer || []).filter((e) => e && e.event === "lead_accepted"));
+  check("reach() throws: no lead_accepted event was pushed", throwsDataLayer.length === 0, JSON.stringify(throwsDataLayer));
+
+  // 11. Honest-delivery (TDD case: lone surrogate). A lone UTF-16 surrogate
+  // half in a field must not throw out of the handler -- honest message and
+  // contacts still show, and the outbox entry is still saved.
+  const loneSurrogatePage = await browser.newPage();
+  await blockRoistat(loneSurrogatePage);
+  await loneSurrogatePage.addInitScript({ content: `window.roistatGoal = { reach: function () { throw new Error("blocked"); } };` });
+  await loneSurrogatePage.addInitScript({ content: DRAFT_CAPTURE_SRC });
+  await loneSurrogatePage.addInitScript({ content: POLYFILL_SRC });
+  await loneSurrogatePage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  await loneSurrogatePage.evaluate(() => localStorage.removeItem("anima_lead_outbox_v1"));
+  var lonePageErrored = false;
+  loneSurrogatePage.on("pageerror", function () { lonePageErrored = true; });
+  await loneSurrogatePage.fill('#leadForm input[name="name"]', "Lone Surrogate Human");
+  await loneSurrogatePage.fill('#leadForm input[name="business"]', "Lone Co");
+  await loneSurrogatePage.fill('#leadForm input[name="city"]', "Kyiv");
+  await loneSurrogatePage.fill('#leadForm input[name="contact"]', "lone@example.com");
+  await loneSurrogatePage.evaluate(() => {
+    var f = document.querySelector('#leadForm textarea[name="message"]');
+    f.value = "before \ud83d lone surrogate";
+    f.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await loneSurrogatePage.click('#leadForm button[type="submit"]', { force: true });
+  await loneSurrogatePage.waitForTimeout(200);
+  check("lone surrogate in a field: no uncaught error out of the handler", lonePageErrored === false, JSON.stringify(lonePageErrored));
+  const loneStatus = await loneSurrogatePage.textContent("#leadForm .lf-status");
+  check(
+    "lone surrogate in a field: the honest delivery-failed message and contacts are still shown",
+    /couldn't send your request automatically|could not send via the site/i.test(loneStatus || ""),
+    JSON.stringify(loneStatus)
+  );
+  const loneHasTel = await loneSurrogatePage.evaluate(() => !!document.querySelector('#leadForm .lf-status a[href^="tel:"]'));
+  check("lone surrogate in a field: tel contact still present", loneHasTel, JSON.stringify(loneHasTel));
+  const loneOutbox = await loneSurrogatePage.evaluate(() => JSON.parse(localStorage.getItem("anima_lead_outbox_v1") || "[]"));
+  check("lone surrogate in a field: the outbox entry is still saved", Array.isArray(loneOutbox) && loneOutbox.length === 1, JSON.stringify(loneOutbox));
+
+  // 12. Honest-delivery (TDD case: oversized fields). A non-details field so
+  // large the ~1800-char bound can never be met even with details truncated
+  // to empty must omit the controls (not throw), and still save the outbox.
+  const oversizedPage = await browser.newPage();
+  await blockRoistat(oversizedPage);
+  await oversizedPage.addInitScript({ content: `window.roistatGoal = { reach: function () { throw new Error("blocked"); } };` });
+  await oversizedPage.addInitScript({ content: DRAFT_CAPTURE_SRC });
+  await oversizedPage.addInitScript({ content: POLYFILL_SRC });
+  await oversizedPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  await oversizedPage.evaluate(() => localStorage.removeItem("anima_lead_outbox_v1"));
+  var oversizedErrored = false;
+  oversizedPage.on("pageerror", function () { oversizedErrored = true; });
+  await oversizedPage.fill('#leadForm input[name="name"]', "Oversized Other Human");
+  await oversizedPage.fill('#leadForm input[name="business"]', "y".repeat(3000));
+  await oversizedPage.fill('#leadForm input[name="city"]', "Kyiv");
+  await oversizedPage.fill('#leadForm input[name="contact"]', "oversized@example.com");
+  await oversizedPage.click('#leadForm button[type="submit"]', { force: true });
+  await oversizedPage.waitForTimeout(200);
+  check("other fields oversized: no throw", oversizedErrored === false, JSON.stringify(oversizedErrored));
+  const oversizedBtnCount = await oversizedPage.evaluate(() => document.querySelectorAll("#leadForm .lf-status button.lf-draft-btn").length);
+  check("other fields oversized: no one-tap button is shown (bound unreachable)", oversizedBtnCount === 0, JSON.stringify(oversizedBtnCount));
+  const oversizedOutbox = await oversizedPage.evaluate(() => JSON.parse(localStorage.getItem("anima_lead_outbox_v1") || "[]"));
+  check("other fields oversized: the outbox entry is still saved", Array.isArray(oversizedOutbox) && oversizedOutbox.length === 1, JSON.stringify(oversizedOutbox));
+
+  // 13. Honest-delivery (TDD case: flushOutbox re-delivery). A stale outbox
+  // entry from a prior failed submit must be re-sent via reach() once
+  // Roistat becomes available on a later page view, fire lead_accepted with
+  // delivery_status "unconfirmed", and then be cleared from the outbox.
+  const flushPage = await browser.newPage();
+  await blockRoistat(flushPage);
+  await flushPage.addInitScript({
+    content: `window.localStorage.setItem("anima_lead_outbox_v1", JSON.stringify([{ ts: Date.now(), origin: "human", data: { name: "Flush Test Lead", company: "Flush Co", city: "Kyiv", machines: "", contact: "flush@example.com", details: "", source_page: "/index.html" } }]));`
+  });
+  await flushPage.addInitScript({ content: `window.__roistatCalls = [];` });
+  await flushPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  // Roistat becomes available AFTER the page has loaded (flushOutbox() runs
+  // on DOMContentLoaded and, since window.roistatGoal isn't defined yet,
+  // waits via waitForRoistat() up to the real ~4s default cap).
+  await flushPage.evaluate(() => { window.roistatGoal = { reach: function (p) { window.__roistatCalls.push(p); } }; });
+  await flushPage.waitForTimeout(300);
+  const flushCalls = await flushPage.evaluate(() => window.__roistatCalls);
+  check(
+    "flushOutbox: the stale outbox entry is re-sent via exactly one reach() call",
+    Array.isArray(flushCalls) && flushCalls.length === 1 && flushCalls[0].name === "Flush Test Lead",
+    JSON.stringify(flushCalls)
+  );
+  const flushDataLayer = await flushPage.evaluate(() => (window.dataLayer || []).filter((e) => e && e.event === "lead_accepted"));
+  check(
+    "flushOutbox: re-send fires lead_accepted with delivery_status 'unconfirmed'",
+    flushDataLayer.length === 1 && flushDataLayer[0].delivery_status === "unconfirmed",
+    JSON.stringify(flushDataLayer)
+  );
+  const flushOutboxAfter = await flushPage.evaluate(() => JSON.parse(localStorage.getItem("anima_lead_outbox_v1") || "[]"));
+  check("flushOutbox: the re-sent entry is cleared from the outbox", Array.isArray(flushOutboxAfter) && flushOutboxAfter.length === 0, JSON.stringify(flushOutboxAfter));
+
+  // 14. Pixel positions + viewport safety at 375x667, EN, UA, and the PR #88
+  // newer page (pricing-model.html) which gained the sticky CTA bar. Prints
+  // real measured top/bottom for each one-tap control and the sticky bar's
+  // top, plus innerHeight, and asserts the first control is both in-viewport
+  // and not covered by the sticky bar (Playwright's own click actionability
+  // check does real hit-testing).
+  async function checkViewportAfterDeliveryFailed(url, langLabel) {
+    const pg = await browser.newPage({ viewport: { width: 375, height: 667 } });
+    await blockRoistat(pg);
+    await pg.addInitScript({ content: `window.roistatGoal = { reach: function () { throw new Error("blocked"); } };` });
+    await pg.addInitScript({ content: DRAFT_CAPTURE_SRC });
+    await pg.addInitScript({ content: POLYFILL_SRC });
+    await pg.goto(url, { waitUntil: "networkidle" });
+    await pg.evaluate(() => localStorage.removeItem("anima_lead_outbox_v1"));
+    await pg.fill('#leadForm input[name="name"]', "Viewport Human");
+    await pg.fill('#leadForm input[name="business"]', "Viewport Co");
+    await pg.fill('#leadForm input[name="city"]', "Kyiv");
+    await pg.fill('#leadForm input[name="contact"]', "viewport@example.com");
+    await pg.click('#leadForm button[type="submit"]');
+    let settled = false;
+    let prevY = await pg.evaluate(() => window.scrollY);
+    for (let i = 0; i < 20 && !settled; i++) {
+      await pg.waitForTimeout(100);
+      const y = await pg.evaluate(() => window.scrollY);
+      if (y === prevY) settled = true;
+      prevY = y;
+    }
+    const metrics = await pg.evaluate(() => {
+      var btns = document.querySelectorAll("#leadForm .lf-status button.lf-draft-btn");
+      var bar = document.getElementById("sticky-cta");
+      var barRect = bar ? bar.getBoundingClientRect() : null;
+      var out = { innerHeight: window.innerHeight, barTop: barRect ? barRect.top : null, buttons: [] };
+      Array.prototype.forEach.call(btns, function (btn) {
+        var rects = btn.getClientRects();
+        var r = rects[0] || btn.getBoundingClientRect();
+        out.buttons.push({ label: btn.textContent, top: r.top, bottom: r.bottom });
+      });
+      return out;
+    });
+    console.log(`PIXELS ${langLabel} (${url}): innerHeight=${metrics.innerHeight} stickyBarTop=${metrics.barTop} buttons=${JSON.stringify(metrics.buttons)}`);
+    check(
+      `${langLabel} 375x667: both one-tap buttons rendered`,
+      metrics.buttons.length === 2,
+      JSON.stringify(metrics)
+    );
+    check(
+      `${langLabel} 375x667: both one-tap buttons are within the viewport after scroll settles`,
+      settled && metrics.buttons.length === 2 && metrics.buttons.every((b) => b.top >= 0 && b.bottom <= metrics.innerHeight),
+      JSON.stringify({ settled, metrics })
+    );
+    let clickOk = false;
+    let clickError = null;
+    try {
+      await pg.click("#leadForm .lf-status button.lf-draft-btn >> nth=0", { timeout: 3000 });
+      clickOk = true;
+    } catch (e) {
+      clickError = String(e).split("\n")[0];
+    }
+    check(
+      `${langLabel} 375x667: the first one-tap button is not covered by the sticky CTA bar (clickable)`,
+      clickOk === true,
+      JSON.stringify({ clickOk, clickError })
+    );
+    await pg.close();
+  }
+  await checkViewportAfterDeliveryFailed(`${BASE_URL}/index.html`, "EN");
+  await checkViewportAfterDeliveryFailed(`${BASE_URL}/ua/index.html`, "UA");
+  await checkViewportAfterDeliveryFailed(`${BASE_URL}/pricing-model.html`, "EN-pricing-model(PR88-sticky)");
 
   await browser.close();
 
