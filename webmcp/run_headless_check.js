@@ -272,6 +272,52 @@ async function clickDraftButton(pg) {
       agentResult.telegram === "https://t.me/Animavolitiva",
     JSON.stringify(agentResult)
   );
+  // Round-3 P3 fix: agentResult.message is NOT asserted here -- the
+  // vendored polyfill's executeTool() has a known version-drift bug on
+  // this harness (same root cause as the pre-existing "agent submit with
+  // Roistat ready returns accepted" / "navigator-only" baseline failures:
+  // the resolved value's own fields read differently than its
+  // JSON.stringify rendering, confirmed by direct comparison, not
+  // reinvestigated per the brief). The honest-message assertion for the
+  // agent path is done below via a direct event dispatch that bypasses
+  // executeTool() entirely.
+
+  // Round-3 P3 fix, agent path (direct dispatch): bypasses the vendored
+  // polyfill's executeTool() (see note above) by dispatching a bare
+  // 'submit' Event with agentInvoked/respondWith stubbed, exercising
+  // lead.js's own agent branch directly -- a reliable check independent
+  // of that harness-version drift.
+  async function agentSubmitDirect(pg, fields) {
+    return pg.evaluate((fields) => {
+      var form = document.querySelector("#leadForm");
+      Object.keys(fields).forEach(function (k) {
+        var el = form.querySelector('[name="' + k + '"]');
+        if (el) el.value = fields[k];
+      });
+      return new Promise(function (resolve) {
+        var ev = new Event("submit", { bubbles: true, cancelable: true });
+        ev.agentInvoked = true;
+        ev.respondWith = function (p) { p.then(resolve, resolve); };
+        form.dispatchEvent(ev);
+      });
+    }, fields);
+  }
+  const agentConfiguredPage = await browser.newPage();
+  await blockRoistat(agentConfiguredPage);
+  await agentConfiguredPage.addInitScript({ content: SHORT_WAIT_SRC });
+  await agentConfiguredPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  const agentConfiguredResult = await agentSubmitDirect(agentConfiguredPage, {
+    name: "Agent Configured Direct", business: "Direct Co", city: "Kyiv", contact: "agentdirect@example.com"
+  });
+  check(
+    "agent path (direct dispatch), Roistat configured+timeout: message is the honest T.err copy, not T.noBackend",
+    agentConfiguredResult &&
+      agentConfiguredResult.status === "not_connected" &&
+      /could not send via the site/i.test(agentConfiguredResult.message || "") &&
+      !/isn't wired/i.test(agentConfiguredResult.message || ""),
+    JSON.stringify(agentConfiguredResult)
+  );
+  await agentConfiguredPage.close();
   check("agent submit with empty endpoint made no network POST", networkRequests.length === 0, JSON.stringify(networkRequests));
 
   const dataLayerAfterAgent = await page.evaluate(() => (window.dataLayer || []).filter((e) => e && e.event === "lead_accepted"));
@@ -334,6 +380,142 @@ async function clickDraftButton(pg) {
     JSON.stringify(dataLayerAfterTimeout)
   );
   check("human submit made no network POST either", networkRequests.length === 0, JSON.stringify(networkRequests));
+
+  // 3b. Round-3 P2 fix: at a 375x667 viewport, the old code scrolled
+  // .contact-block (page bottom) into view inside showDeliveryFailed,
+  // leaving the status panel + draft button off-screen above the
+  // viewport (measured -21px). Now it scrolls the status panel itself
+  // into view. reach() throws (configured, Roistat ready) so the
+  // fallback fires synchronously on submit -- no (2b) wait needed.
+  async function checkViewportAfterDeliveryFailed(url, langLabel) {
+    const pg = await browser.newPage({ viewport: { width: 375, height: 667 } });
+    await blockRoistat(pg);
+    await pg.addInitScript({ content: `window.roistatGoal = { reach: function () { throw new Error("blocked"); } };` });
+    await pg.addInitScript({ content: DRAFT_CAPTURE_SRC });
+    await pg.addInitScript({ content: POLYFILL_SRC });
+    await pg.goto(url, { waitUntil: "networkidle" });
+    await pg.fill('#leadForm input[name="name"]', "Viewport Human");
+    await pg.fill('#leadForm input[name="business"]', "Viewport Co");
+    await pg.fill('#leadForm input[name="city"]', "Kyiv");
+    await pg.fill('#leadForm input[name="contact"]', "viewport@example.com");
+    await pg.click('#leadForm button[type="submit"]');
+    // Poll scrollY until it stops changing instead of a fixed sleep --
+    // the smooth-scroll animation's real duration is not guaranteed.
+    let settled = false;
+    let prevY = await pg.evaluate(() => window.scrollY);
+    for (let i = 0; i < 20 && !settled; i++) {
+      await pg.waitForTimeout(100);
+      const y = await pg.evaluate(() => window.scrollY);
+      if (y === prevY) settled = true;
+      prevY = y;
+    }
+    const metrics = await pg.evaluate(() => {
+      var btn = document.querySelector("#leadForm .lf-status button.lf-draft-btn");
+      if (!btn) return { btnPresent: false };
+      // getBoundingClientRect() on a text-wrapped inline button returns the
+      // UNION of its line fragments -- its midpoint can land in the gap
+      // between two lines, which is not actually part of the button. Use
+      // the first fragment's own rect (always a single, real line) instead.
+      var rects = btn.getClientRects();
+      var r = rects[0] || btn.getBoundingClientRect();
+      return { btnPresent: true, top: r.top, bottom: r.bottom, fragments: rects.length };
+    });
+    check(
+      `${langLabel} 375x667: delivery-failed draft button exists and settled scrolling`,
+      settled && metrics.btnPresent === true,
+      JSON.stringify({ settled: settled, metrics: metrics })
+    );
+    check(
+      `${langLabel} 375x667: delivery-failed draft button is within the viewport after scroll settles`,
+      metrics.btnPresent === true && metrics.top >= 0 && metrics.bottom <= 667,
+      JSON.stringify(metrics)
+    );
+    // "Not covered by the sticky CTA bar" == Playwright can actually click
+    // it -- Playwright's own actionability check does real hit-testing at
+    // the element's visible point and fails if another element (e.g. the
+    // fixed #sticky-cta bar) is on top, which is a more robust signal than
+    // a hand-rolled elementFromPoint() against a possibly fragmented rect.
+    let clickOk = false;
+    let clickError = null;
+    try {
+      await pg.click("#leadForm .lf-status button.lf-draft-btn", { timeout: 3000 });
+      clickOk = true;
+    } catch (e) {
+      clickError = String(e).split("\n")[0];
+    }
+    const capturedHref = clickOk ? await pg.evaluate(() => window.__capturedDraftHref) : null;
+    check(
+      `${langLabel} 375x667: delivery-failed draft button is not covered by the sticky CTA bar (clickable)`,
+      metrics.btnPresent === true && clickOk === true && typeof capturedHref === "string",
+      JSON.stringify({ metrics: metrics, clickOk: clickOk, clickError: clickError, capturedHref: capturedHref })
+    );
+    await pg.close();
+  }
+  await checkViewportAfterDeliveryFailed(`${BASE_URL}/index.html`, "EN");
+  await checkViewportAfterDeliveryFailed(`${BASE_URL}/ua/index.html`, "UA");
+
+  // 3c. Round-3 P3 fix: stale state on re-submit. Fail once (reach() never
+  // defined -> (2b) timeout -> showDeliveryFailed with a draft button whose
+  // closure holds the FIRST submit's data), edit a field, then re-submit
+  // with a slow counter (window.roistatGoal defined, but only after a delay
+  // comfortably inside the ~4s wait) so there is a real window to inspect
+  // mid-wait: the old draft button/failure text must be gone and T.sending
+  // shown, THEN a success (T.sent) must replace it once reach() fires.
+  const restalePage = await browser.newPage();
+  await blockRoistat(restalePage);
+  await restalePage.addInitScript({ content: `window.__ROISTAT_TEST_WAIT_MS = 1500;` });
+  await restalePage.addInitScript({ content: POLYFILL_SRC });
+  await restalePage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  // assets/analytics.js sets window.roistatProjectId synchronously, so
+  // roistatConfigured() is already true; window.roistatGoal never appears
+  // (blockRoistat aborts the real counter) -> first submit times out at
+  // ~1.5s into (2b) -> showDeliveryFailed.
+  await restalePage.fill('#leadForm input[name="name"]', "Restale Human");
+  await restalePage.fill('#leadForm input[name="business"]', "Restale Co");
+  await restalePage.fill('#leadForm input[name="city"]', "Kyiv");
+  await restalePage.fill('#leadForm input[name="contact"]', "restale@example.com");
+  await restalePage.click('#leadForm button[type="submit"]');
+  await restalePage.waitForTimeout(1700);
+  const firstFailStatus = await restalePage.textContent("#leadForm .lf-status");
+  check(
+    "re-submit: first submit times out and shows the delivery-failed message with a draft button",
+    /couldn't send your request automatically/i.test(firstFailStatus || "") &&
+      (await restalePage.evaluate(() => !!document.querySelector("#leadForm .lf-status button.lf-draft-btn"))),
+    JSON.stringify(firstFailStatus)
+  );
+  // Edit a field, then install a reach() that only appears after a delay
+  // comfortably inside the new ~1.5s wait, so the re-submit's (2b) wait has
+  // a real in-flight window to inspect before it resolves.
+  await restalePage.fill('#leadForm input[name="city"]', "Bila Tserkva");
+  await restalePage.evaluate(() => {
+    setTimeout(function () {
+      window.roistatGoal = { reach: function (payload) { window.__slowReachPayload = payload; } };
+    }, 500);
+  });
+  await restalePage.click('#leadForm button[type="submit"]');
+  await restalePage.waitForTimeout(150);
+  const midWait = await restalePage.evaluate(() => ({
+    hasDraftBtn: !!document.querySelector("#leadForm .lf-status button.lf-draft-btn"),
+    statusText: document.querySelector("#leadForm .lf-status").textContent
+  }));
+  check(
+    "re-submit: during the wait, the stale draft button is gone and T.sending is shown",
+    midWait.hasDraftBtn === false && /sending|надсилаємо/i.test(midWait.statusText || ""),
+    JSON.stringify(midWait)
+  );
+  await restalePage.waitForTimeout(1600);
+  const afterSuccess = await restalePage.evaluate(() => ({
+    hasDraftBtn: !!document.querySelector("#leadForm .lf-status button.lf-draft-btn"),
+    statusText: document.querySelector("#leadForm .lf-status").textContent,
+    slowReachPayload: window.__slowReachPayload || null
+  }));
+  check(
+    "re-submit: a success replaces the status once the slow reach() call lands",
+    afterSuccess.hasDraftBtn === false &&
+      /thank you|дякуємо/i.test(afterSuccess.statusText || "") &&
+      !!afterSuccess.slowReachPayload,
+    JSON.stringify(afterSuccess)
+  );
 
   // 4. Round-4 fix: navigator.modelContext-only fallback. Some early Chrome
   // preview builds / older explainer drafts exposed the API on navigator
@@ -678,7 +860,7 @@ async function clickDraftButton(pg) {
   const throwsReachPage = await browser.newPage();
   await blockRoistat(throwsReachPage);
   await throwsReachPage.addInitScript({
-    content: `window.roistatGoal = { reach: function () { throw new Error("blocked"); } };`
+    content: `window.__reachCalls = 0; window.roistatGoal = { reach: function () { window.__reachCalls++; throw new Error("blocked"); } };`
   });
   await throwsReachPage.addInitScript({ content: DRAFT_CAPTURE_SRC });
   await throwsReachPage.addInitScript({ content: POLYFILL_SRC });
@@ -710,22 +892,42 @@ async function clickDraftButton(pg) {
     throwsTel && throwsMailLink && throwsBtnPresent,
     JSON.stringify({ tel: throwsTel, mail: throwsMailLink, btn: throwsBtnPresent })
   );
+  // Round-3 finding 5b: the earlier check only asserted the button exists
+  // (duplicate of the presence check above). Also assert no <a> in the
+  // status carries a query string -- the mailto draft data lives ONLY in
+  // the button's closure, never in a real href a click-listener could read.
+  const throwsAnchorsNoQuery = await throwsReachPage.evaluate(() => {
+    var anchors = document.querySelectorAll("#leadForm .lf-status a");
+    return Array.prototype.every.call(anchors, function (a) {
+      return (a.getAttribute("href") || "").indexOf("?") === -1;
+    });
+  });
   check(
-    "reach() throws: the draft control is a <button>, never an <a> carrying the mailto href",
-    throwsBtnPresent,
-    JSON.stringify(throwsBtnPresent)
+    "reach() throws: the draft control is a <button>, never an <a> -- no <a> in the status carries a query string",
+    throwsBtnPresent && throwsAnchorsNoQuery,
+    JSON.stringify({ btn: throwsBtnPresent, anchorsNoQuery: throwsAnchorsNoQuery })
   );
+  // Round-3 finding 5a: lfSending is already "" after the failure (reset by
+  // setSending(form,false) before showDeliveryFailed renders), so checking
+  // it after the draft click was vacuous. Attach a real submit-event
+  // counter before the draft click and assert no second reach() call fires.
+  const reachCallsBeforeDraftClick = await throwsReachPage.evaluate(() => window.__reachCalls);
+  await throwsReachPage.evaluate(() => {
+    window.__submitEvents = 0;
+    document.querySelector("#leadForm").addEventListener("submit", function () { window.__submitEvents++; });
+  });
   const throwsDraftHref = await clickDraftButton(throwsReachPage);
   check(
     "reach() throws: clicking the draft button yields a correctly encoded mailto URL via the hook",
     typeof throwsDraftHref === "string" && throwsDraftHref.indexOf("mailto:animacoffeeco@gmail.com") === 0,
     JSON.stringify(throwsDraftHref)
   );
-  const throwsFormNotSubmitted = await throwsReachPage.evaluate(() => document.querySelector("#leadForm").dataset.lfSending !== "1");
+  await throwsReachPage.waitForTimeout(100);
+  const throwsFormNotSubmitted = await throwsReachPage.evaluate(() => ({ submits: window.__submitEvents, reaches: window.__reachCalls }));
   check(
-    "reach() throws: clicking the draft button does not submit the form",
-    throwsFormNotSubmitted,
-    JSON.stringify(throwsFormNotSubmitted)
+    "reach() throws: clicking the draft button does not submit the form (no new submit event, no new reach() call)",
+    throwsFormNotSubmitted.submits === 0 && throwsFormNotSubmitted.reaches === reachCallsBeforeDraftClick,
+    JSON.stringify({ before: reachCallsBeforeDraftClick, after: throwsFormNotSubmitted })
   );
   const throwsDataLayer = await throwsReachPage.evaluate(() => (window.dataLayer || []).filter((e) => e && e.event === "lead_accepted"));
   check("reach() throws: no lead_accepted event was pushed", throwsDataLayer.length === 0, JSON.stringify(throwsDataLayer));
@@ -755,6 +957,20 @@ async function clickDraftButton(pg) {
     "never configured: T.noBackend is unchanged (not the honest-delivery message)",
     /isn't wired/i.test(unconfiguredStatus || "") && !/couldn't send your request automatically/i.test(unconfiguredStatus || ""),
     JSON.stringify(unconfiguredStatus)
+  );
+  // Round-3 P3 fix, agent side (direct dispatch, see note above -- same
+  // page, same never-configured state): the agent JSON result's message
+  // must stay T.noBackend, never T.err.
+  const unconfiguredAgentResult = await agentSubmitDirect(unconfiguredPage, {
+    name: "Unconfigured Agent Direct", business: "Direct Co", city: "Kyiv", contact: "unconfigured-agent-direct@example.com"
+  });
+  check(
+    "agent path (direct dispatch), never configured: message is T.noBackend, not the honest T.err copy",
+    unconfiguredAgentResult &&
+      unconfiguredAgentResult.status === "not_connected" &&
+      /isn't wired/i.test(unconfiguredAgentResult.message || "") &&
+      !/could not send via the site/i.test(unconfiguredAgentResult.message || ""),
+    JSON.stringify(unconfiguredAgentResult)
   );
 
   // 7d. Honest-delivery (TDD case 6): a hostile value (quotes, <script>,
@@ -844,11 +1060,30 @@ async function clickDraftButton(pg) {
   await emojiPage.addInitScript({ content: DRAFT_CAPTURE_SRC });
   await emojiPage.addInitScript({ content: POLYFILL_SRC });
   await emojiPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
-  // "☕" (coffee cup, BMP) repeated to pad length, then a surrogate-pair
-  // emoji (😀, astral) placed every 200 chars so at least one lands
-  // exactly on a truncation boundary.
-  var emojiDetails = "";
-  for (var ei = 0; ei < 30; ei++) emojiDetails += "a".repeat(197) + "😀" + "bb";
+  // Round-2's fixture placed a surrogate pair every 201 units while
+  // safeTruncate's cut step is 200 -- 201 and 200 are coprime, so across
+  // only 30 repeats no truncation boundary (length - 200*k) could ever
+  // land on the high surrogate (checked: no integer solution in range),
+  // meaning safeTruncate's protective branch never actually ran --
+  // round-3 finding: the test was vacuous. Rebuilt on a flat 6000-char
+  // buffer with a surrogate pair written across EVERY multiple-of-200
+  // boundary (high at index 200k-1, low at 200k), so the FIRST truncation
+  // step (length 6000 -> 5800) cuts exactly at index 5799, a high
+  // surrogate, by construction.
+  var EMOJI_LEN = 6000;
+  var emojiChars = new Array(EMOJI_LEN).fill("a");
+  for (var ek = 1; ek <= EMOJI_LEN / 200 - 1; ek++) {
+    emojiChars[200 * ek - 1] = "\ud83d"; // high surrogate
+    emojiChars[200 * ek] = "\ude00"; // low surrogate (pairs with the preceding high)
+  }
+  var emojiDetails = emojiChars.join("");
+  var emojiFirstCutLen = EMOJI_LEN - 200;
+  var emojiBoundaryCode = emojiDetails.charCodeAt(emojiFirstCutLen - 1);
+  check(
+    "emoji fixture sanity: the first truncation step boundary lands on a high surrogate (not vacuous)",
+    emojiBoundaryCode >= 0xd800 && emojiBoundaryCode <= 0xdbff,
+    JSON.stringify({ index: emojiFirstCutLen - 1, code: emojiBoundaryCode.toString(16) })
+  );
   await emojiPage.fill('#leadForm input[name="name"]', "Emoji Boundary Human");
   await emojiPage.fill('#leadForm input[name="business"]', "Emoji Co");
   await emojiPage.fill('#leadForm input[name="city"]', "Kyiv");
@@ -871,9 +1106,10 @@ async function clickDraftButton(pg) {
   );
   var emojiDecodeOk = false;
   var emojiDecodeDetail = null;
+  var emojiDecodedBody = null;
   try {
     var q = emojiHref.indexOf("?");
-    decodeURIComponent(emojiHref.slice(q + 1));
+    emojiDecodedBody = decodeURIComponent(emojiHref.slice(q + 1));
     emojiDecodeOk = true;
   } catch (e) {
     emojiDecodeDetail = String(e);
@@ -882,6 +1118,24 @@ async function clickDraftButton(pg) {
     "emoji straddling a truncation boundary: the captured href decodes cleanly",
     emojiDecodeOk === true,
     emojiDecodeDetail
+  );
+  function hasLoneSurrogate(s) {
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charCodeAt(i);
+      if (c >= 0xd800 && c <= 0xdbff) {
+        var next = s.charCodeAt(i + 1);
+        if (!(next >= 0xdc00 && next <= 0xdfff)) return true;
+        i++;
+      } else if (c >= 0xdc00 && c <= 0xdfff) {
+        return true;
+      }
+    }
+    return false;
+  }
+  check(
+    "emoji straddling a truncation boundary: decoded body contains no lone surrogate",
+    emojiDecodeOk === true && hasLoneSurrogate(emojiDecodedBody) === false,
+    JSON.stringify({ decodeOk: emojiDecodeOk })
   );
 
   // Round-2 required case: a lone (unpaired) surrogate in a field must not
