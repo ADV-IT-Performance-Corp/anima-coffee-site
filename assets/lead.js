@@ -55,13 +55,19 @@
         sending: "Надсилаємо…",
         sent: "Дякуємо! Заявку отримано. Ми зв'яжемося з вами.",
         err: "Не вдалося надіслати через сайт. Скористайтесь контактами нижче — ми відповідаємо швидко.",
-        noBackend: "Форма ще не підключена до нашої системи. Зв'яжіться з нами напряму — ми відповідаємо швидко:"
+        noBackend: "Форма ще не підключена до нашої системи. Зв'яжіться з нами напряму — ми відповідаємо швидко:",
+        oneTap: "Надіслати ці дані в один дотик:",
+        viaEmail: "Email",
+        viaTelegram: "Telegram"
       }
     : {
         sending: "Sending…",
         sent: "Thank you! Your request has been received. We'll be in touch.",
         err: "Could not send via the site. Please use the contacts below — we reply fast.",
-        noBackend: "This form isn't wired to our system yet. Reach us directly — we reply fast:"
+        noBackend: "This form isn't wired to our system yet. Reach us directly — we reply fast:",
+        oneTap: "Send these details in one tap:",
+        viaEmail: "Email",
+        viaTelegram: "Telegram"
       };
 
   // Published contact facts (CLAUDE.md "Contacts & business info", canonical
@@ -126,10 +132,58 @@
     if (dy) window.scrollBy({ top: dy, behavior: "smooth" });
   }
 
+  // Backup lead channel (no server needed). A lead that could not be handed to
+  // Roistat is kept in this browser (persist-first, 7 days, max 3) and is
+  // (a) offered as a prefilled email / Telegram message so the visitor does
+  // not retype it, and (b) re-delivered through Roistat on the next page view
+  // where it is available. Never shown as "sent" until Roistat really takes it.
+  var OUTBOX_KEY = "anima_lead_outbox_v1";
+  var OUTBOX_TTL_MS = 7 * 24 * 3600 * 1000;
+  function readOutbox() {
+    try {
+      var all = JSON.parse(localStorage.getItem(OUTBOX_KEY) || "[]");
+      var now = Date.now();
+      return Array.isArray(all) ? all.filter(function (x) { return x && x.data && now - x.ts < OUTBOX_TTL_MS; }) : [];
+    } catch (e) { return []; }
+  }
+  function writeOutbox(list) {
+    try {
+      if (list.length) localStorage.setItem(OUTBOX_KEY, JSON.stringify(list.slice(-3)));
+      else localStorage.removeItem(OUTBOX_KEY);
+    } catch (e) {}
+  }
+  function saveOutbox(data, origin) {
+    if (!data || !data.contact) return;
+    var list = readOutbox();
+    list.push({ ts: Date.now(), origin: origin || "human", data: data });
+    writeOutbox(list);
+  }
+  function leadText(data) {
+    var rows = [
+      ["Name", data.name], ["Business", data.company], ["City", data.city],
+      ["Machines", data.machines], ["Contact", data.contact], ["Details", data.details]
+    ];
+    return rows.filter(function (r) { return r[1]; })
+      .map(function (r) { return r[0] + ": " + r[1]; }).join("\n");
+  }
+  function flushOutbox() {
+    var list = readOutbox();
+    if (!list.length || !roistatConfigured()) return;
+    waitForRoistat().then(function (ready) {
+      if (!ready) return;
+      var left = [];
+      readOutbox().forEach(function (item) {
+        var id = reachRoistat(item.data, item.origin);
+        if (id) fireAccepted(item.data.source_page, id, item.origin); else left.push(item);
+      });
+      writeOutbox(left);
+    });
+  }
+
   // No backend configured: never fake a conversion, never auto-navigate to
   // mailto. Surface the site's own contact block (tel/mailto links, already
   // rendered in the page footer) as the fallback CTA.
-  function showFallbackContact(status) {
+  function showFallbackContact(status, data) {
     var block = document.querySelector(".contact-block");
     var tel = block && block.querySelector('a[href^="tel:"]');
     var mail = block && block.querySelector('a[href^="mailto:"]');
@@ -141,6 +195,22 @@
       if (mail) status.appendChild(document.createTextNode(" · "));
     }
     if (mail) status.appendChild(mail.cloneNode(true));
+    if (data && data.contact) {
+      var text = leadText(data);
+      var a1 = document.createElement("a");
+      a1.href = "mailto:" + CONTACT.email + "?subject=" + encodeURIComponent("Заявка з " + location.hostname) + "&body=" + encodeURIComponent(text);
+      a1.textContent = T.viaEmail;
+      var a2 = document.createElement("a");
+      a2.href = CONTACT.telegram + "?text=" + encodeURIComponent(text);
+      a2.target = "_blank"; a2.rel = "noopener";
+      a2.textContent = T.viaTelegram;
+      var br = document.createElement("div");
+      br.appendChild(document.createTextNode(T.oneTap + " "));
+      br.appendChild(a1);
+      br.appendChild(document.createTextNode(" · "));
+      br.appendChild(a2);
+      status.appendChild(br);
+    }
     status.className = "lf-status err";
 
     if (block) {
@@ -248,6 +318,7 @@
     }
     // reach() threw (e.g. blocked mid-call) -> never claim success.
     setSending(form, false);
+    saveOutbox(data, origin);
     return notConnectedResult();
   }
 
@@ -262,7 +333,8 @@
       showSent(status);
       return;
     }
-    showFallbackContact(status);
+    saveOutbox(data, origin);
+    showFallbackContact(status, data);
   }
 
   // No phone-vs-email validation exists elsewhere in this file (the
@@ -490,6 +562,7 @@
             waitForRoistat().then(function (ready) {
               if (ready) return deliverRoistatAgent(form, data, origin);
               setSending(form, false);
+              saveOutbox(data, origin);
               return notConnectedResult();
             })
           );
@@ -499,7 +572,8 @@
               deliverRoistatHuman(form, status, data, origin);
             } else {
               setSending(form, false);
-              showFallbackContact(status);
+              saveOutbox(data, origin);
+              showFallbackContact(status, data);
             }
           });
         }
@@ -507,8 +581,9 @@
       }
 
       // (3) fallback — today's behaviour.
-      if (isAgent) { e.respondWith(Promise.resolve(notConnectedResult())); return; }
-      showFallbackContact(status);
+      if (isAgent) { saveOutbox(data, origin); e.respondWith(Promise.resolve(notConnectedResult())); return; }
+      saveOutbox(data, origin);
+      showFallbackContact(status, data);
     });
   }
 
@@ -547,16 +622,19 @@
     }
     function viaRoistat() {
       var leadId = reachRoistat(data, origin);
-      if (!leadId) return notConnectedResult();
+      if (!leadId) { saveOutbox(data, origin); return notConnectedResult(); }
       fireAccepted(data.source_page, leadId, origin);
       return { status: "accepted", leadId: leadId };
     }
     if (roistatReady()) return Promise.resolve(viaRoistat());
     if (roistatConfigured()) {
       return waitForRoistat().then(function (ready) {
-        return ready ? viaRoistat() : notConnectedResult();
+        if (ready) return viaRoistat();
+        saveOutbox(data, origin);
+        return notConnectedResult();
       });
     }
+    saveOutbox(data, origin);
     return Promise.resolve(notConnectedResult());
   }
 
@@ -579,5 +657,6 @@
 
   document.addEventListener("DOMContentLoaded", function () {
     Array.prototype.forEach.call(document.querySelectorAll("form.lead-form"), handle);
+    flushOutbox();
   });
 })();
