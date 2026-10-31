@@ -116,6 +116,12 @@
   // page at all at 375px (measured 2026-10-25).
   function showSent(status) {
     setStatus(status, T.sent, "ok");
+    scrollStatusIntoView(status);
+  }
+
+  // Brings `status` clear of the sticky nav and the sticky CTA bar. Shared
+  // by showSent and showDeliveryFailed.
+  function scrollStatusIntoView(status) {
     status.setAttribute("tabindex", "-1");
     try { status.focus({ preventScroll: true }); } catch (e) {}
     var r = status.getBoundingClientRect();
@@ -147,10 +153,10 @@
     return mail;
   }
 
-  function highlightContactBlock(block) {
+  function highlightContactBlock(block, noScroll) {
     if (!block) return;
     block.classList.add("lf-highlight");
-    block.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (!noScroll) block.scrollIntoView({ behavior: "smooth", block: "center" });
     setTimeout(function () { block.classList.remove("lf-highlight"); }, 2600);
   }
 
@@ -277,7 +283,11 @@
     }
 
     status.className = "lf-status err";
-    highlightContactBlock(block);
+    // The contact block sits at the page bottom: scrolling to it pushed the
+    // draft button off-screen above the viewport on phones (375x667), so
+    // keep the status in view instead and only flash the block.
+    highlightContactBlock(block, true);
+    scrollStatusIntoView(status);
   }
 
   // Double-submit guard: disables the submit button AND marks the form
@@ -498,7 +508,8 @@
   function notConnectedResult() {
     return {
       status: "not_connected",
-      message: T.noBackend,
+      // T.noBackend is false when Roistat is configured but delivery failed.
+      message: roistatConfigured() ? T.err : T.noBackend,
       phone: CONTACT.phone,
       email: CONTACT.email,
       telegram: CONTACT.telegram
@@ -611,6 +622,9 @@
       // fallback. Never wait when Roistat was never configured at all.
       if (roistatConfigured()) {
         setSending(form, true);
+        // Drop the previous failure text and its draft button (whose closure
+        // holds the earlier values) for the duration of the wait.
+        if (!isAgent) setStatus(status, T.sending, "");
         if (isAgent) {
           e.respondWith(
             waitForRoistat().then(function (ready) {
