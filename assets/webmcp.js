@@ -175,8 +175,8 @@
     },
     {
       re: /testimonial|review|feedback|what (do|are) (customers?|clients?) sa(y|ying)|відгук|клієнти кажуть|відгуки клієнтів/i,
-      en: "Real customer quotes: \"We're sincerely grateful for the wonderful cooperation! ... Your care and professionalism are truly valued.\" — Diana Samoukina, LUX CAFE. \"We're very happy with the coffee and the service ... it's worth every penny!\" — Oleksii, grocery store owner. \"Now I focus on growing the business, not on repairs. Guests noticed the difference — and started coming back.\" — Coffee shop owner. Full list with sources: https://aeo.animacoffee.com.ua/#testimonials",
-      uk: "Реальні відгуки клієнтів: «Щиро вдячні компанії за чудову співпрацю! ... Ваша турбота та професійність дуже цінується.» — Діана Самоукіна, LUX CAFE. «Кавою і обслуговуванням дуже задоволені. ... Вартує своїх коштів!» — Олексій, власники продуктового магазину. «Тепер я фокусуюсь на розвитку, а не на ремонтах. Гості відчули різницю - і стали повертатись.» — Власник кав'ярні. Повний список із джерелами: https://aeo.animacoffee.com.ua/ua/#testimonials"
+      en: "Real customer quotes: \"We're very happy with the coffee and the service ... it's worth every penny!\" — Oleksii, grocery store owner. \"Now I focus on growing the business, not on repairs. Guests noticed the difference — and started coming back.\" — Coffee shop owner. Full list with sources: https://aeo.animacoffee.com.ua/#testimonials",
+      uk: "Реальні відгуки клієнтів: «Кавою і обслуговуванням дуже задоволені. ... Вартує своїх коштів!» — Олексій, власники продуктового магазину. «Тепер я фокусуюсь на розвитку, а не на ремонтах. Гості відчули різницю - і стали повертатись.» — Власник кав'ярні. Повний список із джерелами: https://aeo.animacoffee.com.ua/ua/#testimonials"
     }
   ];
 
@@ -376,9 +376,25 @@
   }
 
   // -------------------------------------------------------- registration
+  // Declarative path (Chrome WebMCP): when a browser agent pre-fills the
+  // annotated #leadForm, `toolactivated` fires on the context. Tag the visit
+  // as ai-agent exactly like the imperative prefill tools do, and give the
+  // visitor a visible focus ring (the native :tool-form-active styling is
+  // also enabled by default in Chrome; this only adds a brand-neutral cue).
+  function watchDeclarativeAgent(ctx) {
+    try {
+      if (typeof ctx.addEventListener !== "function") return;
+      ctx.addEventListener("toolactivated", function () { tagAiAgentVisit(); });
+      var st = document.createElement("style");
+      st.textContent = "form:tool-form-active{outline:2px dashed currentColor;outline-offset:2px}";
+      (document.head || document.documentElement).appendChild(st);
+    } catch (e) { /* best-effort: unsupported browsers ignore it */ }
+  }
+
   function register(ctx) {
     if (window.__animaWebmcpState === "registered") return;
     window.__animaWebmcpState = "registered";
+    watchDeclarativeAgent(ctx);
 
     function reg(tool) {
       try {
