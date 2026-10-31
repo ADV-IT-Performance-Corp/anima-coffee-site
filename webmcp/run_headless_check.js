@@ -75,6 +75,16 @@ const ROISTAT_STUB_SRC = `(function () {
 // doesn't spend 4 real seconds per such page.
 const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
 
+// Round-2: the draft control is a <button>, not an <a> (no visitor data may
+// ever land in a real href attribute an analytics click-listener could
+// read). This hook captures the mailto URL on click without navigating a
+// real mail client, following the window.__ROISTAT_TEST_WAIT_MS convention.
+const DRAFT_CAPTURE_SRC = `window.__capturedDraftHref = null; window.__LEAD_DRAFT_CAPTURE = function (href) { window.__capturedDraftHref = href; };`;
+async function clickDraftButton(pg) {
+  await pg.click("#leadForm .lf-status button.lf-draft-btn");
+  return pg.evaluate(() => window.__capturedDraftHref);
+}
+
 (async () => {
   const browser = await chromium.launch();
   const page = await browser.newPage();
@@ -277,6 +287,11 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
   // lead_accepted may fire since delivery was never attempted. Replaces
   // the old "shows the fallback contact block" assertion, which expected
   // the now-misleading T.noBackend text on this exact (configured) path.
+  // Round-2: the draft-capture hook doesn't need to be installed before
+  // navigation (showDeliveryFailed reads window.__LEAD_DRAFT_CAPTURE
+  // dynamically at click time, not at load time), so it's safe to attach
+  // here on the already-navigated `page`.
+  await page.evaluate(DRAFT_CAPTURE_SRC);
   await page.fill('#leadForm input[name="name"]', "Human Visitor");
   await page.fill('#leadForm input[name="business"]', "Human Co");
   await page.fill('#leadForm input[name="city"]', "Kyiv");
@@ -295,12 +310,20 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
     nameFieldAfterTimeout === "Human Visitor",
     JSON.stringify(nameFieldAfterTimeout)
   );
-  const draftHrefAfterTimeout = await page.evaluate(() => {
-    var a = document.querySelector("#leadForm .lf-status a");
-    return a ? a.getAttribute("href") : null;
-  });
+  // tel and mailto contacts are present in the fallback alongside the draft button (finding 1).
+  const contactsAfterTimeout = await page.evaluate(() => ({
+    tel: !!document.querySelector('#leadForm .lf-status a[href^="tel:"]'),
+    mail: !!document.querySelector('#leadForm .lf-status a[href^="mailto:"]'),
+    btn: !!document.querySelector("#leadForm .lf-status button.lf-draft-btn")
+  }));
   check(
-    "configured+timeout: a mailto draft link to the page's own contact address is shown",
+    "configured+timeout: tel and mailto contacts are present alongside the draft button",
+    contactsAfterTimeout.tel && contactsAfterTimeout.mail && contactsAfterTimeout.btn,
+    JSON.stringify(contactsAfterTimeout)
+  );
+  const draftHrefAfterTimeout = await clickDraftButton(page);
+  check(
+    "configured+timeout: clicking the draft button yields a mailto draft to the page's own contact address, via the hook",
     typeof draftHrefAfterTimeout === "string" && draftHrefAfterTimeout.indexOf("mailto:animacoffeeco@gmail.com") === 0,
     JSON.stringify(draftHrefAfterTimeout)
   );
@@ -657,6 +680,7 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
   await throwsReachPage.addInitScript({
     content: `window.roistatGoal = { reach: function () { throw new Error("blocked"); } };`
   });
+  await throwsReachPage.addInitScript({ content: DRAFT_CAPTURE_SRC });
   await throwsReachPage.addInitScript({ content: POLYFILL_SRC });
   await throwsReachPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
   await throwsReachPage.fill('#leadForm input[name="name"]', "Throws Reach Human");
@@ -677,14 +701,31 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
     throwsNameField === "Throws Reach Human",
     JSON.stringify(throwsNameField)
   );
-  const throwsDraftHref = await throwsReachPage.evaluate(() => {
-    var a = document.querySelector("#leadForm .lf-status a");
-    return a ? a.getAttribute("href") : null;
-  });
+  // tel and mailto contacts are present in the fallback alongside the draft button.
+  const throwsTel = await throwsReachPage.evaluate(() => !!document.querySelector('#leadForm .lf-status a[href^="tel:"]'));
+  const throwsMailLink = await throwsReachPage.evaluate(() => !!document.querySelector('#leadForm .lf-status a[href^="mailto:"]'));
+  const throwsBtnPresent = await throwsReachPage.evaluate(() => !!document.querySelector("#leadForm .lf-status button.lf-draft-btn"));
   check(
-    "reach() throws: a mailto draft link to the page's own contact address is shown",
+    "reach() throws: tel and mailto contacts are present alongside the draft button",
+    throwsTel && throwsMailLink && throwsBtnPresent,
+    JSON.stringify({ tel: throwsTel, mail: throwsMailLink, btn: throwsBtnPresent })
+  );
+  check(
+    "reach() throws: the draft control is a <button>, never an <a> carrying the mailto href",
+    throwsBtnPresent,
+    JSON.stringify(throwsBtnPresent)
+  );
+  const throwsDraftHref = await clickDraftButton(throwsReachPage);
+  check(
+    "reach() throws: clicking the draft button yields a correctly encoded mailto URL via the hook",
     typeof throwsDraftHref === "string" && throwsDraftHref.indexOf("mailto:animacoffeeco@gmail.com") === 0,
     JSON.stringify(throwsDraftHref)
+  );
+  const throwsFormNotSubmitted = await throwsReachPage.evaluate(() => document.querySelector("#leadForm").dataset.lfSending !== "1");
+  check(
+    "reach() throws: clicking the draft button does not submit the form",
+    throwsFormNotSubmitted,
+    JSON.stringify(throwsFormNotSubmitted)
   );
   const throwsDataLayer = await throwsReachPage.evaluate(() => (window.dataLayer || []).filter((e) => e && e.event === "lead_accepted"));
   check("reach() throws: no lead_accepted event was pushed", throwsDataLayer.length === 0, JSON.stringify(throwsDataLayer));
@@ -725,10 +766,12 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
   await hostilePage.addInitScript({
     content: `window.roistatGoal = { reach: function () { throw new Error("blocked"); } };`
   });
+  await hostilePage.addInitScript({ content: DRAFT_CAPTURE_SRC });
   await hostilePage.addInitScript({ content: POLYFILL_SRC });
   await hostilePage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
   const HOSTILE_VALUE = 'Quote" <script>alert(1)</script> & newline\nend';
-  await hostilePage.fill('#leadForm input[name="name"]', "Hostile Human");
+  const SENTINEL = "SENTINEL_HOSTILE_NAME_Z9q";
+  await hostilePage.fill('#leadForm input[name="name"]', SENTINEL);
   await hostilePage.fill('#leadForm input[name="business"]', "Hostile Co");
   await hostilePage.fill('#leadForm input[name="city"]', "Kyiv");
   await hostilePage.fill('#leadForm input[name="contact"]', "hostile@example.com");
@@ -737,12 +780,26 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
   await hostilePage.waitForTimeout(200);
   const hostileInert = await hostilePage.evaluate(() => !document.querySelector("#leadForm .lf-status script"));
   check("hostile value: no <script> element was injected into the DOM", hostileInert === true, JSON.stringify(hostileInert));
-  const hostileHref = await hostilePage.evaluate(() => {
-    var a = document.querySelector("#leadForm .lf-status a");
-    return a ? a.getAttribute("href") : null;
-  });
+  // The button and its subtree expose no visitor data (outerHTML contains
+  // neither the sentinel field value nor, inside any <a>, the sentinel).
+  const hostileStatusHtml = await hostilePage.evaluate(() => document.querySelector("#leadForm .lf-status").outerHTML);
   check(
-    "hostile value: mailto href carries the encoded form, never a raw <script> tag",
+    "hostile value: the draft button and its subtree expose no visitor data (sentinel absent from .lf-status outerHTML)",
+    hostileStatusHtml.indexOf(SENTINEL) === -1,
+    hostileStatusHtml
+  );
+  const hostileAnchorsCarrySentinel = await hostilePage.evaluate((sentinel) => {
+    var anchors = document.querySelectorAll("#leadForm .lf-status a");
+    return Array.prototype.some.call(anchors, function (a) { return a.outerHTML.indexOf(sentinel) !== -1; });
+  }, SENTINEL);
+  check(
+    "hostile value: no <a> in the status contains the visitor's sentinel value",
+    hostileAnchorsCarrySentinel === false,
+    JSON.stringify(hostileAnchorsCarrySentinel)
+  );
+  const hostileHref = await clickDraftButton(hostilePage);
+  check(
+    "hostile value: mailto href (captured via the hook) carries the encoded form, never a raw <script> tag",
     typeof hostileHref === "string" &&
       hostileHref.indexOf("<script>") === -1 &&
       hostileHref.toLowerCase().indexOf("%3cscript%3e") !== -1 &&
@@ -758,6 +815,7 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
   await longDetailsPage.addInitScript({
     content: `window.roistatGoal = { reach: function () { throw new Error("blocked"); } };`
   });
+  await longDetailsPage.addInitScript({ content: DRAFT_CAPTURE_SRC });
   await longDetailsPage.addInitScript({ content: POLYFILL_SRC });
   await longDetailsPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
   const LONG_DETAILS = "x".repeat(5000);
@@ -768,14 +826,183 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
   await longDetailsPage.fill('#leadForm textarea[name="message"]', LONG_DETAILS);
   await longDetailsPage.click('#leadForm button[type="submit"]');
   await longDetailsPage.waitForTimeout(200);
-  const longHref = await longDetailsPage.evaluate(() => {
-    var a = document.querySelector("#leadForm .lf-status a");
-    return a ? a.getAttribute("href") : null;
-  });
+  const longHref = await clickDraftButton(longDetailsPage);
   check(
     "very long details: mailto href stays within the ~1800-char bound",
     typeof longHref === "string" && longHref.length <= 1900,
     JSON.stringify({ length: longHref ? longHref.length : null })
+  );
+
+  // Round-2 required case: emoji straddling a truncation boundary must not
+  // throw a URIError, the href must stay within bound, and must decode
+  // cleanly (no lone surrogate left at the cut point).
+  const emojiPage = await browser.newPage();
+  await blockRoistat(emojiPage);
+  await emojiPage.addInitScript({
+    content: `window.roistatGoal = { reach: function () { throw new Error("blocked"); } };`
+  });
+  await emojiPage.addInitScript({ content: DRAFT_CAPTURE_SRC });
+  await emojiPage.addInitScript({ content: POLYFILL_SRC });
+  await emojiPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  // "☕" (coffee cup, BMP) repeated to pad length, then a surrogate-pair
+  // emoji (😀, astral) placed every 200 chars so at least one lands
+  // exactly on a truncation boundary.
+  var emojiDetails = "";
+  for (var ei = 0; ei < 30; ei++) emojiDetails += "a".repeat(197) + "😀" + "bb";
+  await emojiPage.fill('#leadForm input[name="name"]', "Emoji Boundary Human");
+  await emojiPage.fill('#leadForm input[name="business"]', "Emoji Co");
+  await emojiPage.fill('#leadForm input[name="city"]', "Kyiv");
+  await emojiPage.fill('#leadForm input[name="contact"]', "emoji@example.com");
+  await emojiPage.fill('#leadForm textarea[name="message"]', emojiDetails);
+  var emojiPageErrored = false;
+  emojiPage.on("pageerror", function () { emojiPageErrored = true; });
+  await emojiPage.click('#leadForm button[type="submit"]');
+  await emojiPage.waitForTimeout(200);
+  const emojiHref = await clickDraftButton(emojiPage);
+  check(
+    "emoji straddling a truncation boundary: no throw, honest message still shown",
+    emojiPageErrored === false,
+    JSON.stringify(emojiPageErrored)
+  );
+  check(
+    "emoji straddling a truncation boundary: mailto href stays within the ~1800-char bound",
+    typeof emojiHref === "string" && emojiHref.length <= 1900,
+    JSON.stringify({ length: emojiHref ? emojiHref.length : null })
+  );
+  var emojiDecodeOk = false;
+  var emojiDecodeDetail = null;
+  try {
+    var q = emojiHref.indexOf("?");
+    decodeURIComponent(emojiHref.slice(q + 1));
+    emojiDecodeOk = true;
+  } catch (e) {
+    emojiDecodeDetail = String(e);
+  }
+  check(
+    "emoji straddling a truncation boundary: the captured href decodes cleanly",
+    emojiDecodeOk === true,
+    emojiDecodeDetail
+  );
+
+  // Round-2 required case: a lone (unpaired) surrogate in a field must not
+  // throw out of the handler -- the honest message and contacts still show,
+  // but per finding 2 (false copy), with no draft control (encoding failed).
+  const loneSurrogatePage = await browser.newPage();
+  await blockRoistat(loneSurrogatePage);
+  await loneSurrogatePage.addInitScript({
+    content: `window.roistatGoal = { reach: function () { throw new Error("blocked"); } };`
+  });
+  await loneSurrogatePage.addInitScript({ content: DRAFT_CAPTURE_SRC });
+  await loneSurrogatePage.addInitScript({ content: POLYFILL_SRC });
+  await loneSurrogatePage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  var lonePageErrored = false;
+  loneSurrogatePage.on("pageerror", function () { lonePageErrored = true; });
+  await loneSurrogatePage.fill('#leadForm input[name="name"]', "Lone Surrogate Human");
+  await loneSurrogatePage.fill('#leadForm input[name="business"]', "Lone Co");
+  await loneSurrogatePage.fill('#leadForm input[name="city"]', "Kyiv");
+  await loneSurrogatePage.fill('#leadForm input[name="contact"]', "lone@example.com");
+  // A lone high surrogate (\uD83D with no low surrogate partner) injected
+  // directly via the DOM (fill() with a raw string may get normalized by
+  // some browsers, so set .value then dispatch input to mirror a real paste).
+  await loneSurrogatePage.evaluate(() => {
+    var f = document.querySelector('#leadForm textarea[name="message"]');
+    f.value = "before \ud83d lone surrogate";
+    f.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await loneSurrogatePage.click('#leadForm button[type="submit"]', { force: true });
+  await loneSurrogatePage.waitForTimeout(200);
+  check("lone surrogate in a field: no uncaught error out of the handler", lonePageErrored === false, JSON.stringify(lonePageErrored));
+  const loneStatus = await loneSurrogatePage.textContent("#leadForm .lf-status");
+  check(
+    "lone surrogate in a field: the honest message (either copy) and contacts are still shown",
+    /couldn't send your request automatically|could not send via the site/i.test(loneStatus || ""),
+    JSON.stringify(loneStatus)
+  );
+  const loneHasTel = await loneSurrogatePage.evaluate(() => !!document.querySelector('#leadForm .lf-status a[href^="tel:"]'));
+  check("lone surrogate in a field: tel contact still present", loneHasTel, JSON.stringify(loneHasTel));
+
+  // Round-2 required case: other fields (not `details`) oversized -- only
+  // `details` truncates, so the ~1800 bound can't be met and no draft
+  // control must be shown, with no throw.
+  const oversizedOtherPage = await browser.newPage();
+  await blockRoistat(oversizedOtherPage);
+  await oversizedOtherPage.addInitScript({
+    content: `window.roistatGoal = { reach: function () { throw new Error("blocked"); } };`
+  });
+  await oversizedOtherPage.addInitScript({ content: DRAFT_CAPTURE_SRC });
+  await oversizedOtherPage.addInitScript({ content: POLYFILL_SRC });
+  await oversizedOtherPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  var oversizedOtherErrored = false;
+  oversizedOtherPage.on("pageerror", function () { oversizedOtherErrored = true; });
+  await oversizedOtherPage.fill('#leadForm input[name="name"]', "Oversized Other Human");
+  await oversizedOtherPage.fill('#leadForm input[name="business"]', "y".repeat(3000));
+  await oversizedOtherPage.fill('#leadForm input[name="city"]', "Kyiv");
+  await oversizedOtherPage.fill('#leadForm input[name="contact"]', "oversized@example.com");
+  // force: true -- a 3000-char input value leaves the submit button's
+  // bounding box reporting as never-stable to Playwright's actionability
+  // check (unrelated to app behavior under test).
+  await oversizedOtherPage.click('#leadForm button[type="submit"]', { force: true });
+  await oversizedOtherPage.waitForTimeout(200);
+  check("other fields oversized: no throw", oversizedOtherErrored === false, JSON.stringify(oversizedOtherErrored));
+  const oversizedOtherBtn = await oversizedOtherPage.evaluate(() => !!document.querySelector("#leadForm .lf-status button.lf-draft-btn"));
+  check("other fields oversized: no draft button is shown", oversizedOtherBtn === false, JSON.stringify(oversizedOtherBtn));
+
+  // Round-2 required case: no usable mailto on the page -- T.err copy,
+  // no draft button. Strip the mailto out of the contact-block before submit.
+  const noMailtoPage = await browser.newPage();
+  await blockRoistat(noMailtoPage);
+  await noMailtoPage.addInitScript({
+    content: `window.roistatGoal = { reach: function () { throw new Error("blocked"); } };`
+  });
+  await noMailtoPage.addInitScript({ content: DRAFT_CAPTURE_SRC });
+  await noMailtoPage.addInitScript({ content: POLYFILL_SRC });
+  await noMailtoPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  await noMailtoPage.evaluate(() => {
+    var m = document.querySelector('.contact-block a[href^="mailto:"]');
+    if (m) m.parentNode.removeChild(m);
+  });
+  await noMailtoPage.fill('#leadForm input[name="name"]', "No Mailto Human");
+  await noMailtoPage.fill('#leadForm input[name="business"]', "No Mailto Co");
+  await noMailtoPage.fill('#leadForm input[name="city"]', "Kyiv");
+  await noMailtoPage.fill('#leadForm input[name="contact"]', "nomailto@example.com");
+  await noMailtoPage.click('#leadForm button[type="submit"]');
+  await noMailtoPage.waitForTimeout(200);
+  const noMailtoStatus = await noMailtoPage.textContent("#leadForm .lf-status");
+  check(
+    "no mailto on the page: T.err copy is shown, not the deliveryFailed promise of a prepared email",
+    /could not send via the site/i.test(noMailtoStatus || "") && !/couldn't send your request automatically/i.test(noMailtoStatus || ""),
+    JSON.stringify(noMailtoStatus)
+  );
+  const noMailtoBtn = await noMailtoPage.evaluate(() => !!document.querySelector("#leadForm .lf-status button.lf-draft-btn"));
+  check("no mailto on the page: no draft button is shown", noMailtoBtn === false, JSON.stringify(noMailtoBtn));
+  const noMailtoTel = await noMailtoPage.evaluate(() => !!document.querySelector('#leadForm .lf-status a[href^="tel:"]'));
+  check("no mailto on the page: the tel contact is still shown", noMailtoTel, JSON.stringify(noMailtoTel));
+
+  // Round-2 required case: uk page shows Ukrainian field labels in the
+  // draft body.
+  const ukPage = await browser.newPage();
+  await blockRoistat(ukPage);
+  await ukPage.addInitScript({
+    content: `window.roistatGoal = { reach: function () { throw new Error("blocked"); } };`
+  });
+  await ukPage.addInitScript({ content: DRAFT_CAPTURE_SRC });
+  await ukPage.addInitScript({ content: POLYFILL_SRC });
+  await ukPage.goto(`${BASE_URL}/ua/index.html`, { waitUntil: "networkidle" });
+  await ukPage.fill('#leadForm input[name="name"]', "Українська Людина");
+  await ukPage.fill('#leadForm input[name="business"]', "Компанія ТОВ");
+  await ukPage.fill('#leadForm input[name="city"]', "Київ");
+  await ukPage.fill('#leadForm input[name="contact"]', "uk@example.com");
+  await ukPage.click('#leadForm button[type="submit"]');
+  await ukPage.waitForTimeout(200);
+  const ukHref = await clickDraftButton(ukPage);
+  var ukBody = ukHref ? decodeURIComponent(ukHref.slice(ukHref.indexOf("&body=") + 6)) : "";
+  check(
+    "uk page: the draft body uses Ukrainian field labels (matching the form's own UA labels)",
+    typeof ukHref === "string" &&
+      ukBody.indexOf("Ім'я: Українська Людина") !== -1 &&
+      ukBody.indexOf("Компанія: Компанія ТОВ") !== -1 &&
+      ukBody.indexOf("Місто: Київ") !== -1,
+    JSON.stringify({ href: ukHref, body: ukBody })
   );
 
   // 8. Fast-follow: two back-to-back agent submits with the SAME data must
