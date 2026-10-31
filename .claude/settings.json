@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Read", "Edit", "Write", "Glob", "Grep", "Agent", "Task", "Skill", "WebSearch", "WebFetch",
+      "Bash(git status*)", "Bash(git diff*)", "Bash(git log*)", "Bash(git show*)", "Bash(git fetch*)",
+      "Bash(git pull*)", "Bash(git add*)", "Bash(git commit*)", "Bash(git checkout*)", "Bash(git switch*)",
+      "Bash(git branch*)", "Bash(git stash*)", "Bash(git restore*)", "Bash(git rebase*)", "Bash(git merge*)",
+      "Bash(git push -u origin claude/*)", "Bash(git push origin claude/*)", "Bash(git push origin HEAD*)",
+      "Bash(gh *)",
+      "Bash(npm *)", "Bash(npx *)", "Bash(node *)", "Bash(bun *)",
+      "Bash(python *)", "Bash(python3 *)", "Bash(pytest *)", "Bash(pip *)",
+      "Bash(ls *)", "Bash(cat *)", "Bash(head *)", "Bash(tail *)", "Bash(grep *)", "Bash(rg *)", "Bash(find *)",
+      "Bash(mkdir *)", "Bash(cp *)", "Bash(mv *)", "Bash(touch *)", "Bash(echo *)", "Bash(jq *)", "Bash(wc *)",
+      "Bash(sort *)", "Bash(diff *)", "Bash(sed *)", "Bash(awk *)", "Bash(curl *)", "Bash(xmllint *)",
+      "Bash(gbrain *)", "Bash(~/.claude/skills/gstack/*)", "Bash(gstack-*)",
+      "mcp__gbrain__*", "mcp__github__*"
+    ],
+    "deny": [
+      "Read(.env)", "Read(.env.*)", "Read(**/.env)", "Read(**/.env.*)", "Read(**/secrets/**)",
+      "Read(~/.ssh/**)", "Read(~/.aws/**)", "Read(~/.config/gcloud/**)", "Read(**/*.pem)",
+      "Bash(rm -rf /*)", "Bash(rm -rf ~*)", "Bash(rm -rf ..*)", "Bash(sudo *)",
+      "Bash(git push --force*)", "Bash(git push -f*)", "Bash(git push * --force*)",
+      "Bash(git push origin main*)", "Bash(git push origin master*)",
+      "Bash(git reset --hard origin*)", "Bash(git clean -fdx*)",
+      "Bash(curl * | sh*)", "Bash(curl * | bash*)",
+      "Bash(npm install -g gbrain*)", "Bash(bun add -g gbrain*)",
+      "Edit(CNAME)", "Write(CNAME)", "Edit(robots.txt)", "Write(robots.txt)"
+    ]
+  }
+}

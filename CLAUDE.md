@@ -192,3 +192,9 @@ the specific lines cited above is unchanged and still binding.
 On 2026-09-15, the unconfirmed roaster name was removed site-wide (it had
 never been confirmed by the owner — see the "Coffee:" entry above); this is a
 removal, not a rule change on the still-undecided brand list.
+
+## Toolchain: gstack + gbrain (added 2026-10-31)
+
+Use the gstack skills (`/investigate`, `/review`, `/qa`, `/browse`, `/ship`, `/land-and-deploy`, `/cso`) and recall with
+`gbrain query` before non-trivial work. How to work, install notes and merge rules: `AGENTS.md`. Routine commands are not
+to be asked about. None of this changes the factual rules above.
