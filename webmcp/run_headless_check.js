@@ -267,22 +267,48 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
   const dataLayerAfterAgent = await page.evaluate(() => (window.dataLayer || []).filter((e) => e && e.event === "lead_accepted"));
   check("agent not_connected path pushed no lead_accepted event", dataLayerAfterAgent.length === 0, JSON.stringify(dataLayerAfterAgent));
 
-  // 3. Human submit path unchanged: fill + click submit, expect fallback block
+  // 3. Honest-delivery fallback (2026-10-31, TDD case 3): Roistat IS
+  // configured (live ROISTAT_PROJECT_ID) but blockRoistat() means
+  // window.roistatGoal never appears, so this runs the (2b) wait path
+  // (SHORT_WAIT_SRC caps it at 250ms) then times out. T.noBackend ("isn't
+  // wired") would be FALSE here since a backend IS configured, so the
+  // honest message + a prefilled mailto draft link must show instead; the
+  // visitor's typed values must survive (no form.reset()), and no
+  // lead_accepted may fire since delivery was never attempted. Replaces
+  // the old "shows the fallback contact block" assertion, which expected
+  // the now-misleading T.noBackend text on this exact (configured) path.
   await page.fill('#leadForm input[name="name"]', "Human Visitor");
   await page.fill('#leadForm input[name="business"]', "Human Co");
   await page.fill('#leadForm input[name="city"]', "Kyiv");
   await page.fill('#leadForm input[name="contact"]', "human@example.com");
   await page.click('#leadForm button[type="submit"]');
-  // Roistat is configured (live ROISTAT_PROJECT_ID) but blockRoistat()
-  // means window.roistatGoal never appears, so this now runs the (2b)
-  // wait path (SHORT_WAIT_SRC caps it at 250ms) before falling back.
   await page.waitForTimeout(400);
   const statusText = await page.textContent("#leadForm .lf-status");
-  const hasHighlight = await page.evaluate(() => !!document.querySelector(".contact-block.lf-highlight"));
   check(
-    "human submit with empty endpoint shows the fallback contact block",
-    /isn't wired|reach us directly/i.test(statusText || "") || hasHighlight,
-    JSON.stringify({ statusText, hasHighlight })
+    "configured+timeout: shows the honest delivery-failed message, not T.noBackend",
+    /couldn't send your request automatically/i.test(statusText || ""),
+    JSON.stringify(statusText)
+  );
+  const nameFieldAfterTimeout = await page.inputValue('#leadForm input[name="name"]');
+  check(
+    "configured+timeout: the visitor's form values are kept, not reset",
+    nameFieldAfterTimeout === "Human Visitor",
+    JSON.stringify(nameFieldAfterTimeout)
+  );
+  const draftHrefAfterTimeout = await page.evaluate(() => {
+    var a = document.querySelector("#leadForm .lf-status a");
+    return a ? a.getAttribute("href") : null;
+  });
+  check(
+    "configured+timeout: a mailto draft link to the page's own contact address is shown",
+    typeof draftHrefAfterTimeout === "string" && draftHrefAfterTimeout.indexOf("mailto:animacoffeeco@gmail.com") === 0,
+    JSON.stringify(draftHrefAfterTimeout)
+  );
+  const dataLayerAfterTimeout = await page.evaluate(() => (window.dataLayer || []).filter((e) => e && e.event === "lead_accepted"));
+  check(
+    "configured+timeout: no lead_accepted event was pushed",
+    dataLayerAfterTimeout.length === 0,
+    JSON.stringify(dataLayerAfterTimeout)
   );
   check("human submit made no network POST either", networkRequests.length === 0, JSON.stringify(networkRequests));
 
@@ -459,6 +485,11 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
   );
   const humanRoistatDataLayer = await roistatPage.evaluate(() => (window.dataLayer || []).filter((e) => e && e.event === "lead_accepted"));
   check("human Roistat submit pushed exactly one lead_accepted event", humanRoistatDataLayer.length === 1, JSON.stringify(humanRoistatDataLayer));
+  check(
+    "honest-delivery (TDD case 1): Roistat-delivered lead_accepted carries delivery_status 'unconfirmed'",
+    humanRoistatDataLayer.length === 1 && humanRoistatDataLayer[0].delivery_status === "unconfirmed",
+    JSON.stringify(humanRoistatDataLayer)
+  );
 
   // Agent submit on the same stubbed page — reset the form's own call log
   // and dataLayer aren't reset, but the count check below only cares about
@@ -546,6 +577,12 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
     /thank you|дякуємо/i.test(endpointStatus || ""),
     JSON.stringify(endpointStatus)
   );
+  const endpointDataLayer = await endpointPage.evaluate(() => (window.dataLayer || []).filter((e) => e && e.event === "lead_accepted"));
+  check(
+    "honest-delivery (TDD case 2): first-party-endpoint lead_accepted carries delivery_status 'confirmed'",
+    endpointDataLayer.length === 1 && endpointDataLayer[0].delivery_status === "confirmed",
+    JSON.stringify(endpointDataLayer)
+  );
 
   // 6. Fast-follow (2026-09-14): window.roistatGoal appears 1.5s AFTER
   // submit (a fast agent, or a human on a slow connection, racing the
@@ -603,14 +640,143 @@ const SHORT_WAIT_SRC = `window.__ROISTAT_TEST_WAIT_MS = 250;`;
   await neverReadyPage.click('#leadForm button[type="submit"]');
   await neverReadyPage.waitForTimeout(500);
   const neverReadyStatus = await neverReadyPage.textContent("#leadForm .lf-status");
-  const neverReadyHighlight = await neverReadyPage.evaluate(() => !!document.querySelector(".contact-block.lf-highlight"));
   check(
-    "roistatGoal never ready: falls back to the contact block after the wait times out",
-    /isn't wired|reach us directly/i.test(neverReadyStatus || "") || neverReadyHighlight,
-    JSON.stringify({ neverReadyStatus, neverReadyHighlight })
+    "roistatGoal never ready: shows the honest delivery-failed message (configured, not T.noBackend)",
+    /couldn't send your request automatically/i.test(neverReadyStatus || ""),
+    JSON.stringify(neverReadyStatus)
   );
   const neverReadyDataLayer = await neverReadyPage.evaluate(() => (window.dataLayer || []).filter((e) => e && e.event === "lead_accepted"));
   check("roistatGoal never ready: no lead_accepted event was pushed", neverReadyDataLayer.length === 0, JSON.stringify(neverReadyDataLayer));
+
+  // 7b. Honest-delivery (TDD case 4): roistatGoal.reach() itself THROWS
+  // (e.g. a blocker kills the call mid-flight) with Roistat ready
+  // immediately -- no (2b) wait needed. Same honest message, kept values,
+  // draft link, no lead_accepted as the timeout case above.
+  const throwsReachPage = await browser.newPage();
+  await blockRoistat(throwsReachPage);
+  await throwsReachPage.addInitScript({
+    content: `window.roistatGoal = { reach: function () { throw new Error("blocked"); } };`
+  });
+  await throwsReachPage.addInitScript({ content: POLYFILL_SRC });
+  await throwsReachPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  await throwsReachPage.fill('#leadForm input[name="name"]', "Throws Reach Human");
+  await throwsReachPage.fill('#leadForm input[name="business"]', "Throws Co");
+  await throwsReachPage.fill('#leadForm input[name="city"]', "Kyiv");
+  await throwsReachPage.fill('#leadForm input[name="contact"]', "throws@example.com");
+  await throwsReachPage.click('#leadForm button[type="submit"]');
+  await throwsReachPage.waitForTimeout(200);
+  const throwsStatus = await throwsReachPage.textContent("#leadForm .lf-status");
+  check(
+    "reach() throws: shows the honest delivery-failed message",
+    /couldn't send your request automatically/i.test(throwsStatus || ""),
+    JSON.stringify(throwsStatus)
+  );
+  const throwsNameField = await throwsReachPage.inputValue('#leadForm input[name="name"]');
+  check(
+    "reach() throws: the visitor's form values are kept, not reset",
+    throwsNameField === "Throws Reach Human",
+    JSON.stringify(throwsNameField)
+  );
+  const throwsDraftHref = await throwsReachPage.evaluate(() => {
+    var a = document.querySelector("#leadForm .lf-status a");
+    return a ? a.getAttribute("href") : null;
+  });
+  check(
+    "reach() throws: a mailto draft link to the page's own contact address is shown",
+    typeof throwsDraftHref === "string" && throwsDraftHref.indexOf("mailto:animacoffeeco@gmail.com") === 0,
+    JSON.stringify(throwsDraftHref)
+  );
+  const throwsDataLayer = await throwsReachPage.evaluate(() => (window.dataLayer || []).filter((e) => e && e.event === "lead_accepted"));
+  check("reach() throws: no lead_accepted event was pushed", throwsDataLayer.length === 0, JSON.stringify(throwsDataLayer));
+
+  // 7c. Honest-delivery (TDD case 5): Roistat NEVER configured at all
+  // (window.roistatProjectId falsy) -- the never-configured path (3) must
+  // keep showing T.noBackend unchanged; this is NOT the honest-delivery
+  // message, since no backend was ever wired on this page.
+  const unconfiguredPage = await browser.newPage();
+  await blockRoistat(unconfiguredPage);
+  await unconfiguredPage.addInitScript({ content: SHORT_WAIT_SRC });
+  await unconfiguredPage.addInitScript({ content: POLYFILL_SRC });
+  await unconfiguredPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  // assets/analytics.js sets window.roistatProjectId synchronously at page
+  // load from its own live ROISTAT_PROJECT_ID constant; delete it here,
+  // right before submit, to simulate a deployment where Roistat was never
+  // configured (lead.js's roistatConfigured() reads this dynamically).
+  await unconfiguredPage.evaluate(() => { delete window.roistatProjectId; });
+  await unconfiguredPage.fill('#leadForm input[name="name"]', "Unconfigured Human");
+  await unconfiguredPage.fill('#leadForm input[name="business"]', "Unconfigured Co");
+  await unconfiguredPage.fill('#leadForm input[name="city"]', "Kyiv");
+  await unconfiguredPage.fill('#leadForm input[name="contact"]', "unconfigured@example.com");
+  await unconfiguredPage.click('#leadForm button[type="submit"]');
+  await unconfiguredPage.waitForTimeout(200);
+  const unconfiguredStatus = await unconfiguredPage.textContent("#leadForm .lf-status");
+  check(
+    "never configured: T.noBackend is unchanged (not the honest-delivery message)",
+    /isn't wired/i.test(unconfiguredStatus || "") && !/couldn't send your request automatically/i.test(unconfiguredStatus || ""),
+    JSON.stringify(unconfiguredStatus)
+  );
+
+  // 7d. Honest-delivery (TDD case 6): a hostile value (quotes, <script>,
+  // &, newline) in a form field must stay inert in the DOM and encoded in
+  // the mailto href, never raw/executed. Reuses the reach()-throws stub so
+  // the honest-fallback path fires immediately.
+  const hostilePage = await browser.newPage();
+  await blockRoistat(hostilePage);
+  await hostilePage.addInitScript({
+    content: `window.roistatGoal = { reach: function () { throw new Error("blocked"); } };`
+  });
+  await hostilePage.addInitScript({ content: POLYFILL_SRC });
+  await hostilePage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  const HOSTILE_VALUE = 'Quote" <script>alert(1)</script> & newline\nend';
+  await hostilePage.fill('#leadForm input[name="name"]', "Hostile Human");
+  await hostilePage.fill('#leadForm input[name="business"]', "Hostile Co");
+  await hostilePage.fill('#leadForm input[name="city"]', "Kyiv");
+  await hostilePage.fill('#leadForm input[name="contact"]', "hostile@example.com");
+  await hostilePage.fill('#leadForm textarea[name="message"]', HOSTILE_VALUE);
+  await hostilePage.click('#leadForm button[type="submit"]');
+  await hostilePage.waitForTimeout(200);
+  const hostileInert = await hostilePage.evaluate(() => !document.querySelector("#leadForm .lf-status script"));
+  check("hostile value: no <script> element was injected into the DOM", hostileInert === true, JSON.stringify(hostileInert));
+  const hostileHref = await hostilePage.evaluate(() => {
+    var a = document.querySelector("#leadForm .lf-status a");
+    return a ? a.getAttribute("href") : null;
+  });
+  check(
+    "hostile value: mailto href carries the encoded form, never a raw <script> tag",
+    typeof hostileHref === "string" &&
+      hostileHref.indexOf("<script>") === -1 &&
+      hostileHref.toLowerCase().indexOf("%3cscript%3e") !== -1 &&
+      hostileHref.indexOf("%26") !== -1,
+    JSON.stringify(hostileHref)
+  );
+
+  // 7e. Honest-delivery (TDD case 7): a very long details field must leave
+  // the mailto href within the ~1800-char bound (truncating details), not
+  // an unbounded URL.
+  const longDetailsPage = await browser.newPage();
+  await blockRoistat(longDetailsPage);
+  await longDetailsPage.addInitScript({
+    content: `window.roistatGoal = { reach: function () { throw new Error("blocked"); } };`
+  });
+  await longDetailsPage.addInitScript({ content: POLYFILL_SRC });
+  await longDetailsPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  const LONG_DETAILS = "x".repeat(5000);
+  await longDetailsPage.fill('#leadForm input[name="name"]', "Long Details Human");
+  await longDetailsPage.fill('#leadForm input[name="business"]', "Long Co");
+  await longDetailsPage.fill('#leadForm input[name="city"]', "Kyiv");
+  await longDetailsPage.fill('#leadForm input[name="contact"]', "long@example.com");
+  await longDetailsPage.fill('#leadForm textarea[name="message"]', LONG_DETAILS);
+  await longDetailsPage.click('#leadForm button[type="submit"]');
+  await longDetailsPage.waitForTimeout(200);
+  const longHref = await longDetailsPage.evaluate(() => {
+    var a = document.querySelector("#leadForm .lf-status a");
+    return a ? a.getAttribute("href") : null;
+  });
+  check(
+    "very long details: mailto href stays within the ~1800-char bound",
+    typeof longHref === "string" && longHref.length <= 1900,
+    JSON.stringify({ length: longHref ? longHref.length : null })
+  );
 
   // 8. Fast-follow: two back-to-back agent submits with the SAME data must
   // produce exactly one reach() call. window.__LEAD_RESET_DELAY_MS widens
