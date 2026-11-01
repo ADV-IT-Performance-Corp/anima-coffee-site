@@ -48,6 +48,14 @@
         "notes": "Reads dataLayer.lead_origin ('human' or 'agent'), pushed by window.animaTrackLead() in assets/analytics.js."
       },
       {
+        "name": "DLV - delivery_status",
+        "type": "v",
+        "parameter": [
+          { "type": "template", "key": "name", "value": "delivery_status" }
+        ],
+        "notes": "Reads dataLayer.delivery_status ('confirmed' when a first-party endpoint returned a lead_id, 'unconfirmed' when delivery went through Roistat's fire-and-forget reach()), pushed by window.animaTrackLead() in assets/analytics.js (2026-10-31 honest-delivery slice)."
+      },
+      {
         "name": "JS - AI Referral Source",
         "type": "jsm",
         "parameter": [
@@ -145,6 +153,13 @@
                 "map": [
                   { "type": "template", "key": "parameter", "value": "lead_origin" },
                   { "type": "template", "key": "parameterValue", "value": "{{DLV - lead_origin}}" }
+                ]
+              },
+              {
+                "type": "map",
+                "map": [
+                  { "type": "template", "key": "parameter", "value": "delivery_status" },
+                  { "type": "template", "key": "parameterValue", "value": "{{DLV - delivery_status}}" }
                 ]
               }
             ]

@@ -211,7 +211,7 @@
       var data = window.animaLead.collectBase();
       data.name = name.value.trim(); data.company = ""; data.city = state.city; data.machines = "";
       data.contact = c; data.details = summary(); data.consent = true;
-      window.animaLead.submitChat(data).then(function (r) {
+      window.animaLead.submitChat(data, f).then(function (r) {
         state.sending = false;
         if (r && r.status === "accepted") { track("chatkit_lead_sent", {}); finish(false); }
         else { go.disabled = false; err.textContent = ""; fallback(); }
@@ -309,7 +309,7 @@
       else if (m.type === "tool_result" && m.tool === "save_anima_lead" && m.result && m.result.success && m.result.confirmed && !live.leadTracked) {
         // Backend confirmed durable acceptance; mirror it into analytics.
         live.leadTracked = true;
-        try { if (window.animaTrackLead) window.animaTrackLead(location.pathname, m.result.lead_id || "", "chatkit"); } catch (e) {}
+        try { if (window.animaTrackLead) window.animaTrackLead(location.pathname, m.result.lead_id || "", "chatkit", "confirmed"); } catch (e) {}
         track("chatkit_lead_sent", { mode: "live" });
       }
       else if (m.type === "session_end") { say(m.content || T.nobackend); fallback(); clearTray(); live.up = false; }
