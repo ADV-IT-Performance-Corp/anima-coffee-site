@@ -211,7 +211,7 @@
       var data = window.animaLead.collectBase();
       data.name = name.value.trim(); data.company = ""; data.city = state.city; data.machines = "";
       data.contact = c; data.details = summary(); data.consent = true;
-      window.animaLead.submitChat(data).then(function (r) {
+      window.animaLead.submitChat(data, f).then(function (r) {
         state.sending = false;
         if (r && r.status === "accepted") { track("chatkit_lead_sent", {}); finish(false); }
         else { go.disabled = false; err.textContent = ""; fallback(); }

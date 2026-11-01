@@ -79,7 +79,7 @@
         sent: "Дякуємо! Заявку отримано. Ми зв'яжемося з вами.",
         err: "Не вдалося надіслати через сайт. Скористайтесь контактами нижче — ми відповідаємо швидко.",
         noBackend: "Форма ще не підключена до нашої системи. Зв'яжіться з нами напряму — ми відповідаємо швидко:",
-        deliveryFailed: "Не вдалося надіслати заявку автоматично. Вона збережена і буде надіслана автоматично, щойно зв'язок відновиться. Можете також написати нам напряму зараз:",
+        deliveryFailed: "Не вдалося підтвердити, що заявку надіслано. Напишіть нам напряму, щоб вона не загубилася:",
         oneTap: "Надіслати ці дані в один дотик:",
         viaEmail: "Email",
         viaTelegram: "Telegram"
@@ -89,7 +89,7 @@
         sent: "Thank you! Your request has been received. We'll be in touch.",
         err: "Could not send via the site. Please use the contacts below — we reply fast.",
         noBackend: "This form isn't wired to our system yet. Reach us directly — we reply fast:",
-        deliveryFailed: "We couldn't send your request automatically. It's saved and will be sent automatically once the connection is back. You can also reach us directly right now:",
+        deliveryFailed: "We couldn't confirm your request went through. Please contact us directly so it doesn't get lost:",
         oneTap: "Send these details in one tap:",
         viaEmail: "Email",
         viaTelegram: "Telegram"
@@ -207,13 +207,42 @@
       else localStorage.removeItem(OUTBOX_KEY);
     } catch (e) {}
   }
+  function genOutboxId() {
+    return "ob_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
+  }
   function saveOutbox(data, origin) {
     try {
-      if (!data || !data.contact) return;
+      if (!data || !data.contact) return null;
+      var id = genOutboxId();
       var list = readOutbox();
-      list.push({ ts: Date.now(), origin: origin || "human", data: data });
+      list.push({ id: id, ts: Date.now(), origin: origin || "human", data: data });
       writeOutbox(list);
-    } catch (e) {}
+      return id;
+    } catch (e) { return null; }
+  }
+  function removeOutboxEntry(id) {
+    if (!id) return;
+    try { writeOutbox(readOutbox().filter(function (x) { return x.id !== id; })); } catch (e) {}
+  }
+
+  // Re-submit dedupe (v2 round 2, P2): a re-submit from the SAME form/chat
+  // instance supersedes that instance's own earlier outbox entry instead of
+  // stacking a duplicate -- otherwise a later flushOutbox() page view would
+  // send both and fire a second lead_accepted for one visitor action. Scoped
+  // to one page-load's WeakMap, so entries from earlier page views (which
+  // this instance never tracked) are never touched, and flushOutbox() itself
+  // is unchanged. `key` is the DOM form element for lead forms, or the chat
+  // widget's own form element for ChatKit.
+  var OUTBOX_PENDING = new WeakMap();
+  function supersedeOutboxFor(key, data, origin) {
+    var prev = OUTBOX_PENDING.get(key);
+    if (prev) removeOutboxEntry(prev);
+    var id = saveOutbox(data, origin);
+    if (id) OUTBOX_PENDING.set(key, id); else OUTBOX_PENDING.delete(key);
+  }
+  function clearOutboxFor(key) {
+    var prev = OUTBOX_PENDING.get(key);
+    if (prev) { removeOutboxEntry(prev); OUTBOX_PENDING.delete(key); }
   }
   function leadText(data) {
     var rows = [
@@ -292,9 +321,14 @@
   // Builds one <button type="button"> per working channel. The URL lives
   // only in this closure -- never written to href/data-*/title, so no
   // click-tracking listener can read it. On click: mailto via
-  // window.location.href; Telegram via window.open(..., "_blank",
-  // "noopener") with a window.location.href fallback if the popup was
-  // blocked (returns null). Neither ever auto-opens on render, and neither
+  // window.location.href; Telegram via window.open(url, "_blank") (NOT
+  // "noopener" -- that makes window.open() return null even when the
+  // popup opens in spec-compliant browsers, which made the old
+  // if-(!w)-fallback always fire and navigate the visitor's own tab away).
+  // w.opener is nulled manually once we have the real window reference
+  // instead. window.location.href is only the actual blocked-popup
+  // fallback (window.open returning null for real). Neither ever
+  // auto-opens on render, and neither
   // may submit the form (this is a plain <button>, no form submission is
   // wired to it at all). window.__LEAD_DRAFT_CAPTURE(channel, url) is a
   // harness-only test hook (window.__ROISTAT_TEST_WAIT_MS convention).
@@ -308,8 +342,8 @@
         try { window.__LEAD_DRAFT_CAPTURE(channel, url); } catch (e) {}
       }
       if (channel === "telegram") {
-        var w = window.open(url, "_blank", "noopener");
-        if (!w) window.location.href = url;
+        var w = window.open(url, "_blank");
+        if (w) { try { w.opener = null; } catch (e) {} } else { window.location.href = url; }
       } else {
         window.location.href = url;
       }
@@ -466,6 +500,7 @@
     var leadId = reachRoistat(data, origin);
     if (leadId) {
       fireAccepted(data.source_page, leadId, origin, "unconfirmed");
+      clearOutboxFor(form);
       // Deferred to the next tick: resetting the form synchronously, in the
       // same turn as respondWith(), was observed to break the WebMCP
       // polyfill's resolution of the returned promise (it never delivered
@@ -478,9 +513,10 @@
       return { status: "accepted", leadId: leadId };
     }
     // reach() threw (e.g. blocked mid-call) -> never claim success; keep
-    // the lead for automatic re-delivery.
+    // the lead for automatic re-delivery. A re-submit of THIS form
+    // supersedes its own earlier outbox entry instead of stacking one.
     setSending(form, false);
-    saveOutbox(data, origin);
+    supersedeOutboxFor(form, data, origin);
     return notConnectedResult();
   }
 
@@ -491,13 +527,15 @@
     setSending(form, false);
     if (leadId) {
       fireAccepted(data.source_page, leadId, origin, "unconfirmed");
+      clearOutboxFor(form);
       form.reset();
       showSent(status);
       return;
     }
     // reach() threw mid-call -- Roistat IS configured, so this is the
-    // delivery-failed case, not the never-configured one.
-    saveOutbox(data, origin);
+    // delivery-failed case, not the never-configured one. Supersedes this
+    // form's own earlier outbox entry (fix 2).
+    supersedeOutboxFor(form, data, origin);
     showDeliveryFailed(status, data);
   }
 
@@ -573,6 +611,7 @@
     }).then(function (body) {
       if (!body || !body.lead_id) { throw new Error("no_lead_id"); }
       fireAccepted(data.source_page, body.lead_id, "human", "confirmed");
+      clearOutboxFor(form);
       form.reset();
       showSent(status);
     }).catch(function () {
@@ -595,6 +634,7 @@
     }).then(function (body) {
       if (!body || !body.lead_id) { throw new Error("no_lead_id"); }
       fireAccepted(data.source_page, body.lead_id, "agent", "confirmed");
+      clearOutboxFor(form);
       form.reset();
       return { status: "accepted", leadId: body.lead_id };
     }).catch(function () {
@@ -731,7 +771,7 @@
             waitForRoistat().then(function (ready) {
               if (ready) return deliverRoistatAgent(form, data, origin);
               setSending(form, false);
-              saveOutbox(data, origin);
+              supersedeOutboxFor(form, data, origin);
               return notConnectedResult();
             })
           );
@@ -741,7 +781,7 @@
               deliverRoistatHuman(form, status, data, origin);
             } else {
               setSending(form, false);
-              saveOutbox(data, origin);
+              supersedeOutboxFor(form, data, origin);
               showDeliveryFailed(status, data);
             }
           });
@@ -749,9 +789,10 @@
         return;
       }
 
-      // (3) fallback — never configured, today's behaviour.
-      if (isAgent) { saveOutbox(data, origin); e.respondWith(Promise.resolve(notConnectedResult())); return; }
-      saveOutbox(data, origin);
+      // (3) fallback — never configured, today's behaviour. Also
+      // supersedes this form's own earlier outbox entry (fix 2).
+      if (isAgent) { supersedeOutboxFor(form, data, origin); e.respondWith(Promise.resolve(notConnectedResult())); return; }
+      supersedeOutboxFor(form, data, origin);
       showFallbackContact(status, data);
     });
   }
@@ -768,7 +809,11 @@
     return ((f && f.getAttribute("data-endpoint")) || "").trim();
   }
 
-  function submitChat(data) {
+  // `formKey` (the chat widget's own <form> element, passed by
+  // assets/chat.js) scopes the re-submit supersede (fix 2) to this chat
+  // instance -- optional so a caller with no stable key just never
+  // supersedes (falls back to saveOutbox's old stacking behaviour).
+  function submitChat(data, formKey) {
     var origin = "chatkit";
     var endpoint = chatEndpoint();
     data.lead_origin = origin;
@@ -784,6 +829,7 @@
       }).then(function (body) {
         if (!body || !body.lead_id) { throw new Error("no_lead_id"); }
         fireAccepted(data.source_page, body.lead_id, origin, "confirmed");
+        if (formKey) clearOutboxFor(formKey);
         return { status: "accepted", leadId: body.lead_id };
       }).catch(function () {
         return { status: "error", message: T.err };
@@ -791,19 +837,23 @@
     }
     function viaRoistat() {
       var leadId = reachRoistat(data, origin);
-      if (!leadId) { saveOutbox(data, origin); return notConnectedResult(); }
+      if (!leadId) {
+        if (formKey) supersedeOutboxFor(formKey, data, origin); else saveOutbox(data, origin);
+        return notConnectedResult();
+      }
       fireAccepted(data.source_page, leadId, origin, "unconfirmed");
+      if (formKey) clearOutboxFor(formKey);
       return { status: "accepted", leadId: leadId };
     }
     if (roistatReady()) return Promise.resolve(viaRoistat());
     if (roistatConfigured()) {
       return waitForRoistat().then(function (ready) {
         if (ready) return viaRoistat();
-        saveOutbox(data, origin);
+        if (formKey) supersedeOutboxFor(formKey, data, origin); else saveOutbox(data, origin);
         return notConnectedResult();
       });
     }
-    saveOutbox(data, origin);
+    if (formKey) supersedeOutboxFor(formKey, data, origin); else saveOutbox(data, origin);
     return Promise.resolve(notConnectedResult());
   }
 
