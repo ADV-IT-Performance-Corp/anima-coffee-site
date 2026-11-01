@@ -309,6 +309,11 @@ async function clickOneTapButton(pg, label) {
   // saved to the outbox, and no lead_accepted may fire.
   await page.evaluate(() => localStorage.removeItem("anima_lead_outbox_v1"));
   await page.evaluate(DRAFT_CAPTURE_SRC);
+  // Fix 5: widen the sentinel-leak scan beyond the .lf-status subtree --
+  // installed BEFORE the submit below so it captures every console message
+  // this submit produces.
+  var sentinelConsoleMessages = [];
+  page.on("console", function (msg) { sentinelConsoleMessages.push(msg.text()); });
   const SENTINEL_NAME = "Human Visitor SENTINEL_Q7x";
   await page.fill('#leadForm input[name="name"]', SENTINEL_NAME);
   await page.fill('#leadForm input[name="business"]', "Human Co");
@@ -319,7 +324,9 @@ async function clickOneTapButton(pg, label) {
   const statusText = await page.textContent("#leadForm .lf-status");
   check(
     "configured+timeout: shows the honest delivery-failed message, not T.noBackend",
-    /couldn't send your request automatically/i.test(statusText || "") && !/isn't wired/i.test(statusText || ""),
+    /couldn't confirm your request went through/i.test(statusText || "") &&
+      !/isn't wired/i.test(statusText || "") &&
+      !/sent automatically/i.test(statusText || ""),
     JSON.stringify(statusText)
   );
   const nameFieldAfterTimeout = await page.inputValue('#leadForm input[name="name"]');
@@ -339,6 +346,24 @@ async function clickOneTapButton(pg, label) {
       statusHtmlAfterTimeout.indexOf(SENTINEL_NAME) === -1 &&
       anchorHrefsAfterTimeout.every((h) => h.indexOf(SENTINEL_NAME) === -1 && h.indexOf("?") === -1),
     JSON.stringify({ anchorHrefsAfterTimeout })
+  );
+  // Fix 5: the sentinel must never leak anywhere in the WHOLE document (not
+  // just the .lf-status subtree), nor into dataLayer, nor into any console
+  // message -- a real click-tracking/error-reporting integration reads all
+  // three.
+  const sentinelWholeDocumentClean = await page.evaluate((name) => {
+    return Array.prototype.every.call(document.querySelectorAll("*"), function (el) {
+      return Array.prototype.every.call(el.attributes, function (a) { return a.value.indexOf(name) === -1; });
+    });
+  }, SENTINEL_NAME);
+  const sentinelDataLayerClean = await page.evaluate((name) => {
+    try { return JSON.stringify(window.dataLayer || []).indexOf(name) === -1; } catch (e) { return true; }
+  }, SENTINEL_NAME);
+  const sentinelConsoleClean = sentinelConsoleMessages.every(function (t) { return t.indexOf(SENTINEL_NAME) === -1; });
+  check(
+    "configured+timeout: the sentinel never leaks into any attribute of any element in the whole document, dataLayer, or any console message",
+    sentinelWholeDocumentClean && sentinelDataLayerClean && sentinelConsoleClean,
+    JSON.stringify({ sentinelWholeDocumentClean, sentinelDataLayerClean, sentinelConsoleClean, consoleCount: sentinelConsoleMessages.length })
   );
   const contactsAfterTimeout = await page.evaluate(() => ({
     tel: !!document.querySelector('#leadForm .lf-status a[href^="tel:"]'),
@@ -698,7 +723,7 @@ async function clickOneTapButton(pg, label) {
   const neverReadyStatus = await neverReadyPage.textContent("#leadForm .lf-status");
   check(
     "roistatGoal never ready: shows the honest delivery-failed message (configured, not T.noBackend)",
-    /couldn't send your request automatically/i.test(neverReadyStatus || ""),
+    /couldn't confirm your request went through/i.test(neverReadyStatus || "") && !/sent automatically/i.test(neverReadyStatus || ""),
     JSON.stringify(neverReadyStatus)
   );
   const neverReadyDataLayer = await neverReadyPage.evaluate(() => (window.dataLayer || []).filter((e) => e && e.event === "lead_accepted"));
@@ -725,7 +750,7 @@ async function clickOneTapButton(pg, label) {
   const throwsStatus = await throwsReachPage.textContent("#leadForm .lf-status");
   check(
     "reach() throws: shows the honest delivery-failed message",
-    /couldn't send your request automatically/i.test(throwsStatus || ""),
+    /couldn't confirm your request went through/i.test(throwsStatus || "") && !/sent automatically/i.test(throwsStatus || ""),
     JSON.stringify(throwsStatus)
   );
   const throwsOutbox = await throwsReachPage.evaluate(() => JSON.parse(localStorage.getItem("anima_lead_outbox_v1") || "[]"));
@@ -762,11 +787,18 @@ async function clickOneTapButton(pg, label) {
   await loneSurrogatePage.waitForTimeout(200);
   check("lone surrogate in a field: no uncaught error out of the handler", lonePageErrored === false, JSON.stringify(lonePageErrored));
   const loneStatus = await loneSurrogatePage.textContent("#leadForm .lf-status");
+  // Pinned (fix 5, not an OR of two possible strings): the lone surrogate
+  // throws out of buildChannelUrl's FIRST encodeURIComponent attempt (the
+  // untruncated text) for BOTH channels, so renderFallback() gets 0
+  // controls and downgrades to T.err -- T.deliveryFailed's wording never
+  // actually renders for this scenario, confirmed by a real run.
   check(
-    "lone surrogate in a field: the honest delivery-failed message and contacts are still shown",
-    /couldn't send your request automatically|could not send via the site/i.test(loneStatus || ""),
+    "lone surrogate in a field: the honest fallback message (T.err, no one-tap controls were buildable) and contacts are still shown",
+    /could not send via the site/i.test(loneStatus || "") && !/couldn't confirm your request went through/i.test(loneStatus || ""),
     JSON.stringify(loneStatus)
   );
+  const loneBtnCount = await loneSurrogatePage.evaluate(() => document.querySelectorAll("#leadForm .lf-status button.lf-draft-btn").length);
+  check("lone surrogate in a field: no one-tap button is shown (both channels failed to build)", loneBtnCount === 0, JSON.stringify(loneBtnCount));
   const loneHasTel = await loneSurrogatePage.evaluate(() => !!document.querySelector('#leadForm .lf-status a[href^="tel:"]'));
   check("lone surrogate in a field: tel contact still present", loneHasTel, JSON.stringify(loneHasTel));
   const loneOutbox = await loneSurrogatePage.evaluate(() => JSON.parse(localStorage.getItem("anima_lead_outbox_v1") || "[]"));
@@ -830,7 +862,22 @@ async function clickOneTapButton(pg, label) {
   emojiPage.on("pageerror", function () { emojiPageErrored = true; });
   await emojiPage.click('#leadForm button[type="submit"]');
   await emojiPage.waitForTimeout(200);
-  check("emoji straddling a truncation boundary: no throw, honest message still shown", emojiPageErrored === false, JSON.stringify(emojiPageErrored));
+  check("emoji straddling a truncation boundary: no throw", emojiPageErrored === false, JSON.stringify(emojiPageErrored));
+  const emojiStatus = await emojiPage.textContent("#leadForm .lf-status");
+  check(
+    "emoji straddling a truncation boundary: the honest delivery-failed message (T.deliveryFailed, controls DID build) is shown",
+    /couldn't confirm your request went through/i.test(emojiStatus || ""),
+    JSON.stringify(emojiStatus)
+  );
+  const emojiContacts = await emojiPage.evaluate(() => ({
+    tel: !!document.querySelector('#leadForm .lf-status a[href^="tel:"]'),
+    mail: !!document.querySelector('#leadForm .lf-status a[href^="mailto:"]')
+  }));
+  check(
+    "emoji straddling a truncation boundary: tel and mailto contact links are present",
+    emojiContacts.tel && emojiContacts.mail,
+    JSON.stringify(emojiContacts)
+  );
   const emojiDraft = await clickOneTapButton(emojiPage, T_VIA_EMAIL);
   check(
     "emoji straddling a truncation boundary: mailto href stays within the ~1800-char bound",
@@ -961,6 +1008,400 @@ async function clickOneTapButton(pg, label) {
   await checkViewportAfterDeliveryFailed(`${BASE_URL}/index.html`, "EN");
   await checkViewportAfterDeliveryFailed(`${BASE_URL}/ua/index.html`, "UA");
   await checkViewportAfterDeliveryFailed(`${BASE_URL}/pricing-model.html`, "EN-pricing-model(PR88-sticky)");
+
+  // -------------------------------------------------------------------
+  // Round-2 fixes (2026-10-31): sections 15-18 below. All run BEFORE
+  // section 8's known pre-existing hang (do not reorder past it).
+  // -------------------------------------------------------------------
+
+  // Shared helper for fix 4's agent-route-by-direct-event coverage
+  // (sections 17): dispatches a synthetic 'submit' event on #leadForm with
+  // e.agentInvoked = true and a stub e.respondWith that captures the
+  // resolved/rejected value -- exactly the shape assets/lead.js's handle()
+  // checks, bypassing the WebMCP polyfill/executeTool machinery entirely.
+  async function agentDirectSubmit(pg, fields) {
+    return pg.evaluate((fields) => {
+      return new Promise((resolve) => {
+        var form = document.getElementById("leadForm");
+        Object.keys(fields).forEach(function (k) {
+          var f = form.querySelector('[name="' + k + '"]');
+          if (f) f.value = fields[k];
+        });
+        var ev = new Event("submit", { bubbles: true, cancelable: true });
+        ev.agentInvoked = true;
+        ev.respondWith = function (p) { p.then(resolve, resolve); };
+        form.dispatchEvent(ev);
+      });
+    }, fields);
+  }
+
+  // 15. Fix 1 coverage (P1): a REAL Playwright click on the Telegram
+  // one-tap button, with NO window.open stub (unlike every other page in
+  // this suite) and t.me intercepted via page.route so nothing reaches the
+  // network. This is the exact scenario the bug lived in:
+  // window.open(url, "_blank", "noopener") returns null in spec-compliant
+  // browsers, so the OLD always-fallback branch took the visitor's own tab
+  // away from the site, leaving the form behind.
+  const telPage = await browser.newPage();
+  await blockRoistat(telPage);
+  await telPage.route(/t\.me/, (route) => route.abort());
+  await telPage.addInitScript({ content: `window.roistatGoal = { reach: function () { throw new Error("blocked"); } };` });
+  await telPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  await telPage.evaluate(() => localStorage.removeItem("anima_lead_outbox_v1"));
+  await telPage.fill('#leadForm input[name="name"]', "Real Click Human");
+  await telPage.fill('#leadForm input[name="business"]', "Real Click Co");
+  await telPage.fill('#leadForm input[name="city"]', "Kyiv");
+  await telPage.fill('#leadForm input[name="contact"]', "realclick@example.com");
+  await telPage.click('#leadForm button[type="submit"]');
+  await telPage.waitForTimeout(200);
+  const telPageUrlBefore = telPage.url();
+  const [telPopup] = await Promise.all([
+    telPage.waitForEvent("popup"),
+    telPage.locator('#leadForm .lf-status button.lf-draft-btn').filter({ hasText: "Telegram" }).click()
+  ]);
+  await telPopup.waitForLoadState("domcontentloaded").catch(() => {});
+  const telPopupUrl = telPopup.url();
+  check(
+    "real Telegram click: a real popup opened carrying the encoded t.me URL (not a same-tab navigation)",
+    telPopupUrl.indexOf("https://t.me/Animavolitiva") === 0 && telPopupUrl.indexOf("text=") !== -1,
+    JSON.stringify({ telPopupUrl })
+  );
+  check(
+    "real Telegram click: the visitor's own tab URL is unchanged",
+    telPage.url() === telPageUrlBefore,
+    JSON.stringify({ before: telPageUrlBefore, after: telPage.url() })
+  );
+  const telStatusStillVisible = await telPage.evaluate(() => !!document.querySelector("#leadForm .lf-status button.lf-draft-btn"));
+  check(
+    "real Telegram click: the status line and one-tap controls are still visible on the original page",
+    telStatusStillVisible,
+    String(telStatusStillVisible)
+  );
+  await telPopup.close().catch(() => {});
+  await telPage.close().catch(() => {});
+
+  // 15b. Fix 1 coverage: the blocked-popup case -- window.open stubbed to
+  // return null (ad blocker / popup blocker) -- the current tab must fall
+  // back to a real navigation via window.location.href, per the fixed
+  // handler (`if (w) {...} else { window.location.href = url; }`).
+  const telBlockedPage = await browser.newPage();
+  await blockRoistat(telBlockedPage);
+  var telNavRequests = [];
+  await telBlockedPage.route(/t\.me/, (route) => {
+    telNavRequests.push({ url: route.request().url(), isNav: route.request().isNavigationRequest() });
+    route.abort();
+  });
+  await telBlockedPage.addInitScript({ content: `window.roistatGoal = { reach: function () { throw new Error("blocked"); } };` });
+  await telBlockedPage.addInitScript({ content: `window.open = function () { return null; };` });
+  await telBlockedPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  await telBlockedPage.evaluate(() => localStorage.removeItem("anima_lead_outbox_v1"));
+  await telBlockedPage.fill('#leadForm input[name="name"]', "Blocked Popup Human");
+  await telBlockedPage.fill('#leadForm input[name="business"]', "Blocked Co");
+  await telBlockedPage.fill('#leadForm input[name="city"]', "Kyiv");
+  await telBlockedPage.fill('#leadForm input[name="contact"]', "blocked@example.com");
+  await telBlockedPage.click('#leadForm button[type="submit"]');
+  await telBlockedPage.waitForTimeout(200);
+  await telBlockedPage.locator('#leadForm .lf-status button.lf-draft-btn').filter({ hasText: "Telegram" }).click().catch(() => {});
+  await telBlockedPage.waitForTimeout(300);
+  check(
+    "blocked popup: window.open returning null falls back to a real top-level navigation on the current tab",
+    telNavRequests.length >= 1 && telNavRequests[0].isNav === true && telNavRequests[0].url.indexOf("https://t.me/Animavolitiva") === 0,
+    JSON.stringify(telNavRequests)
+  );
+  await telBlockedPage.close().catch(() => {});
+
+  // 16. Fix 2 coverage (P2): re-submit dedupe -- a re-submit from the SAME
+  // form/chat instance supersedes its own earlier outbox entry instead of
+  // stacking a duplicate.
+  // 16a. Form path, failure then failure: still exactly 1 entry, holding
+  // the SECOND submission's data (supersede, not stack).
+  const resubmitFailPage = await browser.newPage();
+  await blockRoistat(resubmitFailPage);
+  await resubmitFailPage.addInitScript({ content: `window.roistatGoal = { reach: function () { throw new Error("blocked"); } };` });
+  await resubmitFailPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  await resubmitFailPage.evaluate(() => localStorage.removeItem("anima_lead_outbox_v1"));
+  await resubmitFailPage.fill('#leadForm input[name="name"]', "Resubmit First");
+  await resubmitFailPage.fill('#leadForm input[name="business"]', "Resubmit Co");
+  await resubmitFailPage.fill('#leadForm input[name="city"]', "Kyiv");
+  await resubmitFailPage.fill('#leadForm input[name="contact"]', "resubmit@example.com");
+  await resubmitFailPage.click('#leadForm button[type="submit"]');
+  await resubmitFailPage.waitForTimeout(200);
+  const resubmitOutboxAfterFirst = await resubmitFailPage.evaluate(() => JSON.parse(localStorage.getItem("anima_lead_outbox_v1") || "[]"));
+  check("re-submit (form, fail then fail): 1 entry after the FIRST failure", resubmitOutboxAfterFirst.length === 1, JSON.stringify(resubmitOutboxAfterFirst));
+  await resubmitFailPage.fill('#leadForm input[name="name"]', "Resubmit Second");
+  await resubmitFailPage.click('#leadForm button[type="submit"]');
+  await resubmitFailPage.waitForTimeout(200);
+  const resubmitOutboxAfterSecond = await resubmitFailPage.evaluate(() => JSON.parse(localStorage.getItem("anima_lead_outbox_v1") || "[]"));
+  check(
+    "re-submit (form, fail then fail): still exactly 1 entry after the SECOND failure, holding the second submission's data",
+    resubmitOutboxAfterSecond.length === 1 && resubmitOutboxAfterSecond[0].data.name === "Resubmit Second",
+    JSON.stringify(resubmitOutboxAfterSecond)
+  );
+  await resubmitFailPage.close().catch(() => {});
+
+  // 16b. Form path, failure then success: 0 entries afterward -- no later
+  // flushOutbox() on another page view could ever re-send it, and no
+  // duplicate lead_accepted can fire.
+  const resubmitSuccessPage = await browser.newPage();
+  await blockRoistat(resubmitSuccessPage);
+  await resubmitSuccessPage.addInitScript({
+    content: `window.__reachOk = false; window.__roistatCalls = []; window.roistatGoal = { reach: function (p) { if (window.__reachOk) { window.__roistatCalls.push(p); return; } throw new Error("blocked"); } };`
+  });
+  await resubmitSuccessPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  await resubmitSuccessPage.evaluate(() => localStorage.removeItem("anima_lead_outbox_v1"));
+  await resubmitSuccessPage.fill('#leadForm input[name="name"]', "Resubmit Fail-Then-Succeed");
+  await resubmitSuccessPage.fill('#leadForm input[name="business"]', "Resubmit Co 2");
+  await resubmitSuccessPage.fill('#leadForm input[name="city"]', "Kyiv");
+  await resubmitSuccessPage.fill('#leadForm input[name="contact"]', "resubmit2@example.com");
+  await resubmitSuccessPage.click('#leadForm button[type="submit"]');
+  await resubmitSuccessPage.waitForTimeout(200);
+  const resubmitSuccessOutboxAfterFail = await resubmitSuccessPage.evaluate(() => JSON.parse(localStorage.getItem("anima_lead_outbox_v1") || "[]"));
+  check("re-submit (form, fail then succeed): 1 entry after the failure", resubmitSuccessOutboxAfterFail.length === 1, JSON.stringify(resubmitSuccessOutboxAfterFail));
+  await resubmitSuccessPage.evaluate(() => { window.__reachOk = true; });
+  await resubmitSuccessPage.click('#leadForm button[type="submit"]');
+  await resubmitSuccessPage.waitForTimeout(200);
+  const resubmitSuccessOutboxAfterSuccess = await resubmitSuccessPage.evaluate(() => JSON.parse(localStorage.getItem("anima_lead_outbox_v1") || "[]"));
+  check(
+    "re-submit (form, fail then succeed): 0 entries after the success",
+    resubmitSuccessOutboxAfterSuccess.length === 0,
+    JSON.stringify(resubmitSuccessOutboxAfterSuccess)
+  );
+  const resubmitReachCalls = await resubmitSuccessPage.evaluate(() => window.__roistatCalls || []);
+  check(
+    "re-submit (form, fail then succeed): exactly one reach() call total across both attempts",
+    resubmitReachCalls.length === 1,
+    JSON.stringify(resubmitReachCalls)
+  );
+  await resubmitSuccessPage.close().catch(() => {});
+
+  // 16c. Agent timeout path ((2b) wait), same form, twice -- 1 entry, not 2.
+  const resubmitAgentPage = await browser.newPage();
+  await blockRoistat(resubmitAgentPage);
+  await resubmitAgentPage.addInitScript({ content: SHORT_WAIT_SRC });
+  await resubmitAgentPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  await resubmitAgentPage.evaluate(() => localStorage.removeItem("anima_lead_outbox_v1"));
+  const agentTimeoutFields = { name: "Agent Resubmit", business: "Agent Co", city: "Kyiv", contact: "agentresubmit@example.com" };
+  const agentTimeout1 = await agentDirectSubmit(resubmitAgentPage, agentTimeoutFields);
+  await resubmitAgentPage.waitForTimeout(100);
+  const agentTimeout2 = await agentDirectSubmit(resubmitAgentPage, agentTimeoutFields);
+  await resubmitAgentPage.waitForTimeout(100);
+  const resubmitAgentOutbox = await resubmitAgentPage.evaluate(() => JSON.parse(localStorage.getItem("anima_lead_outbox_v1") || "[]"));
+  check(
+    "re-submit (agent timeout path, same form, twice): exactly 1 outbox entry, not 2",
+    Array.isArray(resubmitAgentOutbox) && resubmitAgentOutbox.length === 1,
+    JSON.stringify({ agentTimeout1, agentTimeout2, resubmitAgentOutbox })
+  );
+  await resubmitAgentPage.close().catch(() => {});
+
+  // 16d. Chat failure path re-submit, via window.animaLead.submitChat(data,
+  // formKey) directly -- this harness does not load assets/chat.js's DOM
+  // widget, so a detached <form> element stands in for the chat widget's
+  // own stable form key (exactly the shape assets/chat.js passes).
+  const chatResubmitPage = await browser.newPage();
+  await blockRoistat(chatResubmitPage);
+  await chatResubmitPage.addInitScript({
+    content: `window.__reachOk = false; window.__roistatCalls = []; window.roistatGoal = { reach: function (p) { if (window.__reachOk) { window.__roistatCalls.push(p); return; } throw new Error("blocked"); } };`
+  });
+  await chatResubmitPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  await chatResubmitPage.evaluate(() => localStorage.removeItem("anima_lead_outbox_v1"));
+  async function chatSubmit(pg, name) {
+    return pg.evaluate((name) => {
+      window.__chatFormKey = window.__chatFormKey || document.createElement("form");
+      var data = window.animaLead.collectBase();
+      data.name = name;
+      data.company = "";
+      data.city = "Kyiv";
+      data.machines = "";
+      data.contact = "chat@example.com";
+      data.details = "chat request";
+      return window.animaLead.submitChat(data, window.__chatFormKey);
+    }, name);
+  }
+  const chatFail1 = await chatSubmit(chatResubmitPage, "Chat Fail 1");
+  const chatOutboxAfterFail1 = await chatResubmitPage.evaluate(() => JSON.parse(localStorage.getItem("anima_lead_outbox_v1") || "[]"));
+  check("re-submit (chat, fail once): 1 outbox entry", chatOutboxAfterFail1.length === 1, JSON.stringify({ chatFail1, chatOutboxAfterFail1 }));
+  const chatFail2 = await chatSubmit(chatResubmitPage, "Chat Fail 2");
+  const chatOutboxAfterFail2 = await chatResubmitPage.evaluate(() => JSON.parse(localStorage.getItem("anima_lead_outbox_v1") || "[]"));
+  check(
+    "re-submit (chat, fail then fail, same formKey): still exactly 1 entry, holding the SECOND attempt's data",
+    chatOutboxAfterFail2.length === 1 && chatOutboxAfterFail2[0].data.name === "Chat Fail 2",
+    JSON.stringify(chatOutboxAfterFail2)
+  );
+  await chatResubmitPage.evaluate(() => { window.__reachOk = true; });
+  const chatSuccess = await chatSubmit(chatResubmitPage, "Chat Success");
+  const chatOutboxAfterSuccess = await chatResubmitPage.evaluate(() => JSON.parse(localStorage.getItem("anima_lead_outbox_v1") || "[]"));
+  check(
+    "re-submit (chat, fail/fail then success, same formKey): 0 entries after the success",
+    chatSuccess && chatSuccess.status === "accepted" && chatOutboxAfterSuccess.length === 0,
+    JSON.stringify({ chatSuccess, chatOutboxAfterSuccess })
+  );
+  await chatResubmitPage.close().catch(() => {});
+
+  // 17. Fix 4 coverage: agent route, by direct synthetic submit event
+  // (section E of the brief) -- bypasses the WebMCP polyfill entirely.
+  // 17a. Configured + timeout.
+  const agentDirectTimeoutPage = await browser.newPage();
+  await blockRoistat(agentDirectTimeoutPage);
+  await agentDirectTimeoutPage.addInitScript({ content: SHORT_WAIT_SRC });
+  await agentDirectTimeoutPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  await agentDirectTimeoutPage.evaluate(() => localStorage.removeItem("anima_lead_outbox_v1"));
+  const agentDirectTimeoutFields = { name: "Direct Event Timeout", business: "Direct Co", city: "Kyiv", contact: "directtimeout@example.com" };
+  const agentDirectTimeoutResult = await agentDirectSubmit(agentDirectTimeoutPage, agentDirectTimeoutFields);
+  await agentDirectTimeoutPage.waitForTimeout(100);
+  check(
+    "agent route (direct event), configured+timeout: resolves not_connected",
+    agentDirectTimeoutResult && agentDirectTimeoutResult.status === "not_connected",
+    JSON.stringify(agentDirectTimeoutResult)
+  );
+  const agentDirectTimeoutOutbox = await agentDirectTimeoutPage.evaluate(() => JSON.parse(localStorage.getItem("anima_lead_outbox_v1") || "[]"));
+  check("agent route (direct event), configured+timeout: outbox gets exactly one entry", agentDirectTimeoutOutbox.length === 1, JSON.stringify(agentDirectTimeoutOutbox));
+  const agentDirectTimeoutDataLayer = await agentDirectTimeoutPage.evaluate(() => (window.dataLayer || []).filter((e) => e && e.event === "lead_accepted"));
+  check("agent route (direct event), configured+timeout: no lead_accepted fired", agentDirectTimeoutDataLayer.length === 0, JSON.stringify(agentDirectTimeoutDataLayer));
+  await agentDirectTimeoutPage.close().catch(() => {});
+
+  // 17b. reach() throws (Roistat ready immediately, no (2b) wait needed).
+  const agentDirectThrowPage = await browser.newPage();
+  await blockRoistat(agentDirectThrowPage);
+  await agentDirectThrowPage.addInitScript({ content: `window.roistatGoal = { reach: function () { throw new Error("blocked"); } };` });
+  await agentDirectThrowPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  await agentDirectThrowPage.evaluate(() => localStorage.removeItem("anima_lead_outbox_v1"));
+  const agentDirectThrowFields = { name: "Direct Event Throw", business: "Direct Co", city: "Kyiv", contact: "directthrow@example.com" };
+  const agentDirectThrowResult = await agentDirectSubmit(agentDirectThrowPage, agentDirectThrowFields);
+  check(
+    "agent route (direct event), reach() throws: resolves not_connected",
+    agentDirectThrowResult && agentDirectThrowResult.status === "not_connected",
+    JSON.stringify(agentDirectThrowResult)
+  );
+  const agentDirectThrowOutbox = await agentDirectThrowPage.evaluate(() => JSON.parse(localStorage.getItem("anima_lead_outbox_v1") || "[]"));
+  check("agent route (direct event), reach() throws: outbox gets exactly one entry", agentDirectThrowOutbox.length === 1, JSON.stringify(agentDirectThrowOutbox));
+  const agentDirectThrowDataLayer = await agentDirectThrowPage.evaluate(() => (window.dataLayer || []).filter((e) => e && e.event === "lead_accepted"));
+  check("agent route (direct event), reach() throws: no lead_accepted fired", agentDirectThrowDataLayer.length === 0, JSON.stringify(agentDirectThrowDataLayer));
+  await agentDirectThrowPage.close().catch(() => {});
+
+  // 17c. success.
+  const agentDirectSuccessPage = await browser.newPage();
+  await blockRoistat(agentDirectSuccessPage);
+  await agentDirectSuccessPage.addInitScript({ content: `window.roistatGoal = { reach: function (p) { window.__roistatCalls = window.__roistatCalls || []; window.__roistatCalls.push(p); } };` });
+  await agentDirectSuccessPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  await agentDirectSuccessPage.evaluate(() => localStorage.removeItem("anima_lead_outbox_v1"));
+  const agentDirectSuccessFields = { name: "Direct Event Success", business: "Direct Co", city: "Kyiv", contact: "directsuccess@example.com" };
+  const agentDirectSuccessResult = await agentDirectSubmit(agentDirectSuccessPage, agentDirectSuccessFields);
+  await agentDirectSuccessPage.waitForTimeout(100);
+  check(
+    "agent route (direct event), success: resolves accepted with a lead_id",
+    agentDirectSuccessResult && agentDirectSuccessResult.status === "accepted" && !!agentDirectSuccessResult.leadId,
+    JSON.stringify(agentDirectSuccessResult)
+  );
+  const agentDirectSuccessOutbox = await agentDirectSuccessPage.evaluate(() => JSON.parse(localStorage.getItem("anima_lead_outbox_v1") || "[]"));
+  check("agent route (direct event), success: outbox stays empty", agentDirectSuccessOutbox.length === 0, JSON.stringify(agentDirectSuccessOutbox));
+  const agentDirectSuccessDataLayer = await agentDirectSuccessPage.evaluate(() => (window.dataLayer || []).filter((e) => e && e.event === "lead_accepted"));
+  check(
+    "agent route (direct event), success: lead_accepted fired with delivery_status unconfirmed",
+    agentDirectSuccessDataLayer.length === 1 && agentDirectSuccessDataLayer[0].delivery_status === "unconfirmed",
+    JSON.stringify(agentDirectSuccessDataLayer)
+  );
+  await agentDirectSuccessPage.close().catch(() => {});
+
+  // 18. Fix 4 coverage: outbox cap and expiry.
+  // 18a. Cap: seeding 3 distinct entries then one real failed submit (a
+  // 4th) keeps only the newest 3 (writeOutbox's existing .slice(-3) --
+  // this proves existing behavior still holds after the id/supersede
+  // changes, it does not change the cap).
+  const capPage = await browser.newPage();
+  await blockRoistat(capPage);
+  await capPage.addInitScript({ content: `window.roistatGoal = { reach: function () { throw new Error("blocked"); } };` });
+  await capPage.addInitScript({
+    content: `window.localStorage.setItem("anima_lead_outbox_v1", JSON.stringify([
+      { id: "seed_1", ts: Date.now() - 3000, origin: "human", data: { name: "Seed One", contact: "seed1@example.com" } },
+      { id: "seed_2", ts: Date.now() - 2000, origin: "human", data: { name: "Seed Two", contact: "seed2@example.com" } },
+      { id: "seed_3", ts: Date.now() - 1000, origin: "human", data: { name: "Seed Three", contact: "seed3@example.com" } }
+    ]));`
+  });
+  await capPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  await capPage.fill('#leadForm input[name="name"]', "Seed Four");
+  await capPage.fill('#leadForm input[name="business"]', "Cap Co");
+  await capPage.fill('#leadForm input[name="city"]', "Kyiv");
+  await capPage.fill('#leadForm input[name="contact"]', "seed4@example.com");
+  await capPage.click('#leadForm button[type="submit"]');
+  await capPage.waitForTimeout(200);
+  const capOutbox = await capPage.evaluate(() => JSON.parse(localStorage.getItem("anima_lead_outbox_v1") || "[]"));
+  check(
+    "outbox cap: a 4th entry keeps only the newest 3 (the oldest seed is dropped)",
+    capOutbox.length === 3 && capOutbox.every((x) => x.id !== "seed_1") && capOutbox.some((x) => x.data.name === "Seed Four"),
+    JSON.stringify(capOutbox)
+  );
+  await capPage.close().catch(() => {});
+
+  // 18b. Expiry: an entry older than the 7-day TTL is dropped without a
+  // re-send, and does not survive a later readOutbox()/writeOutbox()
+  // round-trip.
+  const expiryPage = await browser.newPage();
+  await blockRoistat(expiryPage);
+  await expiryPage.addInitScript({ content: `window.__roistatCalls = []; window.roistatGoal = { reach: function (p) { window.__roistatCalls.push(p); } };` });
+  await expiryPage.addInitScript({
+    content: `window.localStorage.setItem("anima_lead_outbox_v1", JSON.stringify([
+      { id: "expired_1", ts: Date.now() - (8 * 24 * 3600 * 1000), origin: "human", data: { name: "Expired Lead", contact: "expired@example.com" } }
+    ]));`
+  });
+  await expiryPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  await expiryPage.waitForTimeout(300);
+  const expiryReachCalls = await expiryPage.evaluate(() => window.__roistatCalls);
+  check("outbox expiry: the expired entry is never re-sent via reach() on page load's flushOutbox()", Array.isArray(expiryReachCalls) && expiryReachCalls.length === 0, JSON.stringify(expiryReachCalls));
+  await expiryPage.evaluate(() => { window.roistatGoal = { reach: function () { throw new Error("blocked"); } }; });
+  await expiryPage.fill('#leadForm input[name="name"]', "Fresh After Expiry");
+  await expiryPage.fill('#leadForm input[name="business"]', "Expiry Co");
+  await expiryPage.fill('#leadForm input[name="city"]', "Kyiv");
+  await expiryPage.fill('#leadForm input[name="contact"]', "freshafter@example.com");
+  await expiryPage.click('#leadForm button[type="submit"]');
+  await expiryPage.waitForTimeout(200);
+  const expiryOutboxFinal = await expiryPage.evaluate(() => JSON.parse(localStorage.getItem("anima_lead_outbox_v1") || "[]"));
+  check(
+    "outbox expiry: the expired entry does not survive a round-trip -- only the fresh submit's entry remains",
+    expiryOutboxFinal.length === 1 && expiryOutboxFinal.every((x) => x.id !== "expired_1"),
+    JSON.stringify(expiryOutboxFinal)
+  );
+  await expiryPage.close().catch(() => {});
+
+  // 19. Fix 3 coverage: both deliveryFailed strings asserted EXACTLY (not
+  // an OR of two possible strings, not a substring), on the EN page and
+  // the UA page.
+  const exactEnPage = await browser.newPage();
+  await blockRoistat(exactEnPage);
+  await exactEnPage.addInitScript({ content: `window.roistatGoal = { reach: function () { throw new Error("blocked"); } };` });
+  await exactEnPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
+  await exactEnPage.evaluate(() => localStorage.removeItem("anima_lead_outbox_v1"));
+  await exactEnPage.fill('#leadForm input[name="name"]', "Exact EN Human");
+  await exactEnPage.fill('#leadForm input[name="business"]', "Exact EN Co");
+  await exactEnPage.fill('#leadForm input[name="city"]', "Kyiv");
+  await exactEnPage.fill('#leadForm input[name="contact"]', "exacten@example.com");
+  await exactEnPage.click('#leadForm button[type="submit"]');
+  await exactEnPage.waitForTimeout(200);
+  const exactEnStatus = await exactEnPage.textContent("#leadForm .lf-status");
+  check(
+    "EN deliveryFailed copy: the exact pinned string is present verbatim",
+    (exactEnStatus || "").indexOf("We couldn't confirm your request went through. Please contact us directly so it doesn't get lost:") !== -1,
+    JSON.stringify(exactEnStatus)
+  );
+  await exactEnPage.close().catch(() => {});
+
+  const exactUaPage = await browser.newPage();
+  await blockRoistat(exactUaPage);
+  await exactUaPage.addInitScript({ content: `window.roistatGoal = { reach: function () { throw new Error("blocked"); } };` });
+  await exactUaPage.goto(`${BASE_URL}/ua/index.html`, { waitUntil: "networkidle" });
+  await exactUaPage.evaluate(() => localStorage.removeItem("anima_lead_outbox_v1"));
+  await exactUaPage.fill('#leadForm input[name="name"]', "Exact UA Human");
+  await exactUaPage.fill('#leadForm input[name="business"]', "Exact UA Co");
+  await exactUaPage.fill('#leadForm input[name="city"]', "Kyiv");
+  await exactUaPage.fill('#leadForm input[name="contact"]', "exactua@example.com");
+  await exactUaPage.click('#leadForm button[type="submit"]');
+  await exactUaPage.waitForTimeout(200);
+  const exactUaStatus = await exactUaPage.textContent("#leadForm .lf-status");
+  check(
+    "UA deliveryFailed copy: the exact pinned string is present verbatim",
+    (exactUaStatus || "").indexOf("Не вдалося підтвердити, що заявку надіслано. Напишіть нам напряму, щоб вона не загубилася:") !== -1,
+    JSON.stringify(exactUaStatus)
+  );
+  await exactUaPage.close().catch(() => {});
 
   // 8. Fast-follow: two back-to-back agent submits with the SAME data must
   // produce exactly one reach() call. window.__LEAD_RESET_DELAY_MS widens
