@@ -50,6 +50,7 @@
         err: "Не вдалося надіслати через сайт. Скористайтесь контактами нижче — ми відповідаємо швидко.",
         noBackend: "Форма ще не підключена до нашої системи. Зв'яжіться з нами напряму — ми відповідаємо швидко:",
         oneTap: "Надіслати ці дані в один дотик:",
+        pendingFull: "На цьому пристрої вже є три заявки, що очікують надсилання. Скористайтесь прямим контактом нижче.",
         viaEmail: "Email",
         viaTelegram: "Telegram"
       }
@@ -59,6 +60,7 @@
         err: "Could not send via the site. Please use the contacts below — we reply fast.",
         noBackend: "This form isn't wired to our system yet. Reach us directly — we reply fast:",
         oneTap: "Send these details in one tap:",
+        pendingFull: "There are already three pending requests on this device. Please use a direct contact below.",
         viaEmail: "Email",
         viaTelegram: "Telegram"
       };
@@ -194,13 +196,13 @@
   // No backend configured: never fake a conversion, never auto-navigate to
   // mailto. Surface the site's own contact block (tel/mailto links, already
   // rendered in the page footer) as the fallback CTA.
-  function showFallbackContact(status, data) {
+  function showFallbackContact(status, data, message) {
     var block = document.querySelector(".contact-block");
     var tel = block && block.querySelector('a[href^="tel:"]');
     var mail = block && block.querySelector('a[href^="mailto:"]');
 
     status.textContent = "";
-    status.appendChild(document.createTextNode(T.noBackend + " "));
+    status.appendChild(document.createTextNode((message || T.noBackend) + " "));
     if (tel) {
       status.appendChild(tel.cloneNode(true));
       if (mail) status.appendChild(document.createTextNode(" · "));
@@ -481,6 +483,12 @@
         JSON.stringify(intakePayload(x.data, "")) === fingerprint;
     });
     if (!item) {
+      if (list.length >= 3) {
+        var full = notConnectedResult();
+        full.message = T.pendingFull;
+        full.reason = "pending_limit";
+        return Promise.resolve(full);
+      }
       item = { id: "anima_" + crypto.randomUUID(), ts: Date.now(), origin: origin,
         endpoint: url, data: data };
       list.push(item);
@@ -494,7 +502,7 @@
     setStatus(status, T.sending, "");
     submitIntake(data, endpoint, "human").then(function (result) {
       if (result.status === "accepted") { form.reset(); showSent(status); }
-      else showFallbackContact(status, data);
+      else showFallbackContact(status, data, result.message);
       setSending(form, false);
     });
   }

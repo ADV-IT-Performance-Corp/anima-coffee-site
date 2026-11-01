@@ -212,5 +212,15 @@ class DurableLeads(unittest.TestCase):
         self.assertEqual(self.submit()['status'], 'accepted')
         self.assertEqual(self.requests[1]['idempotency_key'], first)
 
+    def test_capacity_does_not_evict_pending_server_items(self):
+        self.mode = 'lost'
+        for i in range(3):
+            self.page.evaluate("i => animaLead.submitChat({name:'Synthetic '+i, contact:'probe@example.invalid', consent:true, source_page:'/'})", i)
+        before = self.outbox()
+        result = self.submit()
+        self.assertEqual(result['reason'], 'pending_limit')
+        self.assertEqual(self.outbox(), before)
+        self.assertEqual(len(self.requests), 3)
+
 if __name__ == '__main__':
     unittest.main()

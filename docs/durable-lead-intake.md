@@ -140,3 +140,31 @@ An early Windows run of the content checker encountered host cp1252 decoding
 errors; rerunning with `PYTHONUTF8=1` passed. Restricted Playwright startup
 stalled creating Python's loopback socket pair; the permitted local-network
 run completed. Neither is production delivery evidence.
+
+## Review and handoff
+
+PR: https://github.com/ADV-IT-Performance-Corp/anima-coffee-site/pull/90
+Owner: this Codex chat, source branch `claude/anima-durable-intake-20261031`.
+Initial independent read-only review covered `4bbe2d5`: the capacity finding
+was addressed by refusing a fourth server-bound submission rather than silently
+evicting an unacknowledged item. Identical pending payloads intentionally reuse
+the same key until acceptance is acknowledged: this is the visitor's retry of
+an uncertain request. After acknowledgement a new submission gets a fresh key.
+Changed payloads also get fresh keys. No long-term person deduplication.
+
+Hosted CI on `4bbe2d5` did not start either job: GitHub reports an account lock
+caused by billing. This is an external account dependency, not a test failure
+or permission to bypass CI. No billing setting was changed.
+The optional AEO-leads check initially failed only its nested llms-full byte
+comparison: the Windows generator writes CRLF while Git stores LF. The normalized
+content has no diff. Preserve this failed observation separately from later runs.
+
+Open. Obtain the authorized Anima-owned intake URL and deployment access; verify
+Postgres and downstream receipts before endpoint activation. (code read)
+Open. Resolve the GitHub account lock, then run hosted CI on the final PR head.
+Open. Verify receiver-side deduplication, Roistat routing and autonomous retry
+using isolated destinations and restart recovery. (code read)
+Open. Run full Node/polyfill suite using `webmcp/run_headless_check.js`. (path read)
+No release, deployment or business acceptance has been observed. The existing
+browser fallback remains active in production. No OpenClaw run/session UUID,
+Anima GBrain checkpoint ingestion or remote resume receipt is available here.
