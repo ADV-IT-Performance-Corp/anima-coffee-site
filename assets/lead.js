@@ -2,16 +2,10 @@
  * docs/specs/spec-anima-aeo-client-delivery-cutover-2026-08-21.md §7 in
  * ADV-Strategy-Core).
  *
- * POSTs JSON to the URL in the form's data-endpoint attribute. No endpoint
- * URL is ever hardcoded here — data-endpoint is set per-deployment once the
- * DC-2 backend exists.
- *
- * The lead_accepted analytics conversion fires ONLY after the API answers
- * HTTP 200 with a lead_id in the body — never on a mailto: click, never
- * speculatively. When data-endpoint is empty (no backend wired yet) the form
- * does NOT fabricate a conversion and does NOT auto-open a mail client: it
- * points the visitor at the direct phone/email contact block already on the
- * page as the fallback CTA.
+ * With data-endpoint configured, maps all channels to the existing Anima
+ * intake /api/anima/lead. A validated response confirms server storage,
+ * not downstream delivery. Retries retain the same idempotency key.
+ * Without an endpoint the original Roistat/browser fallback remains.
  *
  * The hidden honeypot field (name="company_url") is injected on every
  * lead-form page by tools/add_lead_honeypot.py. If it's filled in, the
@@ -25,8 +19,7 @@
  * is byte-for-byte unchanged.
  *
  * Roistat delivery (W2, 2026-09-14): exactly one delivery path runs per
- * submit, chosen in this order — (1) data-endpoint set -> the POST path
- * above, unchanged; (2) else Roistat ready (window.roistatGoal.reach is a
+ * submit, chosen in this order — (1) data-endpoint set -> the durable intake path; (2) else Roistat ready (window.roistatGoal.reach is a
  * function, set by assets/analytics.js once its counter script has
  * loaded) -> one roistatGoal.reach() call, whose Roistat->AmoCRM
  * integration opens the CRM deal, no POST, and a client-generated lead_id
@@ -139,18 +132,24 @@
   // where it is available. Never shown as "sent" until Roistat really takes it.
   var OUTBOX_KEY = "anima_lead_outbox_v1";
   var OUTBOX_TTL_MS = 7 * 24 * 3600 * 1000;
+  var memoryOutbox = [];
+  var outboxStorageFailed = false;
   function readOutbox() {
+    var all = memoryOutbox;
     try {
-      var all = JSON.parse(localStorage.getItem(OUTBOX_KEY) || "[]");
-      var now = Date.now();
-      return Array.isArray(all) ? all.filter(function (x) { return x && x.data && now - x.ts < OUTBOX_TTL_MS; }) : [];
-    } catch (e) { return []; }
+      if (!outboxStorageFailed) all = JSON.parse(localStorage.getItem(OUTBOX_KEY) || "[]");
+    } catch (e) { outboxStorageFailed = true; }
+    var now = Date.now();
+    return Array.isArray(all) ? all.filter(function (x) {
+      return x && x.data && Number.isFinite(x.ts) && x.ts <= now && now - x.ts < OUTBOX_TTL_MS;
+    }) : [];
   }
   function writeOutbox(list) {
+    memoryOutbox = list.slice(-3);
     try {
       if (list.length) localStorage.setItem(OUTBOX_KEY, JSON.stringify(list.slice(-3)));
       else localStorage.removeItem(OUTBOX_KEY);
-    } catch (e) {}
+    } catch (e) { outboxStorageFailed = true; }
   }
   function saveOutbox(data, origin) {
     if (!data || !data.contact) return;
@@ -168,11 +167,23 @@
   }
   function flushOutbox() {
     var list = readOutbox();
+    // Purge expired PII even if no delivery channel is configured.
+    writeOutbox(list);
+    var endpoint = intakeUrl(chatEndpoint());
+    if (endpoint) {
+      list.filter(function (x) {
+        return x.endpoint === endpoint && x.id && x.data.consent === true;
+      }).forEach(sendIntake);
+      return;
+    }
     if (!list.length || !roistatConfigured()) return;
     waitForRoistat().then(function (ready) {
       if (!ready) return;
       var left = [];
       readOutbox().forEach(function (item) {
+        // A server-bound item may already be committed: never hand it to
+        // Roistat when endpoint config is removed or changes.
+        if (item.endpoint) { left.push(item); return; }
         var id = reachRoistat(item.data, item.origin);
         if (id) fireAccepted(item.data.source_page, id, item.origin); else left.push(item);
       });
@@ -397,45 +408,100 @@
     return leadId;
   }
 
-  function submitLead(form, status, data, endpoint) {
-    setStatus(status, T.sending, "");
-    fetch(endpoint, {
-      method: "POST",
+  // Reuse ADV-Strategy-Core's dedicated Anima intake. No CRM URL, token,
+  // tenant selector or secondary provider is accepted from browser input.
+  function intakeUrl(endpoint) {
+    try {
+      var u = new URL(endpoint, location.href);
+      var local = u.hostname === "127.0.0.1" || u.hostname === "localhost";
+      if ((u.protocol !== "https:" && !(local && u.protocol === "http:")) ||
+          u.pathname !== "/api/anima/lead" || u.username || u.password || u.search || u.hash) return "";
+      return u.href;
+    } catch (e) { return ""; }
+  }
+
+  function intakePayload(data, id) {
+    var contact = splitContact(data.contact || "");
+    var p = {
+      client_slug: "anima-coffee", idempotency_key: id,
+      name: data.name || "", business: data.company || "", city: data.city || "",
+      machines: data.machines || "", email: contact.email || "", phone: contact.phone || "",
+      details: data.details || "", page_slug: data.source_page || "",
+      consent: data.consent === true
+    };
+    // Referrer query strings may contain personal data; only send origin/path.
+    try { var r = new URL(data.referrer); p.referrer = r.origin + r.pathname; } catch (e) { p.referrer = ""; }
+    UTM_KEYS.forEach(function (k) { p[k] = data[k] || ""; });
+    return p;
+  }
+
+  var intakePending = {};
+  function sendIntake(item) {
+    if (intakePending[item.id]) return intakePending[item.id];
+    var controller = new AbortController();
+    var timer = setTimeout(function () { controller.abort(); }, 10000);
+    var promise = fetch(item.endpoint, {
+      method: "POST", credentials: "omit", redirect: "error", cache: "no-store",
+      referrerPolicy: "no-referrer", signal: controller.signal,
       headers: { "Accept": "application/json", "Content-Type": "application/json" },
-      body: JSON.stringify(data)
+      body: JSON.stringify(intakePayload(item.data, item.id)), keepalive: true
     }).then(function (r) {
-      if (r.status !== 200) { throw new Error("lead_not_accepted"); }
+      if (r.status !== 200) throw new Error("not_accepted");
       return r.json();
     }).then(function (body) {
-      if (!body || !body.lead_id) { throw new Error("no_lead_id"); }
-      fireAccepted(data.source_page, body.lead_id, "human");
-      form.reset();
-      showSent(status);
+      if (!body || body.status !== "accepted" ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.lead_id || "")) {
+        throw new Error("invalid_receipt");
+      }
+      // Remove only this acknowledged item; do not overwrite newer submissions.
+      writeOutbox(readOutbox().filter(function (x) { return x.id !== item.id; }));
+      fireAccepted(item.data.source_page, body.lead_id, item.origin);
+      // This is a storage receipt, not a downstream CRM delivery receipt.
+      return { status: "accepted", leadId: body.lead_id, receipt: "stored" };
     }).catch(function () {
-      setStatus(status, T.err, "err");
-    }).then(function () {
+      // The server may have committed before the response was lost. Retain
+      // the SAME key and never race this request with a Roistat beacon.
+      return notConnectedResult();
+    }).then(function (result) {
+      clearTimeout(timer);
+      delete intakePending[item.id];
+      return result;
+    });
+    intakePending[item.id] = promise;
+    return promise;
+  }
+
+  function submitIntake(data, endpoint, origin) {
+    var url = intakeUrl(endpoint);
+    if (!url || data.consent !== true || !data.contact) return Promise.resolve(notConnectedResult());
+    var list = readOutbox();
+    var fingerprint = JSON.stringify(intakePayload(data, ""));
+    var item = list.find(function (x) {
+      return x.endpoint === url && x.id && x.data.consent === true &&
+        JSON.stringify(intakePayload(x.data, "")) === fingerprint;
+    });
+    if (!item) {
+      item = { id: "anima_" + crypto.randomUUID(), ts: Date.now(), origin: origin,
+        endpoint: url, data: data };
+      list.push(item);
+      // Persist BEFORE the request; a closed tab can recover the same key.
+      writeOutbox(list);
+    }
+    return sendIntake(item);
+  }
+
+  function submitLead(form, status, data, endpoint) {
+    setStatus(status, T.sending, "");
+    submitIntake(data, endpoint, "human").then(function (result) {
+      if (result.status === "accepted") { form.reset(); showSent(status); }
+      else showFallbackContact(status, data);
       setSending(form, false);
     });
   }
 
-  // Agent path (WebMCP): same POST as submitLead, but resolves a structured
-  // result for e.respondWith() instead of writing to the DOM.
   function submitLeadAgent(form, data, endpoint) {
-    return fetch(endpoint, {
-      method: "POST",
-      headers: { "Accept": "application/json", "Content-Type": "application/json" },
-      body: JSON.stringify(data)
-    }).then(function (r) {
-      if (r.status !== 200) { throw new Error("lead_not_accepted"); }
-      return r.json();
-    }).then(function (body) {
-      if (!body || !body.lead_id) { throw new Error("no_lead_id"); }
-      fireAccepted(data.source_page, body.lead_id, "agent");
-      form.reset();
-      return { status: "accepted", leadId: body.lead_id };
-    }).catch(function () {
-      return { status: "error", message: T.err };
-    }).then(function (result) {
+    return submitIntake(data, endpoint, "agent").then(function (result) {
+      if (result.status === "accepted") form.reset();
       setSending(form, false);
       return result;
     });
@@ -526,8 +592,11 @@
 
       var data = collectData(form);
       var endpoint = (form.getAttribute("data-endpoint") || "").trim();
+      // The form discloses that submission consents to contact; chat uses
+      // its explicit checkbox. Never infer consent for old queued entries.
+      data.consent = !!form.querySelector(".lf-consent a[href]");
 
-      // (1) data-endpoint set -> POST path, unchanged.
+      // (1) Configured durable intake owns this submission exclusively.
       if (endpoint) {
         setSending(form, true);
         if (isAgent) {
@@ -604,22 +673,7 @@
     var endpoint = chatEndpoint();
     data.lead_origin = origin;
     data.lead_source = origin;
-    if (endpoint) {
-      return fetch(endpoint, {
-        method: "POST",
-        headers: { "Accept": "application/json", "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      }).then(function (r) {
-        if (r.status !== 200) { throw new Error("lead_not_accepted"); }
-        return r.json();
-      }).then(function (body) {
-        if (!body || !body.lead_id) { throw new Error("no_lead_id"); }
-        fireAccepted(data.source_page, body.lead_id, origin);
-        return { status: "accepted", leadId: body.lead_id };
-      }).catch(function () {
-        return { status: "error", message: T.err };
-      });
-    }
+    if (endpoint) return submitIntake(data, endpoint, origin);
     function viaRoistat() {
       var leadId = reachRoistat(data, origin);
       if (!leadId) { saveOutbox(data, origin); return notConnectedResult(); }
@@ -654,6 +708,8 @@
       };
     }
   };
+
+  window.addEventListener("online", flushOutbox);
 
   document.addEventListener("DOMContentLoaded", function () {
     Array.prototype.forEach.call(document.querySelectorAll("form.lead-form"), handle);
