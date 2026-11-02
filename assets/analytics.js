@@ -105,16 +105,83 @@
     } catch (e) {}
   }
 
+  // --- AI answer-engine attribution (2026-11-02). Detects, once per session
+  // (first touch wins), which AI surface sent the visitor — from the referrer
+  // host or from utm_source (ChatGPT appends utm_source=chatgpt.com to links
+  // it opens, and often strips the referrer). The label is exposed through
+  // window.animaAttribution.aiSource() for assets/lead.js, which sends it to
+  // Roistat as the `ai_source` field next to the utm_* values, and is pushed
+  // to dataLayer once as `ai_referral_detected` for GTM/GA4. Google AI
+  // Overviews / AI Mode clicks arrive as plain google.com organic and cannot
+  // be told apart client-side. No PII; values come from a fixed allowlist.
+  var AI_HOSTS = {
+    "chatgpt.com": "chatgpt", "chat.openai.com": "chatgpt",
+    "perplexity.ai": "perplexity", "gemini.google.com": "gemini",
+    "copilot.microsoft.com": "copilot", "copilot.com": "copilot",
+    "claude.ai": "claude", "grok.com": "grok", "chat.deepseek.com": "deepseek",
+    "meta.ai": "meta-ai"
+  };
+  var AI_UTM = {
+    "chatgpt": "chatgpt", "chatgpt.com": "chatgpt", "openai": "chatgpt",
+    "perplexity": "perplexity", "perplexity.ai": "perplexity",
+    "gemini": "gemini", "gemini.google.com": "gemini",
+    "copilot": "copilot", "copilot.microsoft.com": "copilot",
+    "claude": "claude", "claude.ai": "claude", "grok": "grok", "deepseek": "deepseek"
+  };
+  var AI_STORE_KEY = "anima_ai_src_v1";
+  function hostLabel(host) {
+    host = (host || "").toLowerCase().replace(/^www\./, "");
+    if (Object.prototype.hasOwnProperty.call(AI_HOSTS, host)) return AI_HOSTS[host];
+    var parts = host.split(".");
+    while (parts.length > 2) {
+      parts.shift();
+      var h = parts.join(".");
+      if (Object.prototype.hasOwnProperty.call(AI_HOSTS, h)) return AI_HOSTS[h];
+    }
+    return "";
+  }
+  function detectAiSource() {
+    var via = "", label = "";
+    try {
+      var u = new URLSearchParams(location.search).get("utm_source");
+      u = (u || "").toLowerCase();
+      if (u && Object.prototype.hasOwnProperty.call(AI_UTM, u)) { label = AI_UTM[u]; via = "utm"; }
+    } catch (e) {}
+    if (!label) {
+      try {
+        var r = document.referrer ? new URL(document.referrer) : null;
+        if (r && r.hostname !== location.hostname) { label = hostLabel(r.hostname); via = label ? "referrer" : ""; }
+      } catch (e) {}
+    }
+    return label ? { label: label, via: via } : null;
+  }
+  var aiSourceCached = "";
+  try { aiSourceCached = sessionStorage.getItem(AI_STORE_KEY) || ""; } catch (e) {}
+  if (!aiSourceCached) {
+    var hit = detectAiSource();
+    if (hit) {
+      aiSourceCached = hit.label;
+      try { sessionStorage.setItem(AI_STORE_KEY, hit.label); } catch (e) {}
+      try { window.dataLayer.push({ event: "ai_referral_detected", ai_source: hit.label, ai_source_via: hit.via, source_page: location.pathname }); } catch (e) {}
+    }
+  }
+  window.animaAttribution = { aiSource: function () { return aiSourceCached; } };
+
   // --- Conversion hook, called by lead.js ONLY after the first-party lead
   // API returns HTTP 200 with a lead_id (never on mailto: open, never
   // speculatively). No currency/value — this is a non-revenue event — and
   // no PII: source_page + lead_id only.
-  window.animaTrackLead = function (sourcePage, leadId, origin, deliveryStatus) {
+  window.animaTrackLead = function (sourcePage, leadId, origin, deliveryStatus, extra) {
     var sp = sourcePage || location.pathname;
     var leadOrigin = origin === "agent" || origin === "chatkit" ? origin : "human";
     var ds = deliveryStatus === "confirmed" || deliveryStatus === "unconfirmed" ? deliveryStatus : "";
-    try { window.dataLayer = window.dataLayer || []; window.dataLayer.push({ event: "lead_accepted", source_page: sp, lead_id: leadId || "", lead_origin: leadOrigin, delivery_status: ds }); } catch (e) {}
-    try { if (GA4_LIVE) gtag("event", "lead_accepted", { source_page: sp, lead_id: leadId || "", lead_origin: leadOrigin, delivery_status: ds }); } catch (e) {}
+    // lead_source (form | webmcp | chatkit) and ai_source (chatgpt, ...) are
+    // the same labels sent to Roistat; both come from fixed vocabularies.
+    var ls = extra && /^(form|webmcp|chatkit)$/.test(extra.lead_source || "") ? extra.lead_source : "";
+    var ai = extra && /^[a-z0-9-]{1,20}$/.test(extra.ai_source || "") ? extra.ai_source : "";
+    var ev = { source_page: sp, lead_id: leadId || "", lead_origin: leadOrigin, delivery_status: ds, lead_source: ls, ai_source: ai };
+    try { window.dataLayer = window.dataLayer || []; var o = { event: "lead_accepted" }; for (var k in ev) o[k] = ev[k]; window.dataLayer.push(o); } catch (e) {}
+    try { if (GA4_LIVE) gtag("event", "lead_accepted", ev); } catch (e) {}
     try { if (METRICA_LIVE && window.ym) ym(METRICA_ID, "reachGoal", "lead_accepted"); } catch (e) {}
   };
 })();

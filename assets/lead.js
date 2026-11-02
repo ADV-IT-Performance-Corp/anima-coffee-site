@@ -183,8 +183,36 @@
     if (mail) status.appendChild(mail.cloneNode(true));
   }
 
-  function fireAccepted(sourcePage, leadId, origin, deliveryStatus) {
-    try { if (window.animaTrackLead) window.animaTrackLead(sourcePage, leadId, origin, deliveryStatus); } catch (e) {}
+  function fireAccepted(sourcePage, leadId, origin, deliveryStatus, data) {
+    try {
+      if (window.animaTrackLead) {
+        window.animaTrackLead(sourcePage, leadId, origin, deliveryStatus, {
+          lead_source: leadSourceFor(data, origin),
+          ai_source: (data && data.ai_source) || ""
+        });
+      }
+    } catch (e) {}
+  }
+
+  // End-to-end source label sent to Roistat (and GA4/GTM): which channel the
+  // lead came through. chatkit = the on-site chat; webmcp = a browser agent
+  // submitted the form, or a WebMCP prefill tool tagged the visit
+  // (utm_source=ai-agent / utm_medium=webmcp, see assets/webmcp.js) and the
+  // visitor pressed submit; form = the plain form. The traffic origin (which
+  // AI answer engine sent the visitor) is the separate ai_source field.
+  function leadSourceFor(data, origin) {
+    if (origin === "chatkit") return "chatkit";
+    if (origin === "agent") return "webmcp";
+    if (data && (data.utm_medium === "webmcp" || data.utm_source === "ai-agent")) return "webmcp";
+    return "form";
+  }
+
+  // AI answer-engine the visit came from (chatgpt, perplexity, gemini, ...),
+  // detected once per session by assets/analytics.js from the referrer host or
+  // utm_source. "" when unknown. Google AI Overviews clicks arrive as plain
+  // google.com organic and cannot be told apart client-side.
+  function aiSource() {
+    try { return (window.animaAttribution && window.animaAttribution.aiSource()) || ""; } catch (e) { return ""; }
   }
 
   // Backup lead channel (no server needed). A lead that could not be handed to
@@ -261,7 +289,7 @@
         var left = [];
         readOutbox().forEach(function (item) {
           var id = reachRoistat(item.data, item.origin);
-          if (id) fireAccepted(item.data.source_page, id, item.origin, "unconfirmed"); else left.push(item);
+          if (id) fireAccepted(item.data.source_page, id, item.origin, "unconfirmed", item.data); else left.push(item);
         });
         writeOutbox(left);
       });
@@ -499,7 +527,7 @@
   function deliverRoistatAgent(form, data, origin) {
     var leadId = reachRoistat(data, origin);
     if (leadId) {
-      fireAccepted(data.source_page, leadId, origin, "unconfirmed");
+      fireAccepted(data.source_page, leadId, origin, "unconfirmed", data);
       clearOutboxFor(form);
       // Deferred to the next tick: resetting the form synchronously, in the
       // same turn as respondWith(), was observed to break the WebMCP
@@ -526,7 +554,7 @@
     var leadId = reachRoistat(data, origin);
     setSending(form, false);
     if (leadId) {
-      fireAccepted(data.source_page, leadId, origin, "unconfirmed");
+      fireAccepted(data.source_page, leadId, origin, "unconfirmed", data);
       clearOutboxFor(form);
       form.reset();
       showSent(status);
@@ -574,9 +602,22 @@
   // real reach call — caller falls through to the fallback path on null).
   function reachRoistat(data, origin) {
     var leadId = genLeadId();
+    var leadSource = leadSourceFor(data, origin);
+    var ai = data.ai_source || "";
+    // Attribution also goes into the free-text comment: Roistat custom fields
+    // only reach amoCRM when mapped there, the comment always does.
+    var attribution = ["lead_source=" + leadSource];
+    if (ai) attribution.push("ai_source=" + ai);
+    ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "gclid"].forEach(function (k) {
+      if (data[k]) attribution.push(k + "=" + data[k]);
+    });
+    if (data.referrer) attribution.push("referrer=" + data.referrer);
+    if (data.source_page) attribution.push("page=" + data.source_page);
+    var leadName = buildLeadName(data, origin);
+    if (ai) leadName += " [AI: " + ai + "]";
     var payload = {
-      leadName: buildLeadName(data, origin),
-      text: data.details,
+      leadName: leadName,
+      text: (data.details ? data.details + "\n\n" : "") + "[" + attribution.join("; ") + "]",
       name: data.name,
       fields: {
         company: data.company,
@@ -585,7 +626,15 @@
         details: data.details,
         source_page: data.source_page,
         lead_origin: origin,
-        lead_source: origin === "chatkit" ? "chatkit" : "form",
+        lead_source: leadSource,
+        ai_source: ai,
+        utm_source: data.utm_source || "",
+        utm_medium: data.utm_medium || "",
+        utm_campaign: data.utm_campaign || "",
+        utm_term: data.utm_term || "",
+        utm_content: data.utm_content || "",
+        gclid: data.gclid || "",
+        referrer: data.referrer || "",
         lead_id: leadId
       }
     };
@@ -610,7 +659,7 @@
       return r.json();
     }).then(function (body) {
       if (!body || !body.lead_id) { throw new Error("no_lead_id"); }
-      fireAccepted(data.source_page, body.lead_id, "human", "confirmed");
+      fireAccepted(data.source_page, body.lead_id, "human", "confirmed", data);
       clearOutboxFor(form);
       form.reset();
       showSent(status);
@@ -633,7 +682,7 @@
       return r.json();
     }).then(function (body) {
       if (!body || !body.lead_id) { throw new Error("no_lead_id"); }
-      fireAccepted(data.source_page, body.lead_id, "agent", "confirmed");
+      fireAccepted(data.source_page, body.lead_id, "agent", "confirmed", data);
       clearOutboxFor(form);
       form.reset();
       return { status: "accepted", leadId: body.lead_id };
@@ -684,7 +733,8 @@
       utm_campaign: utm.utm_campaign || "",
       utm_term: utm.utm_term || "",
       utm_content: utm.utm_content || "",
-      gclid: utm.gclid || ""
+      gclid: utm.gclid || "",
+      ai_source: aiSource()
     };
   }
 
@@ -828,7 +878,7 @@
         return r.json();
       }).then(function (body) {
         if (!body || !body.lead_id) { throw new Error("no_lead_id"); }
-        fireAccepted(data.source_page, body.lead_id, origin, "confirmed");
+        fireAccepted(data.source_page, body.lead_id, origin, "confirmed", data);
         if (formKey) clearOutboxFor(formKey);
         return { status: "accepted", leadId: body.lead_id };
       }).catch(function () {
@@ -841,7 +891,7 @@
         if (formKey) supersedeOutboxFor(formKey, data, origin); else saveOutbox(data, origin);
         return notConnectedResult();
       }
-      fireAccepted(data.source_page, leadId, origin, "unconfirmed");
+      fireAccepted(data.source_page, leadId, origin, "unconfirmed", data);
       if (formKey) clearOutboxFor(formKey);
       return { status: "accepted", leadId: leadId };
     }
@@ -869,7 +919,8 @@
         utm_campaign: utm.utm_campaign || "",
         utm_term: utm.utm_term || "",
         utm_content: utm.utm_content || "",
-        gclid: utm.gclid || ""
+        gclid: utm.gclid || "",
+        ai_source: aiSource()
       };
     }
   };
