@@ -638,16 +638,16 @@ async function clickOneTapButton(pg, label) {
   const endpointPage = await browser.newPage();
   await blockRoistat(endpointPage);
   await endpointPage.addInitScript({ content: ROISTAT_STUB_SRC });
-  await endpointPage.route("**/fake-lead-endpoint", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ lead_id: "srv_test_1" }) })
+  await endpointPage.route("**/api/anima/lead", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ status: "accepted", lead_id: "11111111-1111-4111-8111-111111111111" }) })
   );
   var endpointPostRequests = [];
   endpointPage.on("request", (req) => {
-    if (req.method() === "POST" && req.url().includes("fake-lead-endpoint")) endpointPostRequests.push(req.url());
+    if (req.method() === "POST" && req.url().includes("api/anima/lead")) endpointPostRequests.push(req.url());
   });
   await endpointPage.goto(`${BASE_URL}/index.html`, { waitUntil: "networkidle" });
   await endpointPage.evaluate(() => {
-    document.getElementById("leadForm").setAttribute("data-endpoint", "/fake-lead-endpoint");
+    document.getElementById("leadForm").setAttribute("data-endpoint", "/api/anima/lead");
   });
   await endpointPage.fill('#leadForm input[name="name"]', "Endpoint Human");
   await endpointPage.fill('#leadForm input[name="business"]', "Endpoint Co");
