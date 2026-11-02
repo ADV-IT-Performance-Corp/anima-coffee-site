@@ -189,6 +189,20 @@ def check_llms_full_sync():
     return []
 
 
+def check_llms_txt_links():
+    """Every aeo.animacoffee.com.ua URL listed in llms.txt must resolve to a file."""
+    fails = []
+    text = (ROOT / "llms.txt").read_text(encoding="utf-8")
+    for m in re.finditer(r"https://aeo\.animacoffee\.com\.ua/([^\s)#]*)", text):
+        rel = m.group(1)
+        target = ROOT / (rel or "index.html")
+        if target.is_dir():
+            target = target / "index.html"
+        if not target.exists():
+            fails.append(f"llms.txt links to missing file: {rel}")
+    return fails
+
+
 def check_redirect_stubs():
     fails = []
     for p in all_html_pages():
@@ -872,6 +886,7 @@ CHECKS = [
     ("every sitemap URL resolves to a file", check_sitemap_urls_exist),
     ("every indexable page has a Markdown twin", check_md_twins),
     ("llms-full.txt in sync with generator", check_llms_full_sync),
+    ("every URL in llms.txt resolves to a file", check_llms_txt_links),
     ("every old-slug stub is well-formed", check_redirect_stubs),
     ("no unconfirmed roaster name (Covim) anywhere", check_no_unconfirmed_roaster_name),
     ("pricing-model page pair exists, has lead form, no price figures, FAQ matches visible copy", check_pricing_model_page_complete),
