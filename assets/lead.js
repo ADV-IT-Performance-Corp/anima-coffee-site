@@ -2,7 +2,9 @@
  * docs/specs/spec-anima-aeo-client-delivery-cutover-2026-08-21.md §7 in
  * ADV-Strategy-Core).
  *
- * POSTs JSON to the URL in the form's data-endpoint attribute. No endpoint
+ * With data-endpoint set to the Anima intake (/api/anima/lead) every channel
+ * is mapped to its schema with a stable idempotency key; a validated response
+ * confirms server storage, not downstream delivery. Otherwise: POSTs JSON to the URL in the form's data-endpoint attribute. No endpoint
  * URL is ever hardcoded here — data-endpoint is set per-deployment once the
  * DC-2 backend exists.
  *
@@ -81,6 +83,7 @@
         noBackend: "Форма ще не підключена до нашої системи. Зв'яжіться з нами напряму — ми відповідаємо швидко:",
         deliveryFailed: "Не вдалося підтвердити, що заявку надіслано. Напишіть нам напряму, щоб вона не загубилася:",
         oneTap: "Надіслати ці дані в один дотик:",
+        pendingFull: "На цьому пристрої вже є три заявки, що очікують надсилання. Скористайтесь прямим контактом нижче:",
         viaEmail: "Email",
         viaTelegram: "Telegram"
       }
@@ -91,6 +94,7 @@
         noBackend: "This form isn't wired to our system yet. Reach us directly — we reply fast:",
         deliveryFailed: "We couldn't confirm your request went through. Please contact us directly so it doesn't get lost:",
         oneTap: "Send these details in one tap:",
+        pendingFull: "There are already three pending requests on this device. Please use a direct contact below:",
         viaEmail: "Email",
         viaTelegram: "Telegram"
       };
@@ -222,18 +226,26 @@
   // where it is available. Never shown as "sent" until Roistat really takes it.
   var OUTBOX_KEY = "anima_lead_outbox_v1";
   var OUTBOX_TTL_MS = 7 * 24 * 3600 * 1000;
+  // In-memory mirror so a server-bound item still retries within this page
+  // view when localStorage is denied.
+  var memoryOutbox = [];
+  var outboxStorageFailed = false;
   function readOutbox() {
+    var all = memoryOutbox;
     try {
-      var all = JSON.parse(localStorage.getItem(OUTBOX_KEY) || "[]");
-      var now = Date.now();
-      return Array.isArray(all) ? all.filter(function (x) { return x && x.data && now - x.ts < OUTBOX_TTL_MS; }) : [];
-    } catch (e) { return []; }
+      if (!outboxStorageFailed) all = JSON.parse(localStorage.getItem(OUTBOX_KEY) || "[]");
+    } catch (e) { outboxStorageFailed = true; }
+    var now = Date.now();
+    return Array.isArray(all) ? all.filter(function (x) {
+      return x && x.data && Number.isFinite(x.ts) && x.ts <= now && now - x.ts < OUTBOX_TTL_MS;
+    }) : [];
   }
   function writeOutbox(list) {
+    memoryOutbox = list.slice(-3);
     try {
       if (list.length) localStorage.setItem(OUTBOX_KEY, JSON.stringify(list.slice(-3)));
       else localStorage.removeItem(OUTBOX_KEY);
-    } catch (e) {}
+    } catch (e) { outboxStorageFailed = true; }
   }
   function genOutboxId() {
     return "ob_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
@@ -283,11 +295,23 @@
   function flushOutbox() {
     try {
       var list = readOutbox();
+      // Purge expired PII even if no delivery channel is configured.
+      writeOutbox(list);
+      var endpoint = intakeUrl(chatEndpoint());
+      if (endpoint) {
+        list.filter(function (x) {
+          return x.endpoint === endpoint && x.id && x.data.consent === true;
+        }).forEach(sendIntake);
+        return;
+      }
       if (!list.length || !roistatConfigured()) return;
       waitForRoistat().then(function (ready) {
         if (!ready) return;
         var left = [];
         readOutbox().forEach(function (item) {
+          // A server-bound item may already be committed: never hand it to
+          // Roistat when endpoint config is removed or changes.
+          if (item.endpoint) { left.push(item); return; }
           var id = reachRoistat(item.data, item.origin);
           if (id) fireAccepted(item.data.source_page, id, item.origin, "unconfirmed", item.data); else left.push(item);
         });
@@ -401,9 +425,9 @@
   // downgraded to T.err if NEITHER one-tap control could be built, since
   // deliveryFailed's wording promises a path that doesn't exist without at
   // least one working control.
-  function renderFallback(status, data, deliveryFailed) {
+  function renderFallback(status, data, deliveryFailed, override) {
     var controls = buildOneTapControls(data);
-    var message = deliveryFailed ? (controls.length ? T.deliveryFailed : T.err) : T.noBackend;
+    var message = override || (deliveryFailed ? (controls.length ? T.deliveryFailed : T.err) : T.noBackend);
     var block = document.querySelector(".contact-block");
     status.textContent = "";
     status.appendChild(document.createTextNode(message + " "));
@@ -443,8 +467,8 @@
   // shows the honest deliveryFailed copy, keeps the visitor's typed values
   // (no form.reset()), and the lead stays in the outbox for automatic
   // re-send. Never fires lead_accepted.
-  function showDeliveryFailed(status, data) {
-    renderFallback(status, data, true);
+  function showDeliveryFailed(status, data, override) {
+    renderFallback(status, data, true, override);
   }
 
   // Double-submit guard: disables the submit button AND marks the form
@@ -648,47 +672,107 @@
     return leadId;
   }
 
-  function submitLead(form, status, data, endpoint) {
-    setStatus(status, T.sending, "");
-    fetch(endpoint, {
-      method: "POST",
+  // Reuse ADV-Strategy-Core's dedicated Anima intake. No CRM URL, token,
+  // tenant selector or secondary provider is accepted from browser input.
+  function intakeUrl(endpoint) {
+    try {
+      var u = new URL(endpoint, location.href);
+      var local = u.hostname === "127.0.0.1" || u.hostname === "localhost";
+      if ((u.protocol !== "https:" && !(local && u.protocol === "http:")) ||
+          u.pathname !== "/api/anima/lead" || u.username || u.password || u.search || u.hash) return "";
+      return u.href;
+    } catch (e) { return ""; }
+  }
+
+  function intakePayload(data, id) {
+    var contact = splitContact(data.contact || "");
+    var p = {
+      client_slug: "anima-coffee", idempotency_key: id,
+      name: data.name || "", business: data.company || "", city: data.city || "",
+      machines: data.machines || "", email: contact.email || "", phone: contact.phone || "",
+      details: data.details || "", page_slug: data.source_page || "",
+      consent: data.consent === true
+    };
+    // Referrer query strings may contain personal data; only send origin/path.
+    try { var r = new URL(data.referrer); p.referrer = r.origin + r.pathname; } catch (e) { p.referrer = ""; }
+    UTM_KEYS.forEach(function (k) { p[k] = data[k] || ""; });
+    return p;
+  }
+
+  var intakePending = {};
+  function sendIntake(item) {
+    if (intakePending[item.id]) return intakePending[item.id];
+    var controller = new AbortController();
+    var timer = setTimeout(function () { controller.abort(); }, 10000);
+    var promise = fetch(item.endpoint, {
+      method: "POST", credentials: "omit", redirect: "error", cache: "no-store",
+      referrerPolicy: "no-referrer", signal: controller.signal,
       headers: { "Accept": "application/json", "Content-Type": "application/json" },
-      body: JSON.stringify(data)
+      body: JSON.stringify(intakePayload(item.data, item.id)), keepalive: true
     }).then(function (r) {
-      if (r.status !== 200) { throw new Error("lead_not_accepted"); }
+      if (r.status !== 200) throw new Error("not_accepted");
       return r.json();
     }).then(function (body) {
-      if (!body || !body.lead_id) { throw new Error("no_lead_id"); }
-      fireAccepted(data.source_page, body.lead_id, "human", "confirmed", data);
-      clearOutboxFor(form);
-      form.reset();
-      showSent(status);
+      if (!body || body.status !== "accepted" ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.lead_id || "")) {
+        throw new Error("invalid_receipt");
+      }
+      // Remove only this acknowledged item; do not overwrite newer submissions.
+      writeOutbox(readOutbox().filter(function (x) { return x.id !== item.id; }));
+      // A storage receipt, not a downstream CRM delivery receipt.
+      fireAccepted(item.data.source_page, body.lead_id, item.origin, "confirmed", item.data);
+      return { status: "accepted", leadId: body.lead_id, receipt: "stored" };
     }).catch(function () {
-      setStatus(status, T.err, "err");
-    }).then(function () {
+      // The server may have committed before the response was lost. Retain
+      // the SAME key and never race this request with a Roistat beacon.
+      return notConnectedResult();
+    }).then(function (result) {
+      clearTimeout(timer);
+      delete intakePending[item.id];
+      return result;
+    });
+    intakePending[item.id] = promise;
+    return promise;
+  }
+
+  function submitIntake(data, endpoint, origin) {
+    var url = intakeUrl(endpoint);
+    if (!url || data.consent !== true || !data.contact) return Promise.resolve(notConnectedResult());
+    var list = readOutbox();
+    var fingerprint = JSON.stringify(intakePayload(data, ""));
+    var item = list.find(function (x) {
+      return x.endpoint === url && x.id && x.data.consent === true &&
+        JSON.stringify(intakePayload(x.data, "")) === fingerprint;
+    });
+    if (!item) {
+      if (list.length >= 3) {
+        var full = notConnectedResult();
+        full.message = T.pendingFull;
+        full.reason = "pending_limit";
+        return Promise.resolve(full);
+      }
+      item = { id: "anima_" + crypto.randomUUID(), ts: Date.now(), origin: origin,
+        endpoint: url, data: data };
+      list.push(item);
+      // Persist BEFORE the request; a reload can recover the same key.
+      writeOutbox(list);
+    }
+    return sendIntake(item);
+  }
+
+  function submitLead(form, status, data, endpoint) {
+    setStatus(status, T.sending, "");
+    submitIntake(data, endpoint, "human").then(function (result) {
+      if (result.status === "accepted") { form.reset(); showSent(status); }
+      else showDeliveryFailed(status, data, result.reason === "pending_limit" ? result.message : undefined);
       setSending(form, false);
     });
   }
 
-  // Agent path (WebMCP): same POST as submitLead, but resolves a structured
-  // result for e.respondWith() instead of writing to the DOM.
+  // Agent path (WebMCP): structured result for e.respondWith().
   function submitLeadAgent(form, data, endpoint) {
-    return fetch(endpoint, {
-      method: "POST",
-      headers: { "Accept": "application/json", "Content-Type": "application/json" },
-      body: JSON.stringify(data)
-    }).then(function (r) {
-      if (r.status !== 200) { throw new Error("lead_not_accepted"); }
-      return r.json();
-    }).then(function (body) {
-      if (!body || !body.lead_id) { throw new Error("no_lead_id"); }
-      fireAccepted(data.source_page, body.lead_id, "agent", "confirmed", data);
-      clearOutboxFor(form);
-      form.reset();
-      return { status: "accepted", leadId: body.lead_id };
-    }).catch(function () {
-      return { status: "error", message: T.err };
-    }).then(function (result) {
+    return submitIntake(data, endpoint, "agent").then(function (result) {
+      if (result.status === "accepted") form.reset();
       setSending(form, false);
       return result;
     });
@@ -781,8 +865,11 @@
 
       var data = collectData(form);
       var endpoint = (form.getAttribute("data-endpoint") || "").trim();
+      // The form discloses that submission consents to contact; chat uses
+      // its explicit checkbox. Never infer consent for old queued entries.
+      data.consent = !!form.querySelector(".lf-consent a[href]");
 
-      // (1) data-endpoint set -> POST path, unchanged.
+      // (1) Configured durable intake owns this submission exclusively.
       if (endpoint) {
         setSending(form, true);
         if (isAgent) {
@@ -868,23 +955,7 @@
     var endpoint = chatEndpoint();
     data.lead_origin = origin;
     data.lead_source = origin;
-    if (endpoint) {
-      return fetch(endpoint, {
-        method: "POST",
-        headers: { "Accept": "application/json", "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      }).then(function (r) {
-        if (r.status !== 200) { throw new Error("lead_not_accepted"); }
-        return r.json();
-      }).then(function (body) {
-        if (!body || !body.lead_id) { throw new Error("no_lead_id"); }
-        fireAccepted(data.source_page, body.lead_id, origin, "confirmed", data);
-        if (formKey) clearOutboxFor(formKey);
-        return { status: "accepted", leadId: body.lead_id };
-      }).catch(function () {
-        return { status: "error", message: T.err };
-      });
-    }
+    if (endpoint) return submitIntake(data, endpoint, origin);
     function viaRoistat() {
       var leadId = reachRoistat(data, origin);
       if (!leadId) {
@@ -924,6 +995,8 @@
       };
     }
   };
+
+  window.addEventListener("online", flushOutbox);
 
   document.addEventListener("DOMContentLoaded", function () {
     Array.prototype.forEach.call(document.querySelectorAll("form.lead-form"), handle);

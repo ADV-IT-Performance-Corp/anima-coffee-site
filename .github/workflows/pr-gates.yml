@@ -33,3 +33,18 @@ jobs:
         run: python3 tools/check_md_twin_subset.py
       - name: Chat widget guards
         run: python3 -m unittest tools.test_chat_widget
+
+  durable-lead-browser:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the tested browser harness
+        run: |
+          python -m pip install playwright==1.50.0
+          python -m playwright install --with-deps chromium
+      - name: Test Anima intake with local receivers only
+        run: python -m unittest -v tools.test_durable_leads
