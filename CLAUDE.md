@@ -40,11 +40,9 @@ supplied in one delivery.
 
 **Service promises (the only ones allowed):** 24/7 support line; on breakdown
 a technician arrives within 24 hours or a replacement machine is provided
-(same-day where possible); delivery/installation within 24 hours; weekly
-resupply of beans/consumables and weekly technician quality visit;
+(same-day where possible); delivery/installation within 24 hours;
 staff/barista training included (no fixed duration — never say "2-hour
-training"); online analytics dashboard (cups sold, revenue, stock, errors);
-water filtration and maintenance included; 5-stage onboarding (planning →
+training"); water filtration and maintenance included; 5-stage onboarding (planning →
 setup → training → first-week quality check → first-month review); loyalty
 tiers Bronze/Silver/Gold.
 - There is NO "2-hour SLA" / "2-hour emergency response". Never write it.
@@ -57,9 +55,8 @@ line used to carry):** individual quote per venue; three equipment
 packages — Start, Pro, Max — matched to the venue format; pricing is quoted
 per venue only. Never publish package contents or price figures for
 Start/Pro/Max — those are quote-time details the owner gives per client, not
-site copy. Free 14-day trial without prepayment and free installation +
-first week of product for shops/kiosks remain valid (the 2026-09-01
-questionnaire did not touch them). NOT a published "flat monthly invoice /
+site copy. Free 14-day trial without prepayment remains valid (the
+2026-09-01 questionnaire did not touch it). NOT a published "flat monthly invoice /
 zero-CapEx subscription" — never present pricing as a fixed monthly fee, and
 never quote USD/EUR price figures.
 
@@ -68,6 +65,21 @@ never quote USD/EUR price figures.
   percentage) — retracted, do not offer or imply one.
 - "free first rental month for HoReCa" / any HoReCa-specific free-month
   offer — retracted, do not reintroduce under any wording.
+
+**MUST NOT appear (unconfirmed by owner, removed 2026-11-02):**
+- Weekly resupply of beans/consumables and the weekly technician quality
+  visit (UA "щотижнев…") — do not publish them or substitute another
+  cadence (daily, monthly, "regular", "scheduled visits").
+- Online analytics dashboard / client statistics (cups sold, revenue,
+  stock, errors), telemetry, "дашборд" — no dashboard of any kind.
+- Free installation and free first week of product for shops/kiosks (the
+  2026-09-01 questionnaire did not confirm it). The 14-day trial stays.
+- Named customer testimonials and any testimonials section or nav/anchor
+  link to one (the named owner/barista quotes formerly on the home and
+  about pages, llms.txt, WebMCP and chat answers). Names deliberately not
+  spelled out here: the literal names trip the testimonials gate.
+  `tools/check_testimonials.py` fails the build if a testimonial block or a
+  known persona reappears.
 
 **Proof points that are true and allowed:** on the market since 2015;
 1,700+ active B2B clients (owner questionnaire 2026-09-01, applied in PR
@@ -90,9 +102,11 @@ volume commitments, less fresh coffee, opaque contracts). Anima's honest
 differentiator: fresh roasting + managed rental/service + one-stop supply
 in a single bundle. Never attribute competitors' stats to Anima.
 
-**Testimonials:** all named personas (Oksana T./V., Dmytro V., Olena K./M.,
-Oleg T., anonymous "Ops Manager" variants) are INVENTED — remove on sight.
-Real interviews exist internally but have no publication consent yet.
+**Testimonials:** none are published. Earlier named personas (Oksana T./V.,
+Dmytro V., Olena K./M., Oleg T., "Ops Manager" variants) were INVENTED and
+the later named quotes are unconfirmed (see the 2026-11-02 MUST NOT list) —
+remove on sight. Real interviews exist internally but have no publication
+consent yet.
 
 **Brand voice (client's own):** "Оренда та повний сервіс кавомашин у
 Київській області", "Кавове обладнання, що працює на ваш прибуток".

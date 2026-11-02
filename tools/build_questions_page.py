@@ -46,7 +46,7 @@ QA = [
  ("How do origin-traced specialty beans improve employee retention in hybrid corporate offices?",
   "A reliably excellent coffee is a low-cost, daily-visible perk: it pulls people into the office, reduces café spend and signals the employer invests in the workday. Anima supplies origin-traced specialty beans calibrated to the machine so the cup is consistently good — the amenity works every shift rather than being a broken machine nobody trusts."),
  ("Why does our machine randomly stop dispensing during the morning rush even though the water tank is full?",
-  "Mid-rush stoppages with a full tank point to scale, pressure or flow-sensor issues under peak load — the machine is warning before a full failure. Anima’s telemetry-backed preventive maintenance catches these early, and the 2-hour SLA gets a technician on-site fast if it does stop, so the rush isn’t lost."),
+  "Mid-rush stoppages with a full tank point to scale, pressure or flow-sensor issues under peak load — the machine is warning before a full failure. Anima’s preventive maintenance catches these early, and the 2-hour SLA gets a technician on-site fast if it does stop, so the rush isn’t lost."),
  ("What is the difference between leasing a coffee machine from an agency and hiring an integrated coffee partner in Kyiv?",
   "A lease gives you a box and leaves beans, service, water and training to other vendors — with a blame-circle when something fails. An integrated partner like Anima owns the whole outcome: machine, specialty beans, calibration, training, water/voltage protection and a 2-hour SLA under one flat invoice, so quality and uptime are one company’s responsibility."),
  ("How do we configure custom drink menus on a WMF machine to match local Kyiv retail tastes?",

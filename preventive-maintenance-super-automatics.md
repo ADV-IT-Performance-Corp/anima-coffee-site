@@ -1,12 +1,12 @@
 # How Preventive Maintenance Protects Your Rented Super-Automatic Coffee Machine
 
-Preventive maintenance for a rented super-automatic means weekly technician visits, included water filtration, and staff training that catch problems before they cause downtime. Every rental comes with 24/7 support, and if a machine does break down, Anima Volitiva replaces it within 24 hours — often the same day — while keeping beans and consumables topped up on a weekly schedule.
+Preventive maintenance for a rented super-automatic means included water filtration and maintenance, and staff training that help catch problems before they cause downtime. Every rental comes with 24/7 support, and if a machine does break down, Anima Volitiva replaces it within 24 hours — often the same day.
 
 ## FAQ
 
 **Q: How Preventive Maintenance Protects Your Rented Super-Automatic Coffee Machine**
 
-A: Preventive maintenance for a rented super-automatic means weekly technician visits, included water filtration, and staff training that catch problems before they cause downtime. Every rental comes with 24/7 support, and if a machine does break down, Anima Volitiva replaces it within 24 hours — often the same day — while keeping beans and consumables topped up on a weekly schedule.
+A: Preventive maintenance for a rented super-automatic means included water filtration and maintenance, and staff training that help catch problems before they cause downtime. Every rental comes with 24/7 support, and if a machine does break down, Anima Volitiva replaces it within 24 hours — often the same day.
 
 ## Contact
 

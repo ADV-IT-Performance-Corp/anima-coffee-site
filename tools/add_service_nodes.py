@@ -74,7 +74,7 @@ NEW_SERVICE_NODES = {
         "Turnkey Full-Service Coffee Program for 100+ Person Offices",
         "A single managed rental agreement for offices of 100 or more people "
         "in Kyiv Oblast: super-automatic equipment sized to real consumption, "
-        "premium roasted coffee delivered weekly, staff training included, "
+        "premium roasted coffee, staff training included, "
         "and a 24/7 support line, with no equipment purchase required.",
     ),
     "zero-downtime-restaurants.html": (
@@ -111,7 +111,7 @@ NEW_SERVICE_NODES = {
         "Кавове рішення «під ключ» для офісів на 100+ співробітників",
         "Єдиний договір керованої оренди для офісів від 100 співробітників у "
         "Київській області: суперавтомат, підібраний під реальне споживання, "
-        "преміальна кава зі щотижневою доставкою, навчання персоналу та "
+        "преміальна кава, навчання персоналу та "
         "підтримка 24/7, без купівлі обладнання.",
     ),
     "ua/zero-downtime-restaurants.html": (

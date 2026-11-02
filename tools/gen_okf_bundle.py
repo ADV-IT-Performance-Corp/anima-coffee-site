@@ -179,7 +179,7 @@ def update_llms_txt(llms_txt_path):
     content = llms_txt_path.read_text(encoding="utf-8")
     if BUNDLE_LINE in content:
         return
-    marker = "\n## Customer testimonials"
+    marker = "\n## Pages"
     idx = content.find(marker)
     if idx == -1:
         # Fallback: append at end of file (still exactly one new line).

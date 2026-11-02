@@ -81,13 +81,6 @@ claims:
     current_site_wording: "Free first rental month for HoReCa clients"
     where_used: "hero sections, terms blocks, llms.txt key facts"
 
-  free_install_first_week_retail:
-    status: PENDING_OWNER
-    definition_required:
-      - "Confirm 'free installation and first product week' still applies for shops/kiosks and define scope."
-    current_site_wording: "Free installation and first product week for shops/kiosks"
-    where_used: "CLAUDE.md source-of-truth notes; verify actual page wording matches before shipping"
-
   price_tiers:
     status: PENDING_OWNER
     value: 3
