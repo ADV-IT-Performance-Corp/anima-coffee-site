@@ -188,6 +188,24 @@ def check_webmcp_js():
     return errors
 
 
+def check_webmcp_sources():
+    """Every source page a WebMCP answer cites must exist in EN and UA, and
+    every claim_id must be a registry-style id (claim-anima-...)."""
+    text = (ROOT / "assets" / "webmcp.js").read_text(encoding="utf-8")
+    errors = []
+    pages = set(re.findall(r'(?:page:\s*|"claim-anima-[a-z0-9-]+":\s*)"(answers/[^"]+\.html)"', text))
+    for pg in sorted(pages):
+        for prefix in ("", "ua/"):
+            if not (ROOT / (prefix + pg)).exists():
+                errors.append(f"assets/webmcp.js cites missing page: {prefix}{pg}")
+    for cid in set(re.findall(r'claim:\s*"([^"]+)"', text)):
+        if not re.fullmatch(r"claim-anima-[a-z0-9-]+", cid):
+            errors.append(f"assets/webmcp.js: malformed claim_id {cid!r}")
+    if not pages:
+        errors.append("assets/webmcp.js: no source pages found (pattern drift?)")
+    return errors
+
+
 ROISTAT_CONST_RE = re.compile(r'\bROISTAT_PROJECT_ID\s*=')
 
 
@@ -237,6 +255,7 @@ def main():
         errors.extend(check_toolparam_scope(path))
 
     errors.extend(check_webmcp_js())
+    errors.extend(check_webmcp_sources())
     errors.extend(check_roistat_wiring())
 
     for e in errors:

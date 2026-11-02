@@ -56,6 +56,30 @@
         "notes": "Reads dataLayer.delivery_status ('confirmed' when a first-party endpoint returned a lead_id, 'unconfirmed' when delivery went through Roistat's fire-and-forget reach()), pushed by window.animaTrackLead() in assets/analytics.js (2026-10-31 honest-delivery slice)."
       },
       {
+        "name": "DLV - lead_source",
+        "type": "v",
+        "parameter": [
+          { "type": "template", "key": "name", "value": "lead_source" }
+        ],
+        "notes": "Reads dataLayer.lead_source (form | webmcp | chatkit), pushed by window.animaTrackLead(); the same label is sent to Roistat as fields.lead_source."
+      },
+      {
+        "name": "DLV - ai_source",
+        "type": "v",
+        "parameter": [
+          { "type": "template", "key": "name", "value": "ai_source" }
+        ],
+        "notes": "Reads dataLayer.ai_source (chatgpt, perplexity, gemini, copilot, claude, grok, deepseek, meta-ai), detected in assets/analytics.js from the referrer host or utm_source; the same value is sent to Roistat as fields.ai_source."
+      },
+      {
+        "name": "DLV - ai_source_via",
+        "type": "v",
+        "parameter": [
+          { "type": "template", "key": "name", "value": "ai_source_via" }
+        ],
+        "notes": "Reads dataLayer.ai_source_via (referrer | utm) from the ai_referral_detected event."
+      },
+      {
         "name": "JS - AI Referral Source",
         "type": "jsm",
         "parameter": [
@@ -117,6 +141,21 @@
           }
         ],
         "notes": "Fires on page view only when document.referrer host matches one of the six named AI surfaces."
+      },
+      {
+        "triggerId": "5",
+        "name": "CE - ai_referral_detected",
+        "type": "customEvent",
+        "customEventFilter": [
+          {
+            "type": "equals",
+            "parameter": [
+              { "type": "template", "key": "arg0", "value": "{{_event}}" },
+              { "type": "template", "key": "arg1", "value": "ai_referral_detected" }
+            ]
+          }
+        ],
+        "notes": "Pushed once per session by assets/analytics.js when the visit came from an AI answer engine (referrer host OR utm_source, e.g. ChatGPT's utm_source=chatgpt.com). Complements the referrer-only PV - AI Referral trigger."
       }
     ],
     "tag": [
@@ -160,6 +199,20 @@
                 "map": [
                   { "type": "template", "key": "parameter", "value": "delivery_status" },
                   { "type": "template", "key": "parameterValue", "value": "{{DLV - delivery_status}}" }
+                ]
+              },
+              {
+                "type": "map",
+                "map": [
+                  { "type": "template", "key": "parameter", "value": "lead_source" },
+                  { "type": "template", "key": "parameterValue", "value": "{{DLV - lead_source}}" }
+                ]
+              },
+              {
+                "type": "map",
+                "map": [
+                  { "type": "template", "key": "parameter", "value": "ai_source" },
+                  { "type": "template", "key": "parameterValue", "value": "{{DLV - ai_source}}" }
                 ]
               }
             ]
@@ -214,6 +267,43 @@
           }
         ],
         "firingTriggerId": ["4"]
+      },
+      {
+        "tagId": "5",
+        "name": "GA4 Event - ai_referral_detected",
+        "type": "gaawe",
+        "parameter": [
+          { "type": "template", "key": "eventName", "value": "ai_referral_detected" },
+          { "type": "template", "key": "measurementIdOverride", "value": "{{GA4 Measurement ID}}" },
+          {
+            "type": "list",
+            "key": "eventParameters",
+            "list": [
+              {
+                "type": "map",
+                "map": [
+                  { "type": "template", "key": "parameter", "value": "ai_source" },
+                  { "type": "template", "key": "parameterValue", "value": "{{DLV - ai_source}}" }
+                ]
+              },
+              {
+                "type": "map",
+                "map": [
+                  { "type": "template", "key": "parameter", "value": "ai_source_via" },
+                  { "type": "template", "key": "parameterValue", "value": "{{DLV - ai_source_via}}" }
+                ]
+              },
+              {
+                "type": "map",
+                "map": [
+                  { "type": "template", "key": "parameter", "value": "source_page" },
+                  { "type": "template", "key": "parameterValue", "value": "{{DLV - source_page}}" }
+                ]
+              }
+            ]
+          }
+        ],
+        "firingTriggerId": ["5"]
       }
     ],
     "builtInVariable": [
