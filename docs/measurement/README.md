@@ -13,6 +13,14 @@ that gap without touching any HTML, `analytics.js`, `webmcp.js` or JSON-LD.
 > `GA4_ID` in `assets/analytics.js` a placeholder: setting it would load GA4 a
 > second time and double-count every event.
 
+> **Yandex Metrica counters (checked 2026-11-02).** Two independent counters
+> load on the site. `101507598` is loaded by `assets/analytics.js`
+> (`METRICA_ID`, goal `lead_accepted`). `112262293` is **not** in this repo: it
+> is loaded by two Custom HTML tags inside GTM `GTM-MQQNGFTV` (init on all page
+> views with webvisor/clickmap; goal `form_custom` on the `form_submit`
+> trigger). Both send page views. Do not remove `112262293` without the owner's
+> decision; if Metrica totals look doubled, this is why.
+
 No real IDs are in this repo. `docs/measurement/gtm-ga4-import.json` uses the
 placeholder `G-XXXXXXXXXX` for the GA4 Measurement ID; you paste the real one
 during import (step 2 below).
