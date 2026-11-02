@@ -45,6 +45,10 @@ What the pack adds:
 | `GA4 Event - cta_click` | GA4 event | Custom event `cta_click` | Sends the `channel` param (phone / telegram / form). **Pending**: the sticky-CTA slice that pushes this event to `dataLayer` hasn't landed yet — importing this tag now is safe (it just won't fire until that slice ships), so you don't need a second import round trip |
 | `GA4 Event - ai_referral` | GA4 event | Page view, gated by a referrer-host check | Sends `ai_source` (the matched host) when `document.referrer` is one of `chatgpt.com`, `chat.openai.com`, `perplexity.ai`, `gemini.google.com`, `copilot.microsoft.com`, `claude.ai` |
 
+| `GA4 Event - ai_referral_detected` | GA4 event | Custom event `ai_referral_detected` | Pushed once per session by `assets/analytics.js` (2026-11-02) from the referrer host **or** `utm_source` (ChatGPT strips the referrer but adds `utm_source=chatgpt.com`). Params `ai_source`, `ai_source_via`, `source_page`. Google AI Overviews clicks look like organic google.com and are not detectable |
+
+`lead_accepted` now also carries `lead_source` (`form` / `webmcp` / `chatkit`) and `ai_source`. The same two labels, plus `utm_*`, `gclid` and `referrer`, are sent to Roistat in `roistatGoal.reach()` (custom fields and a bracketed line in the deal comment), so the lead is attributable in Roistat and amoCRM even when the visit had no Roistat-recognised source.
+
 Nothing in `analytics.js` changes — `lead_accepted` is already pushed to
 `dataLayer` by `window.animaTrackLead()` (with `source_page` and
 `lead_origin` params); this pack just adds the GA4-side tag/trigger that
