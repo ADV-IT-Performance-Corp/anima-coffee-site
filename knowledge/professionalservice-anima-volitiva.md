@@ -1,7 +1,7 @@
 ---
 type: "ProfessionalService"
 title: "Anima Volitiva"
-description: "Coffee machine rental and full-service coffee programs for offices, HoReCa and retail across Kyiv & Kyiv Oblast — Dr. Coffee and Necta super-automatics, professional espresso machines, weekly resupply and 24/7 support. On the market since 2015, with 1,700+ active B2B clients."
+description: "Coffee machine rental and full-service coffee programs for offices, HoReCa and retail across Kyiv & Kyiv Oblast — Dr. Coffee and Necta super-automatics, professional espresso machines and 24/7 support. On the market since 2015, with 1,700+ active B2B clients."
 resource: "https://aeo.animacoffee.com.ua/index.html"
 tags: [okf, professionalservice, schema.org]
 timestamp: "2026-09-25"
@@ -9,7 +9,7 @@ timestamp: "2026-09-25"
 
 # Anima Volitiva
 
-Coffee machine rental and full-service coffee programs for offices, HoReCa and retail across Kyiv & Kyiv Oblast — Dr. Coffee and Necta super-automatics, professional espresso machines, weekly resupply and 24/7 support. On the market since 2015, with 1,700+ active B2B clients.
+Coffee machine rental and full-service coffee programs for offices, HoReCa and retail across Kyiv & Kyiv Oblast — Dr. Coffee and Necta super-automatics, professional espresso machines and 24/7 support. On the market since 2015, with 1,700+ active B2B clients.
 
 - @id — https://aeo.animacoffee.com.ua/#localbusiness
 - address — @type: PostalAddress; addressCountry: UA; addressLocality: Bila Tserkva; addressRegion: Kyiv Oblast; streetAddress: 29a Pavlichenko St.

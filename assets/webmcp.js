@@ -4,8 +4,8 @@
  * buyer questions and hand a quote request to the visitor, using ONLY facts
  * already VISIBLE on the live site / llms.txt. It never invents a fact:
  * anything not published (water hardness, liability, contract length,
- * multi-location accounts, POS/cashless, exact maintenance cadence beyond
- * "weekly", staff training curriculum/duration, package contents, prices) is
+ * multi-location accounts, POS/cashless, maintenance cadence,
+ * staff training curriculum/duration, package contents, prices) is
  * answered as "not published" and the agent is told to put the question in
  * the lead request instead.
  *
@@ -126,9 +126,9 @@
       uk: "Без обов'язкового мінімуму. Розрахунок базується на вашому реальному обсязі в межах одного з трьох пакетів обладнання, без мінімальної щомісячної кількості."
     },
     {
-      re: /water filtration|maintenance included|weekly (visit|resupply|service|technician)|фільтрація води|щотижнев/i,
-      en: "Water filtration and maintenance are included with every machine, plus weekly resupply of beans/consumables and a weekly technician quality visit.",
-      uk: "Фільтрація води та обслуговування входять у кожен апарат, а також щотижневе поповнення кави/витратних матеріалів і щотижневий технічний візит."
+      re: /water filtration|maintenance included|фільтрація води|обслуговування включено/i,
+      en: "Water filtration and maintenance are included with every machine.",
+      uk: "Фільтрація води та обслуговування входять у кожен апарат."
     },
     // Brands / models / equipment lineup — published in llms.txt and on the
     // site. Checked before the generic support/technician matcher.
@@ -172,11 +172,6 @@
       re: /barista|staff training|do (we|i) need (a )?barista|training included|бариста|навчання персоналу/i,
       en: "Staff training is included with every installation — no dedicated barista hire needed.",
       uk: "Навчання персоналу входить у кожну інсталяцію — окремий бариста не потрібен."
-    },
-    {
-      re: /testimonial|review|feedback|what (do|are) (customers?|clients?) sa(y|ying)|відгук|клієнти кажуть|відгуки клієнтів/i,
-      en: "Real customer quotes: \"We're very happy with the coffee and the service ... it's worth every penny!\" — Oleksii, grocery store owner. \"Now I focus on growing the business, not on repairs. Guests noticed the difference — and started coming back.\" — Coffee shop owner. Full list with sources: https://aeo.animacoffee.com.ua/#testimonials",
-      uk: "Реальні відгуки клієнтів: «Кавою і обслуговуванням дуже задоволені. ... Вартує своїх коштів!» — Олексій, власники продуктового магазину. «Тепер я фокусуюсь на розвитку, а не на ремонтах. Гості відчули різницю - і стали повертатись.» — Власник кав'ярні. Повний список із джерелами: https://aeo.animacoffee.com.ua/ua/#testimonials"
     }
   ];
 

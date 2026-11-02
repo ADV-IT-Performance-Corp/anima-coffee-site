@@ -213,17 +213,27 @@ async function clickOneTapButton(pg, label) {
     JSON.stringify(hoursVsCoverageResult)
   );
 
-  // 1f. Codex round-3 fix: "technician" appears in both the weekly-visit
-  // fact and the breakdown fact — the more specific weekly-visit ask must
-  // win.
+  // 1f. Removed claims (owner, 2026-11-02): a weekly technician visit is NOT a
+  // published fact. The tool must not affirm it; water filtration and
+  // maintenance (which are published) must resolve to maintenance, not
+  // breakdown coverage.
   const weeklyVisitResult = await callTool("get_anima_service_info", {
     question: "Do you include a weekly technician quality visit?",
     language: "en"
   });
   check(
-    "get_anima_service_info resolves the weekly-visit question to maintenance, not breakdown coverage",
-    weeklyVisitResult && weeklyVisitResult.published === true && /weekly/i.test(weeklyVisitResult.answer || ""),
+    "get_anima_service_info does not affirm a weekly technician visit (unconfirmed claim)",
+    weeklyVisitResult && !/weekly/i.test(weeklyVisitResult.answer || ""),
     JSON.stringify(weeklyVisitResult)
+  );
+  const filtrationResult = await callTool("get_anima_service_info", {
+    question: "Is water filtration and maintenance included?",
+    language: "en"
+  });
+  check(
+    "get_anima_service_info resolves water filtration and maintenance to maintenance, not breakdown coverage",
+    filtrationResult && filtrationResult.published === true && /filtration/i.test(filtrationResult.answer || "") && !/weekly/i.test(filtrationResult.answer || ""),
+    JSON.stringify(filtrationResult)
   );
 
   // 1g. Codex round-4 fix: "minimum contract length" stays unpublished,

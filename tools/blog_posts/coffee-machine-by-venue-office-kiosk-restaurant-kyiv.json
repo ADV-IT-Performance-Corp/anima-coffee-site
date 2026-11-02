@@ -53,7 +53,7 @@
          "Restaurant, cafe, hotel",
          "Barista",
          "Professional espresso (La Spaziale, Nuova Simonelli, Rancilio, Iberital, Astoria, Fiorenzato)",
-         "Trained barista, calibration, weekly quality visit"
+         "Trained barista, calibration"
         ]
        ]
       }
@@ -84,7 +84,7 @@
    [
     "Do not forget water, coffee and consumables",
     [
-     "Equipment is only a part of the cup. Water filtration and maintenance are included in our service, premium roasted coffee is resupplied weekly, and tea, cups, sugar, syrups and napkins can come in the same delivery, so one supplier is responsible for the whole result. See [maintenance](../maintenance.html)."
+     "Equipment is only a part of the cup. Water filtration and maintenance are included in our service, and tea, cups, sugar, syrups and napkins can come in the same delivery, so one supplier is responsible for the whole result. See [maintenance](../maintenance.html)."
     ]
    ],
    [
@@ -162,7 +162,7 @@
          "Ресторан, кафе, готель",
          "Бариста",
          "Професійні еспресо-машини (La Spaziale, Nuova Simonelli, Rancilio, Iberital, Astoria, Fiorenzato)",
-         "Навчений бариста, калібрування, щотижневий візит для перевірки якості"
+         "Навчений бариста, калібрування"
         ]
        ]
       }
@@ -193,7 +193,7 @@
    [
     "Не забудьте про воду, каву та витратні матеріали",
     [
-     "Обладнання — лише частина чашки. Водопідготовка й обслуговування входять у наш сервіс, преміальна обсмажена кава поповнюється щотижня, а чай, стаканчики, цукор, сиропи та серветки можуть приїхати тією ж поставкою, тож за весь результат відповідає один постачальник. Дивіться [обслуговування](../maintenance.html)."
+     "Обладнання — лише частина чашки. Водопідготовка й обслуговування входять у наш сервіс, а чай, стаканчики, цукор, сиропи та серветки можуть приїхати тією ж поставкою, тож за весь результат відповідає один постачальник. Дивіться [обслуговування](../maintenance.html)."
     ]
    ],
    [

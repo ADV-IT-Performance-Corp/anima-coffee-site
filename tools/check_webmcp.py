@@ -55,6 +55,19 @@ FORBIDDEN_SIGNATURES = [
     "flat rate monthly",
     "swiss-grade",
     "swiss machines",
+    # Unconfirmed by the owner, removed 2026-11-02 (CLAUDE.md "MUST NOT appear").
+    "weekly",
+    "щотижнев",
+    "analytics dashboard",
+    "sales dashboard",
+    "дашборд",
+    "панель аналітики",
+    "панель продажів",
+    "free installation",
+    "безкоштовне встановлення",
+    "first week of product",
+    "перший тиждень продукту",
+    "testimonial",
 ]
 
 FORM_RE = re.compile(r'<form\b[^>]*class="lead-form"[^>]*>', re.S)

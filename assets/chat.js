@@ -34,7 +34,7 @@
     qs: [["service", "Що входить у сервіс?"], ["terms", "Умови та ціна"], ["trial", "Пробний період"], ["machines", "Які апарати?"]],
     lead: "Залишити заявку",
     a: {
-      service: "Підтримка 24/7. У разі поломки техніка приїздить протягом 24 годин або ми надаємо апарат на заміну. Доставка та встановлення протягом 24 годин, щотижневе поповнення зерна й витратних матеріалів, щотижневий візит техніка, навчання персоналу, онлайн-панель продажів і вода з фільтрацією та обслуговуванням.",
+      service: "Підтримка 24/7. У разі поломки техніка приїздить протягом 24 годин або ми надаємо апарат на заміну. Доставка та встановлення протягом 24 годин, навчання персоналу, фільтрація води та обслуговування.",
       terms: "Індивідуальний розрахунок під ваш заклад і обсяг. Є три пакети обладнання — Start, Pro, Max — підбираємо під формат закладу. Вартість менеджер називає після розрахунку, фіксованих цін на сайті немає.",
       trial: "Безкоштовний 14-денний тест без передоплати.",
       machines: "Суперавтомати Dr. Coffee та Necta, а також професійні еспресо-машини La Spaziale, Nuova Simonelli, Rancilio, Iberital, Astoria та Fiorenzato. Конкретну модель менеджер підбере під ваш заклад."
@@ -57,7 +57,7 @@
     qs: [["service", "What does service include?"], ["terms", "Terms and price"], ["trial", "Free trial"], ["machines", "Which machines?"]],
     lead: "Leave a request",
     a: {
-      service: "24/7 support line. On a breakdown a technician arrives within 24 hours or we provide a replacement machine. Delivery and installation within 24 hours, weekly resupply of beans and consumables, a weekly technician visit, staff training, an online sales dashboard, and water filtration with maintenance.",
+      service: "24/7 support line. On a breakdown a technician arrives within 24 hours or we provide a replacement machine. Delivery and installation within 24 hours, staff training, and water filtration with maintenance.",
       terms: "Individual quote for your venue and volume. There are three equipment packages — Start, Pro, Max — matched to the venue format. A manager gives the price after the quote; there are no fixed prices on the site.",
       trial: "A free 14-day trial with no prepayment.",
       machines: "Dr. Coffee and Necta super-automatics, plus professional espresso machines from La Spaziale, Nuova Simonelli, Rancilio, Iberital, Astoria and Fiorenzato. A manager picks the exact model for your venue."

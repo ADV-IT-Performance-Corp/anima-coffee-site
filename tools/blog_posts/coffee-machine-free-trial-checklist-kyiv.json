@@ -49,7 +49,7 @@
    [
     "5. Look at data, not only at impressions",
     [
-     "Ask the supplier what you will be able to see. Our service includes an online analytics dashboard with cups sold, revenue, stock and errors. Compare it with your baseline from step 1: did the queue shorten, did complaints drop, did anyone run out of something at the wrong moment.",
+     "Ask the supplier what you will be able to see. Compare it with your baseline from step 1: did the queue shorten, did complaints drop, did anyone run out of something at the wrong moment.",
      "If a supplier cannot show you any data about your own machine, you will be guessing again after the trial."
     ]
    ],
@@ -68,7 +68,7 @@
         [
          "Coffee quality",
          "Taste at the busiest hour compared with your current coffee",
-         "Premium roasted coffee with weekly resupply"
+         "Premium roasted coffee"
         ],
         [
          "Ease of use",
@@ -99,7 +99,7 @@
   ],
   "outro_h": "Who the trial suits",
   "outro": [
-   "We run trials for HoReCa, offices and retail across Kyiv and Kyiv Oblast, with Dr. Coffee and Necta super-automatics and professional espresso machines from La Spaziale, Nuova Simonelli, Rancilio, Iberital, Astoria and Fiorenzato, together with premium roasted coffee, weekly resupply and a weekly technician quality visit. Not sure which machine suits your venue? Read [which coffee machine for an office, a kiosk or a restaurant](coffee-machine-by-venue-office-kiosk-restaurant-kyiv.html).",
+   "We run trials for HoReCa, offices and retail across Kyiv and Kyiv Oblast, with Dr. Coffee and Necta super-automatics and professional espresso machines from La Spaziale, Nuova Simonelli, Rancilio, Iberital, Astoria and Fiorenzato, together with premium roasted coffee. Not sure which machine suits your venue? Read [which coffee machine for an office, a kiosk or a restaurant](coffee-machine-by-venue-office-kiosk-restaurant-kyiv.html).",
    "Call +38 (073) 873 01 45 (Mon-Sat 09:00-17:00) or leave a request, and we will propose a trial setup for your venue."
   ],
   "sources_h": "Sources and where to read more",
@@ -160,7 +160,7 @@
    [
     "5. Дивіться на дані, а не лише на враження",
     [
-     "Спитайте постачальника, що саме ви зможете бачити. До нашого сервісу входить онлайн-дашборд аналітики: продані чашки, виручка, залишки та помилки. Порівняйте його з вашим початковим рівнем із кроку 1: чи скоротилася черга, чи зменшилась кількість скарг, чи щось закінчувалося не в той момент.",
+     "Спитайте постачальника, що саме ви зможете бачити. Порівняйте його з вашим початковим рівнем із кроку 1: чи скоротилася черга, чи зменшилась кількість скарг, чи щось закінчувалося не в той момент.",
      "Якщо постачальник не може показати жодних даних про вашу власну машину, після тесту ви знову гадатимете."
     ]
    ],
@@ -179,7 +179,7 @@
         [
          "Якість кави",
          "Смак у найзавантаженішу годину порівняно з поточною кавою",
-         "Преміальна обсмажена кава з щотижневим поповненням"
+         "Преміальна обсмажена кава"
         ],
         [
          "Зручність",
@@ -210,7 +210,7 @@
   ],
   "outro_h": "Кому підійде тест",
   "outro": [
-   "Ми проводимо тести для HoReCa, офісів і роздробу в Києві та Київській області: суперавтомати Dr. Coffee та Necta, професійні еспресо-машини La Spaziale, Nuova Simonelli, Rancilio, Iberital, Astoria та Fiorenzato, а також преміальна обсмажена кава, щотижневе поповнення й щотижневий візит техніка для перевірки якості. Не знаєте, яка машина підійде? Прочитайте [яка кавомашина для офісу, кіоску чи ресторану](coffee-machine-by-venue-office-kiosk-restaurant-kyiv.html).",
+   "Ми проводимо тести для HoReCa, офісів і роздробу в Києві та Київській області: суперавтомати Dr. Coffee та Necta, професійні еспресо-машини La Spaziale, Nuova Simonelli, Rancilio, Iberital, Astoria та Fiorenzato, а також преміальна обсмажена кава. Не знаєте, яка машина підійде? Прочитайте [яка кавомашина для офісу, кіоску чи ресторану](coffee-machine-by-venue-office-kiosk-restaurant-kyiv.html).",
    "Телефонуйте +38 (073) 873 01 45 (пн-сб 09:00-17:00) або залиште заявку, і ми запропонуємо варіант тесту під ваш заклад."
   ],
   "sources_h": "Джерела та де читати далі",
