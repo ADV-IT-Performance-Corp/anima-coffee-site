@@ -6,6 +6,13 @@ is installed on every page. GA4 is **not** configured inside it on purpose
 counting — see the comment block at the top of that file). This pack closes
 that gap without touching any HTML, `analytics.js`, `webmcp.js` or JSON-LD.
 
+> **Status (2026-11-02):** GA4 is already configured inside the live GTM
+> container `GTM-MQQNGFTV` (Google tag + GA4 event tag `form_custom`), with
+> Measurement ID `G-JTPW4MN3CR` (read from the public `gtm.js`). So the import
+> steps below are only needed to rebuild the container from scratch. Keep
+> `GA4_ID` in `assets/analytics.js` a placeholder: setting it would load GA4 a
+> second time and double-count every event.
+
 No real IDs are in this repo. `docs/measurement/gtm-ga4-import.json` uses the
 placeholder `G-XXXXXXXXXX` for the GA4 Measurement ID; you paste the real one
 during import (step 2 below).
