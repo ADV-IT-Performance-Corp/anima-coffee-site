@@ -219,6 +219,32 @@ def check_webmcp_sources():
     return errors
 
 
+def check_webmcp_catalog():
+    """assets/webmcp-catalog.json is the allow-list of claim ids WebMCP answers may
+    cite; every claim id in webmcp.js must be in it, every source page must exist."""
+    import json
+    cat_path = ROOT / "assets" / "webmcp-catalog.json"
+    if not cat_path.exists():
+        return ["assets/webmcp-catalog.json: missing"]
+    cat = json.loads(cat_path.read_text(encoding="utf-8"))
+    ids = {c["claim_id"] for c in cat.get("claims", [])}
+    text = (ROOT / "assets" / "webmcp.js").read_text(encoding="utf-8")
+    errors = []
+    for cid in sorted(set(re.findall(r'claim:\s*"([^"]+)"', text)) - ids):
+        errors.append(f"assets/webmcp.js: claim_id {cid} not in webmcp-catalog.json")
+    for c in cat.get("claims", []):
+        pg = c.get("source_page")
+        if pg:
+            for prefix in ("", "ua/"):
+                if not (ROOT / (prefix + pg)).exists():
+                    errors.append(f"webmcp-catalog.json: missing page {prefix}{pg}")
+    low = text.lower()
+    for d in cat.get("deny", []):
+        if d.lower() in low:
+            errors.append(f"assets/webmcp.js contains denied text {d!r}")
+    return errors
+
+
 ROISTAT_CONST_RE = re.compile(r'\bROISTAT_PROJECT_ID\s*=')
 
 
@@ -269,6 +295,7 @@ def main():
 
     errors.extend(check_webmcp_js())
     errors.extend(check_webmcp_sources())
+    errors.extend(check_webmcp_catalog())
     errors.extend(check_roistat_wiring())
 
     for e in errors:
