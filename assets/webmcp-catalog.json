@@ -1,0 +1,72 @@
+{
+  "_comment": "Registry-backed claim ids that assets/webmcp.js may return. claim ids mirror data/clients/anima-coffee/truth/public_claims_registry.yaml (ADV-Strategy-Core). Checked by tools/check_webmcp.py.",
+  "registry_source": "ADV-Strategy-Core:data/clients/anima-coffee/truth/public_claims_registry.yaml",
+  "updated": "2026-11-03",
+  "claims": [
+    {
+      "claim_id": "claim-anima-b2b-partners-1700",
+      "source_page": null
+    },
+    {
+      "claim_id": "claim-anima-founding-year-2015",
+      "source_page": null
+    },
+    {
+      "claim_id": "claim-anima-free-trial-14d",
+      "source_page": "answers/free-14-day-trial-coffee-machine-kyiv.html"
+    },
+    {
+      "claim_id": "claim-anima-geography-kyiv-oblast-reconfirmed",
+      "source_page": "answers/coffee-machine-service-area-kyiv-oblast.html"
+    },
+    {
+      "claim_id": "claim-anima-phone-main",
+      "source_page": null
+    },
+    {
+      "claim_id": "claim-anima-pricing-custom-quote",
+      "source_page": "answers/coffee-machine-rental-cost-kyiv.html"
+    },
+    {
+      "claim_id": "claim-anima-support-24-7-replacement-24h",
+      "source_page": null
+    },
+    {
+      "claim_id": "claim-anima-tariff-packages-start-pro-max",
+      "source_page": "answers/coffee-equipment-packages-start-pro-max.html"
+    }
+  ],
+  "deny": [
+    "free first month",
+    "first month free",
+    "перший місяць оренди безкоштовно",
+    "retro-bonus",
+    "ретро-бонус",
+    "1,300+",
+    "1300+",
+    "1,500+",
+    "94%",
+    "2-hour response",
+    "2 hour response",
+    "реагування 2 години",
+    "2-hour sla",
+    "2-hour emergency",
+    "flat-rate monthly",
+    "flat rate monthly",
+    "swiss-grade",
+    "swiss machines",
+    "MUST NOT appear",
+    "weekly",
+    "щотижнев",
+    "analytics dashboard",
+    "sales dashboard",
+    "дашборд",
+    "панель аналітики",
+    "панель продажів",
+    "free installation",
+    "безкоштовне встановлення",
+    "first week of product",
+    "перший тиждень продукту",
+    "testimonial"
+  ]
+}
