@@ -1,5 +1,67 @@
 # Anima server intake integration â€” 2026-10-31
 
+## Current activation checkpoint — 2026-11-03
+
+Owner correction in this chat: Anima uses **Roistat and Kommo**, not an assumed
+amoCRM account. Required route: browser -> durable Anima intake/outbox ->
+Roistat -> the verified Anima Kommo account. Do not activate direct CRM delivery
+as a substitute. Historical variable names such as `amocrm` or
+`ANIMA_LEAD_AMOCRM_WEBHOOK_URL` do not prove which CRM account receives data.
+The current owner direction supersedes older proposed direct-CRM routing below;
+preserve those older observations as history, not activation authority.
+
+Current source: anima-coffee-site main
+`8c822b444d177ea8588e164ca0ae520ff7b3af86`; ADV-Strategy-Core inspected main
+`7a1d03e5479d71ad45b512b047531ebb2d1830a4`.
+PR #96 merged as `e8cbaee471041d04e9b9d5234d4476979e195f5d` and carries
+the intake adapter. PR #90 was closed as superseded on 2026-11-03 at the owner's
+explicit request. Neither event establishes server activation.
+
+Current read-only observations:
+
+- Live EN `/` and UA `/ua/` each returned HTTP 200, `Server: GitHub.com`,
+  and an empty `data-endpoint`. Live `assets/lead.js` contains the intake
+  adapter and browser outbox. No form was submitted.
+- The current gcloud principal's filtered Anima project inventory was empty.
+  A targeted project metadata read for the documented *planned* project
+  `anima-sales-agent` was denied (or the project may not exist). Stop that
+  operation; do not retry with another account or expand an ADV service
+  account's privileges. Establish the actual Anima project and its separate
+  authorized deployment identity first. No secret values were read.
+- GitHub repository-level Actions secret metadata for anima-coffee-site was
+  empty. This does not establish absence of organization/environment secrets
+  or an independently configured Cloudflare account; no such access was verified.
+- The current backend notifier explicitly does not write to Roistat. It offers
+  a generic configured CRM webhook and email. Its name is not a verified Kommo
+  account binding. The hosting runbook still has placeholder service URLs.
+- Browser inventory established no Anima Kommo session. Existing Roistat tabs
+  were labelled authorization pages; an attempted EU entry did not return a
+  verified session. No browser login, credential extraction or CRM write occurred.
+
+Unavailable stages remain null: Anima deployed API URL/revision, permanent DB
+readback, independent retry scheduler, Roistat project/API authorization,
+Roistat acceptance receipt, Anima Kommo account/pipeline identity, Kommo record
+receipt and business acceptance. No live write, DB restart, retry sweep or
+receiver recovery was attempted without a confirmed Anima target.
+
+Next safe operation: identify the actual Anima hosting project/API and establish
+its existing tenant-specific access; inspect deployment/secret references as
+metadata only, then verify permanent storage and the configured Roistat-to-Kommo
+integration. Do not copy ADV or AMC credentials, memory or runtime state.
+Testing must use a non-production receiver/account over the same transport, with
+all real CRM sinks blocked: commit -> browser termination -> service restart ->
+autonomous retry -> Roistat receipt -> Kommo receipt. Include timeout after
+receiver commit, duplicate keys, 429/503 and tenant/account mismatch refusal.
+Do not treat a lead labelled TEST as permission to create a real sales enquiry.
+
+Existing owner/task: Codex chat `01a19460-1946-7d72-9e52-5f32bed74e15`,
+Anima tenant. No admitted OpenClaw task/session key/native UUID or Anima GBrain
+connection was established; these remain unavailable. This checkpoint records
+direct read-only diagnostics, not stack dispatch, memory ingestion or delivery.
+Remaining obligations: activate the durable server route only after access,
+verified routing and independent review; preserve browser fallback; verify
+production using isolated receivers; preserve all earlier incomplete gates.
+
 ## Current evidence and scope
 
 Observed via read-only HTTPS GET on 2026-10-31: `/` returns HTTP 200,
