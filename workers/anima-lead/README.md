@@ -15,14 +15,13 @@ A Roistat 2xx is transport acceptance, not proof a manager saw it in Kommo.
 cd workers/anima-lead
 npx wrangler d1 create anima-leads                      # copy database_id into wrangler.toml
 npx wrangler d1 execute anima-leads --remote --file=schema.sql
-npx wrangler secret put ROISTAT_API_KEY                 # values typed on the PC, never in chat/git
-npx wrangler secret put ROISTAT_LEAD_URL                # Roistat "add lead" proxy API URL for the EU project
+npx wrangler secret put ROISTAT_INTEGRATION_KEY         # Roistat CRM-integration key, typed on the PC, never in chat/git
+# optional: npx wrangler secret put ROISTAT_LEAD_URL     # defaults to https://cloud.roistat.com/api/proxy/1.0/leads/add
 npx wrangler secret put IP_SALT
 npx wrangler deploy                                     # prints https://anima-lead.<sub>.workers.dev
 ```
-Until `ROISTAT_*` are set the Worker still stores every lead (status `pending`) and delivers once they appear.
-`ROISTAT_LEAD_URL` / field names are NOT verified against Roistat's live API here: confirm with one
-Roistat-side test lead (marked TEST, deleted in Kommo) before relying on it.
+Until `ROISTAT_INTEGRATION_KEY` is set the Worker still stores every lead (status `pending`) and delivers once they appear.
+Request format follows Roistat's documented proxylead API (GET `/api/proxy/1.0/leads/add`: `roistat` visit id, `key`, `title`, `name`, `phone`, `email`, `comment`, `sync=1`); the docs name only `cloud.roistat.com`, no EU host. Not exercised against the live Roistat: no test leads are sent from the live site, so the first real enquiry is the first live proof; watch the outbox `last_error`.
 
 ## Activation (after deploy and a manual OPTIONS/health check, no real leads)
 1. Add the Worker origin to `connect-src` in `_headers` and the meta CSP.

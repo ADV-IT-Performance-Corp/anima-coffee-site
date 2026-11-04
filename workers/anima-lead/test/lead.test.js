@@ -6,7 +6,7 @@ import { deliverOne, sweep } from "../src/deliver.js";
 
 const ORIGIN = "https://aeo.animacoffee.com.ua";
 const baseEnv = () => ({ DB: makeDB(), ALLOWED_ORIGINS: ORIGIN + ",https://animacoffee.com.ua", IP_SALT: "t" });
-const confEnv = () => ({ ...baseEnv(), ROISTAT_API_KEY: "k", ROISTAT_LEAD_URL: "https://roistat.invalid/leads/add" });
+const confEnv = () => ({ ...baseEnv(), ROISTAT_INTEGRATION_KEY: "k", ROISTAT_LEAD_URL: "https://roistat.invalid/leads/add" });
 const good = (o = {}) => ({ client_slug: "anima-coffee", idempotency_key: "key-12345678", name: "Test", phone: "+380501234567",
   consent: true, page_slug: "/", lead_source: "form", roistat_visit: "123", ...o });
 const post = (env, body, headers = {}, now) => handle(new Request("https://w.invalid/api/anima/lead", {
@@ -76,10 +76,11 @@ test("delivery not configured: lead stays pending, nothing lost", async () => {
 test("delivery success posts Roistat form with visit id and marks delivered", async () => {
   const env = confEnv(); const b = await (await post(env, good({ ai_source: "chatgpt" }), {}, NOW)).json();
   let seen;
-  const f = async (url, init) => { seen = { url, body: init.body.toString() }; return new Response("{}", { status: 200 }); };
+  const f = async (url, init) => { seen = { url, method: init.method }; return new Response('{"status":"success"}', { status: 200 }); };
   assert.equal(await deliverOne(env, b.lead_id, NOW, f), "delivered");
-  assert.equal(seen.url, "https://roistat.invalid/leads/add");
-  assert.match(seen.body, /roistat=123/); assert.match(seen.body, /chatgpt/); assert.match(seen.body, /lead_id/);
+  assert.equal(seen.method, "GET");
+  assert.match(seen.url, /^https:\/\/roistat\.invalid\/leads\/add\?/);
+  assert.match(seen.url, /roistat=123/); assert.match(seen.url, /sync=1/); assert.match(seen.url, /chatgpt/); assert.match(seen.url, /lead_id/);
   assert.equal(rows(env, "outbox")[0].status, "delivered");
 });
 
@@ -101,4 +102,13 @@ test("sweep recovers after outage without any visitor and reclaims stuck rows", 
   env.DB.raw.prepare("UPDATE outbox SET status='sending', claimed_at=? WHERE lead_id=?").run(NOW, b.lead_id);
   const res = await sweep(env, NOW + 7200, async () => new Response("{}", { status: 200 }));
   assert.deepEqual(res, ["delivered"]);
+});
+
+test("default URL is the documented Roistat proxylead endpoint; error body is a failure", async () => {
+  const env = { ...confEnv() }; delete env.ROISTAT_LEAD_URL;
+  const b = await (await post(env, good(), {}, NOW)).json();
+  let u;
+  const f = async (url) => { u = url; return new Response("error: bad key", { status: 200 }); };
+  assert.equal(await deliverOne(env, b.lead_id, NOW, f), "retry");
+  assert.match(u, /^https:\/\/cloud\.roistat\.com\/api\/proxy\/1\.0\/leads\/add\?/);
 });

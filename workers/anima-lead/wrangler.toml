@@ -14,5 +14,5 @@ database_id = "REPLACE_WITH_ID_FROM_wrangler_d1_create"
 
 [vars]
 ALLOWED_ORIGINS = "https://aeo.animacoffee.com.ua,https://animacoffee.com.ua"
-# Secrets (never in this file): ROISTAT_API_KEY, ROISTAT_LEAD_URL, IP_SALT
-#   npx wrangler secret put ROISTAT_API_KEY
+# Secrets (never in this file): ROISTAT_INTEGRATION_KEY, IP_SALT (optional ROISTAT_LEAD_URL)
+#   npx wrangler secret put ROISTAT_INTEGRATION_KEY
