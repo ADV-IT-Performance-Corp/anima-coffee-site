@@ -691,7 +691,7 @@
       name: data.name || "", business: data.company || "", city: data.city || "",
       machines: data.machines || "", email: contact.email || "", phone: contact.phone || "",
       details: data.details || "", page_slug: data.source_page || "",
-      consent: data.consent === true
+      consent: data.consent === true, roistat_visit: data.roistat_visit || ""
     };
     // Referrer query strings may contain personal data; only send origin/path.
     try { var r = new URL(data.referrer); p.referrer = r.origin + r.pathname; } catch (e) { p.referrer = ""; }
@@ -737,6 +737,7 @@
 
   function submitIntake(data, endpoint, origin) {
     var url = intakeUrl(endpoint);
+    if (!Object.prototype.hasOwnProperty.call(data, "roistat_visit")) data.roistat_visit = readRoistatVisit();
     if (!url || data.consent !== true || !data.contact) return Promise.resolve(notConnectedResult());
     var list = readOutbox();
     var fingerprint = JSON.stringify(intakePayload(data, ""));
@@ -797,6 +798,10 @@
     return { status: "invalid", message: T.err, fields: fields };
   }
 
+  function readRoistatVisit() {
+    try { var match = document.cookie.match(/(?:^|;\s*)roistat_visit=(\d{1,32})(?:;|$)/); return match ? match[1] : ""; } catch (e) { return ""; }
+  }
+
   function collectData(form) {
     var raw = {};
     Array.prototype.forEach.call(form.querySelectorAll("input,textarea"), function (f) {
@@ -810,6 +815,7 @@
       machines: raw.machines || "",
       contact: raw.contact || "",
       details: raw.details || raw.message || "",
+      roistat_visit: readRoistatVisit(),
       source_page: location.pathname,
       referrer: document.referrer || "",
       utm_source: utm.utm_source || "",
@@ -983,6 +989,7 @@
     collectBase: function () {
       var utm = captureUtm();
       return {
+        roistat_visit: readRoistatVisit(),
         source_page: location.pathname,
         referrer: document.referrer || "",
         utm_source: utm.utm_source || "",

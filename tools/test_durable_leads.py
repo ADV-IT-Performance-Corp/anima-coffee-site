@@ -192,6 +192,19 @@ class DurableLeads(unittest.TestCase):
         self.assertEqual(self.requests[1]['idempotency_key'], first)
         self.assertEqual(len(self.committed), 1)
 
+    def test_visit_survives_outage_and_later_cookie_change(self):
+        self.context.add_cookies([{'name':'roistat_visit','value':'123456','url':self.base}])
+        self.mode = 'lost'
+        self.submit()
+        self.assertEqual(self.requests[0]['roistat_visit'], '123456')
+        self.context.add_cookies([{'name':'roistat_visit','value':'987654','url':self.base}])
+        self.mode = 'accepted'
+        self.page.route(self.base + '/', lambda r: r.fulfill(content_type='text/html', body=(ROOT/'index.html').read_text(encoding='utf-8').replace('data-endpoint=""', 'data-endpoint="'+self.endpoint+'"')))
+        self.page.reload()
+        self.page.wait_for_function("k => !localStorage.getItem(k)", arg=KEY)
+        self.assertEqual(self.requests[1]['roistat_visit'], '123456')
+        self.assertEqual(self.requests[0]['idempotency_key'], self.requests[1]['idempotency_key'])
+
     def test_timeout_preserves_pending(self):
         self.mode = 'hang'
         self.assertNotEqual(self.submit()['status'], 'accepted')
