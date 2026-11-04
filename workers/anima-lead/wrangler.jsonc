@@ -1,6 +1,6 @@
 {
-  "name": "anima-lead-reserve",
-  "main": "worker.mjs",
+  "name": "anima-lead",
+  "main": "src/index.js",
   "compatibility_date": "2026-11-04",
   "workers_dev": true,
   "observability": {
@@ -13,12 +13,13 @@
   },
   "vars": {
     "TENANT": "anima-coffee",
-    "DELIVERY_ENABLED": "false"
+    "DELIVERY_ENABLED": "false",
+    "ALLOWED_ORIGINS": "https://aeo.animacoffee.com.ua,https://animacoffee.com.ua"
   },
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "anima-lead-reserve",
+      "database_name": "anima-leads",
       "database_id": "REPLACE_WITH_ANIMA_D1_ID"
     }
   ],

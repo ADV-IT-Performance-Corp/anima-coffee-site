@@ -4,11 +4,11 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync,mkdtempSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import worker,{intake,sweep,providerForm,parseReceipt} from './worker.mjs';
+import worker,{intake,sweep,providerForm,parseReceipt} from '../src/index.js';
 const now=1800000000000;
 const data={client_slug:'anima-coffee',idempotency_key:'11111111-1111-4111-8111-111111111111',consent:true,name:'Synthetic',email:'fixture@example.invalid',roistat_visit:'12345',details:'Synthetic fixture only'};
 function db(path=':memory:') {
- const sql=new DatabaseSync(path); sql.exec(readFileSync(new URL('./schema.sql',import.meta.url),'utf8'));
+ const sql=new DatabaseSync(path); sql.exec(readFileSync(new URL('../schema.sql',import.meta.url),'utf8'));
  return {sql,prepare(query){let values=[]; const stmt=sql.prepare(query);return {bind(...v){values=v;return this;},async run(){return stmt.run(...values);},async first(){return stmt.get(...values)||null;},async all(){return {results:stmt.all(...values)};}};}};
 }
 function env(store=db()) {return {DB:store,TENANT:'anima-coffee',PAYLOAD_KEY:'01'.repeat(32),DELIVERY_ENABLED:'true',ROUTING_VERIFIED:'true',ROISTAT_INTEGRATION_KEY:'fixture-not-a-secret',INTAKE_LIMITER:{async limit(){return {success:true};}}};}
@@ -31,7 +31,7 @@ test('no production transport when disabled or route unverified',async()=>{
 });
 test('browser closure and database reopen retain enquiry; scheduled receiver confirms both stages',async()=>{
  const path=join(mkdtempSync(join(tmpdir(),'anima-d1-test-')),'outbox.sqlite');let e=env(db(path));await intake(req(),e,now);e.DB.sql.close();e=env(db(path));let count=0;
- await sweep(e,async(url,options)=>{count++;assert.equal(url,'https://cloud.roistat.com/api/proxy/1.0/leads/add');assert.equal(options.body.get('roistat'),'12345');assert.equal(options.body.get('is_need_callback'),'0');assert.ok(options.body.get('title').includes(row(e).id));return success();},now);
+ await sweep(e,async(url,options)=>{count++;const target=new URL(url);assert.equal(target.origin+target.pathname,'https://cloud.roistat.com/api/proxy/1.0/leads/add');assert.equal(options.method,'GET');assert.equal(options.redirect,'manual');assert.equal(target.searchParams.get('roistat'),'12345');assert.equal(target.searchParams.get('is_need_callback'),'0');assert.ok(target.searchParams.get('title').includes(row(e).id));return success();},now);
  assert.equal(count,1);assert.equal(row(e).state,'kommo_confirmed');assert.equal(row(e).proxy_id,'12');assert.equal(row(e).kommo_id,'34');await sweep(e,async()=>{throw new Error('duplicate');},now+300000);e.DB.sql.close();
 });
 test('Roistat outage does not lose stored payload or falsely confirm delivery',async()=>{

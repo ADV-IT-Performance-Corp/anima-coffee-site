@@ -1,7 +1,7 @@
 // Anima only. No provider URL or tenant selection from visitor input.
 const TENANT = 'anima-coffee';
 const PROVIDER = 'https://cloud.roistat.com/api/proxy/1.0/leads/add';
-const ORIGINS = new Set(['https://aeo.animacoffee.com.ua']);
+const ORIGINS = new Set(['https://aeo.animacoffee.com.ua','https://animacoffee.com.ua']);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -22,14 +22,16 @@ async function open(payload, id, env) {
   return JSON.parse(dec.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:unhex(iv),additionalData:enc.encode(TENANT + ':' + id)},await key(env),unhex(bytes))));
 }
 export function validate(raw) {
-  if (!raw || raw.client_slug !== TENANT || raw.consent !== true || !UUID.test(raw.idempotency_key || '')) throw new Error('invalid');
+  if (!raw || raw.company_url || raw.client_slug !== TENANT || raw.consent !== true || !UUID.test(raw.idempotency_key || '')) throw new Error('invalid');
   const data = {client_slug:TENANT,consent:true};
-  const limits = {name:160,business:240,city:120,machines:80,email:254,phone:40,details:2000,page_slug:300,referrer:500,roistat_visit:32,utm_source:200,utm_medium:200,utm_campaign:200,utm_term:200,utm_content:200,gclid:200};
+  const limits = {name:160,business:240,city:120,machines:80,email:254,phone:40,details:2000,page_slug:300,referrer:500,roistat_visit:32,utm_source:200,utm_medium:200,utm_campaign:200,utm_term:200,utm_content:200,gclid:200,lead_source:20,ai_source:20};
   for (const [field, limit] of Object.entries(limits)) {
     const value = raw[field] ?? '';
     if (typeof value !== 'string' || value.length > limit || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(value)) throw new Error('invalid');
     data[field] = value.trim();
   }
+  if (data.lead_source && !/^(form|webmcp|chatkit)$/.test(data.lead_source)) throw new Error('invalid');
+  if (data.ai_source && !/^[a-z0-9-]{1,20}$/.test(data.ai_source)) throw new Error('invalid');
   if (!data.email && !data.phone) throw new Error('invalid');
   if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) throw new Error('invalid');
   if (data.phone && !/^\+?[\d ()-]{7,40}$/.test(data.phone)) throw new Error('invalid');
@@ -83,7 +85,7 @@ export async function intake(request, env, now = Date.now()) {
 export function providerForm(data, id, integrationKey) {
   return new URLSearchParams({key:integrationKey,roistat:data.roistat_visit || 'nocookie',
     title:'Website enquiry [' + id + ']',name:data.name,phone:data.phone,email:data.email,
-    comment:JSON.stringify({reference:id,business:data.business,city:data.city,machines:data.machines,details:data.details,page:data.page_slug,referrer:data.referrer,utm_source:data.utm_source,utm_medium:data.utm_medium,utm_campaign:data.utm_campaign,utm_term:data.utm_term,utm_content:data.utm_content,gclid:data.gclid}),
+    comment:JSON.stringify({reference:id,lead_source:data.lead_source,ai_source:data.ai_source,business:data.business,city:data.city,machines:data.machines,details:data.details,page:data.page_slug,referrer:data.referrer,utm_source:data.utm_source,utm_medium:data.utm_medium,utm_campaign:data.utm_campaign,utm_term:data.utm_term,utm_content:data.utm_content,gclid:data.gclid}),
     sync:'1',is_need_callback:'0'});
 }
 // This conservative parser requires fixture verification against an authorized,
@@ -109,7 +111,7 @@ export async function sweep(env, transport = fetch, now = Date.now()) {
     let receipt = {state:'unknown',proxy:null,kommo:null};
     try {
       const data = await open(lead.payload,lead.id,env);
-      const response = await transport(PROVIDER,{method:'POST',redirect:'manual',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:providerForm(data,lead.id,env.ROISTAT_INTEGRATION_KEY),signal:AbortSignal.timeout(15000)});
+      const response = await transport(PROVIDER + '?' + providerForm(data,lead.id,env.ROISTAT_INTEGRATION_KEY).toString(),{method:'GET',redirect:'manual',signal:AbortSignal.timeout(15000)});
       if (response.status === 200) receipt = parseReceipt(await response.json());
     } catch { /* No raw errors/bodies/credentials in logs. Outcome may be ambiguous. */ }
     await env.DB.prepare("UPDATE leads SET state=?,proxy_id=?,kommo_id=? WHERE id=? AND state='sending'").bind(receipt.state,receipt.proxy,receipt.kommo,lead.id).run();

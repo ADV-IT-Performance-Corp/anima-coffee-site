@@ -3,17 +3,19 @@ import {readFileSync,mkdtempSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import assert from 'node:assert/strict';
-const code=readFileSync(new URL('./worker.mjs',import.meta.url),'utf8').replace('export default {','const app = {');
-// Test-only entrypoint; never included in a deployed Worker. Block every outbound request.
-const script=code + `\nexport default {fetch: async (r,e) => {
- if (new URL(r.url).pathname === '/__test/sweep') {await sweep(e);return new Response('ok');}
+import {build} from 'esbuild';
+import {fileURLToPath} from 'node:url';
+const built=await build({stdin:{contents:`import app from './src/index.js';
+export default {async fetch(r,e) {
+ if(new URL(r.url).pathname === '/__test/sweep') {await app.scheduled(null,e);return new Response('ok');}
  return app.fetch(r,e);
-}};`;
+}};`,resolveDir:fileURLToPath(new URL('.',import.meta.url))},bundle:true,write:false,format:'esm',platform:'browser'});
+const script=built.outputFiles[0].text;
 let calls=0;
 const persist=mkdtempSync(join(tmpdir(),'anima-miniflare-'));
 const options={modules:true,script,compatibilityDate:'2026-11-04',d1Databases:['DB'],d1Persist:persist,ratelimits:{INTAKE_LIMITER:{namespace_id:'1001',simple:{limit:10,period:60}}},
  bindings:{TENANT:'anima-coffee',PAYLOAD_KEY:'01'.repeat(32),DELIVERY_ENABLED:'true',ROUTING_VERIFIED:'true',ROISTAT_INTEGRATION_KEY:'fake-fixture'},
- outboundService:async request=>{calls++;assert.equal(new URL(request.url).hostname,'cloud.roistat.com');const body=new URLSearchParams(await request.text());assert.equal(body.get('roistat'),'1234');return new Response(JSON.stringify({status:'success',data:{id:90,order_id:91}}));}};
+ outboundService:async request=>{calls++;assert.equal(new URL(request.url).hostname,'cloud.roistat.com');const body=new URL(request.url).searchParams;assert.equal(body.get('roistat'),'1234');return new Response(JSON.stringify({status:'success',data:{id:90,order_id:91}}));}};
 let mf=new Miniflare({...convertV4MiniflareOptions(options),resourcePersistencePath:persist});
 try {
  let db=await mf.getD1Database('DB');

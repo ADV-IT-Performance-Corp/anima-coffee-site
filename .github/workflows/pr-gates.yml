@@ -49,21 +49,17 @@ jobs:
       - name: Test Anima intake with local receivers only
         run: python -m unittest -v tools.test_durable_leads
 
-  durable-reserve-worker:
-    timeout-minutes: 10
+  anima-lead-worker:
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-          cache: npm
-          cache-dependency-path: server/anima-reserve/package-lock.json
-      - name: Install pinned local Worker harness
-        working-directory: server/anima-reserve
-        run: npm ci
-      - name: Verify SQLite outbox and local Workers/D1 (synthetic receivers only)
-        working-directory: server/anima-reserve
+      - name: Test the Anima lead Worker (local D1 shim, no network)
+        working-directory: workers/anima-lead
         run: |
+          npm ci
           npm test
           node runtime-test.mjs

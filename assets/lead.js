@@ -696,6 +696,11 @@
     // Referrer query strings may contain personal data; only send origin/path.
     try { var r = new URL(data.referrer); p.referrer = r.origin + r.pathname; } catch (e) { p.referrer = ""; }
     UTM_KEYS.forEach(function (k) { p[k] = data[k] || ""; });
+    // End-to-end attribution for the server -> Roistat hop (same labels as the
+    // client-side path): channel, AI answer engine and the Roistat visit id,
+    // which the server cannot read itself because credentials are omitted.
+    p.lead_source = /^(form|webmcp|chatkit)$/.test(data.lead_source || "") ? data.lead_source : leadSourceFor(data, "");
+    p.ai_source = aiSource();
     return p;
   }
 

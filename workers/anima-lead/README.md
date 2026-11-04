@@ -1,4 +1,4 @@
-# Anima reserve: Workers Free + D1 candidate
+# Anima lead: Workers Free + D1 hardened candidate
 
 Production delivery OFF. Replaces the hosting/storage part of the planned backend, preserving the existing Roistat-to-Kommo integration. Never enable a competing direct-CRM sender. Browser fallback remains unchanged except capturing the original Roistat visit.
 
@@ -43,3 +43,11 @@ Evidence: direct development, not an admitted Anima OpenClaw run or GBrain inges
 Independent read-only review found the intake abuse gap (required keyed edge limiter added), unverified provider wire/receipt schema (activation remains gated), and missing automated reconciliation (still open). No production Cloudflare resources, billing setting, Roistat or Kommo record was changed. The Anima browser window is minimized and the available UI interface could not restore it; owner was asked only to restore that existing window. No ADV/AMC identity was substituted.
 
 Active sends are excluded from retention cleanup until their bounded lease ends, so cleanup cannot discard an in-flight receipt. Expired unresolved records lose their contact payload under the seven-day policy; opaque IDs/state tombstones remain. The added retention/send race test passes.
+
+## Continuation of merged component
+
+This hardens the existing `workers/anima-lead` from PRs #102/#103. It is the only server intake implementation in this candidate; the temporary parallel prototype has been removed. The provider request retains the documented GET query format from #103, while changing unsupported redirect:error to manual and forbidding arbitrary provider hosts. Disable logging of outbound URLs since the documented API places the integration key in the query.
+
+Schema changes are NOT a migration for an existing deployed database. Deployment has not been verified. If an older D1 already exists, stop before schema application, preserve its data, and supply a reviewed migration to the new tenant/key/encrypted-payload schema. Do not overwrite an existing database or apply CREATE IF NOT EXISTS as if it migrated columns. Existing old outbox records must be reconciled before switching senders.
+
+Prior tests that treated arbitrary 2xx as delivered and blindly retried ambiguous errors are replaced by explicit negative receipt/lost-response tests. The replacement suite covers the same persistence, origin, tenant, consent, contact, body-size, capacity, missing-config and rate-limit paths plus encryption, process restart, concurrency and retention. Historical "success" stub tests are not production proof.
