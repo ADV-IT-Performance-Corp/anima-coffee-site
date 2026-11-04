@@ -13,8 +13,7 @@
   },
   "vars": {
     "TENANT": "anima-coffee",
-    "DELIVERY_ENABLED": "false",
-    "ALLOWED_ORIGINS": "https://aeo.animacoffee.com.ua,https://animacoffee.com.ua"
+    "DELIVERY_ENABLED": "false"
   },
   "d1_databases": [
     {
