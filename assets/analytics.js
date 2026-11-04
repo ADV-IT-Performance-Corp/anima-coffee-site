@@ -184,4 +184,25 @@
     try { if (GA4_LIVE) gtag("event", "lead_accepted", ev); } catch (e) {}
     try { if (METRICA_LIVE && window.ym) ym(METRICA_ID, "reachGoal", "lead_accepted"); } catch (e) {}
   };
+
+  // --- Click-to-contact tracking for tel:/Telegram/mailto links anywhere on
+  // the page (header, footer, contact blocks). The sticky bar already pushes
+  // its own cta_click, so links inside #sticky-cta are skipped to avoid double
+  // counting. Same event/param names as assets/sticky-cta.js, plus source_page
+  // and ai_source (fixed vocabulary) so phone/Telegram contacts can be tied to
+  // AI-referral sessions. No PII: the href is never sent. Never calls
+  // preventDefault, so navigation is untouched.
+  document.addEventListener("click", function (e) {
+    try {
+      var a = e.target && e.target.closest ? e.target.closest("a[href]") : null;
+      if (!a || a.closest("#sticky-cta")) return;
+      var h = (a.getAttribute("href") || "").toLowerCase();
+      var ch = h.indexOf("tel:") === 0 ? "phone"
+        : /^https?:\/\/(t\.me|telegram\.me)\//.test(h) ? "telegram"
+        : h.indexOf("mailto:") === 0 ? "email" : "";
+      if (!ch) return;
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({ event: "cta_click", channel: ch, source_page: location.pathname, ai_source: aiSourceCached });
+    } catch (err) {}
+  }, true);
 })();
