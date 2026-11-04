@@ -68,3 +68,17 @@ test('rate limit denies spoofed-origin flood before DB writes; missing binding f
  assert.equal((await intake(req(),e,now)).status,429);assert.equal(row(e),undefined);assert.match(seen,/^[0-9a-f]{64}$/);assert.ok(!seen.includes('192.0.2.1'));
  delete e.INTAKE_LIMITER;assert.equal((await intake(req(),e,now)).status,503);
 });
+
+test('retention sweep preserves an active send until its receipt can commit',async()=>{
+ const e=env();await intake(req(),e,now);
+ e.DB.sql.prepare('UPDATE leads SET expires=?').run(now+100);
+ let release,started;
+ const ready=new Promise(resolve=>{started=resolve;});
+ const held=new Promise(resolve=>{release=resolve;});
+ const sending=sweep(e,async()=>{started();await held;return success();},now);
+ await ready;await sweep({...e,DELIVERY_ENABLED:'false'},success,now+101);
+ assert.equal(row(e).state,'sending');assert.ok(row(e).payload);
+ release();await sending;assert.equal(row(e).state,'kommo_confirmed');
+ await sweep({...e,DELIVERY_ENABLED:'false'},success,now+300000);
+ assert.equal(row(e).payload,null);assert.equal(row(e).kommo_id,'34');
+});

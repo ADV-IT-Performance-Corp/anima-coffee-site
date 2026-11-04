@@ -97,7 +97,7 @@ export function parseReceipt(body) {
 export async function sweep(env, transport = fetch, now = Date.now()) {
   if (env.TENANT !== TENANT) throw new Error('tenant');
   // Retention expiry: remove PII; retain opaque key tombstones against replay.
-  await env.DB.prepare("UPDATE leads SET payload=NULL,state='expired' WHERE expires<=? AND state!='expired'").bind(now).run();
+  await env.DB.prepare("UPDATE leads SET payload=NULL,state='expired' WHERE expires<=? AND state NOT IN ('expired','sending')").bind(now).run();
   // A terminated worker might have committed remotely: never automatically resend.
   await env.DB.prepare("UPDATE leads SET state='unknown' WHERE state='sending' AND next_attempt<=?").bind(now).run();
   if (env.DELIVERY_ENABLED !== 'true' || !env.ROISTAT_INTEGRATION_KEY || env.ROUTING_VERIFIED !== 'true') return;
