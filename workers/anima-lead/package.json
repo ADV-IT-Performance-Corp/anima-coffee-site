@@ -1,0 +1,1 @@
+{ "name": "anima-lead", "private": true, "type": "module", "scripts": { "test": "node --test test/lead.test.js" } }
