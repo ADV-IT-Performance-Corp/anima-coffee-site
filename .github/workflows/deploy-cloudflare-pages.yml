@@ -42,5 +42,5 @@ jobs:
         if: steps.cfg.outputs.ready == 'true'
         run: |
           mkdir _site
-          rsync -a --exclude .git --exclude .github --exclude _site ./ _site/
+          rsync -a --exclude .git --exclude .github --exclude _site --exclude workers ./ _site/
           npx --yes wrangler@3 pages deploy _site --project-name=anima-coffee-site --branch=main --commit-dirty=true

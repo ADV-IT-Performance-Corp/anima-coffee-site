@@ -48,3 +48,14 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: Test Anima intake with local receivers only
         run: python -m unittest -v tools.test_durable_leads
+
+  anima-lead-worker:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Test the Anima lead Worker (local D1 shim, no network)
+        run: cd workers/anima-lead && npm test

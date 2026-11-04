@@ -1,0 +1,18 @@
+# Anima lead intake: Cloudflare Worker + D1 (free tier), in ANIMA's Cloudflare account.
+# Setup (one login on the PC: `npx wrangler login`), see README.md.
+name = "anima-lead"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+
+[triggers]
+crons = ["*/5 * * * *"]   # retry sweep, runs without any visitor
+
+[[d1_databases]]
+binding = "DB"
+database_name = "anima-leads"
+database_id = "REPLACE_WITH_ID_FROM_wrangler_d1_create"
+
+[vars]
+ALLOWED_ORIGINS = "https://aeo.animacoffee.com.ua,https://animacoffee.com.ua"
+# Secrets (never in this file): ROISTAT_API_KEY, ROISTAT_LEAD_URL, IP_SALT
+#   npx wrangler secret put ROISTAT_API_KEY
