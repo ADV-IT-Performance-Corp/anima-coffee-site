@@ -32,6 +32,28 @@ async function run(browser, url, referer, prefillWebmcp) {
   return out;
 }
 
+async function intake(browser, url, referer, how) {
+  const ctx = await browser.newContext();
+  await ctx.route(/roistat\.com|googletagmanager|mc\.yandex|google-analytics/, (r) => r.abort());
+  const bodies = [];
+  await ctx.route("**/api/anima/lead", (r) => { bodies.push(r.request().postDataJSON()); r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ status: "accepted", lead_id: "11111111-1111-4111-8111-111111111111" }) }); });
+  const page = await ctx.newPage();
+  await page.goto(url, { referer: referer || undefined, waitUntil: "domcontentloaded" });
+  await page.evaluate((e) => document.querySelector("form.lead-form").setAttribute("data-endpoint", e), BASE + "/api/anima/lead");
+  await page.waitForTimeout(200);
+  if (how === "chat") {
+    await page.evaluate(() => { const d = window.animaLead.collectBase(); Object.assign(d, { name: "Synthetic", contact: "probe@example.invalid", consent: true }); return window.animaLead.submitChat(d); });
+  } else {
+    for (const [n, v] of [["name", "Synthetic"], ["business", "Co"], ["city", "Kyiv"], ["contact", "probe@example.invalid"]]) await page.fill('#leadForm input[name="' + n + '"]', v);
+    if (how === "agent") {
+      await page.evaluate(() => new Promise((res) => { const e = new Event("submit", { cancelable: true }); e.agentInvoked = true; e.respondWith = (p) => p.then(res); document.querySelector("#leadForm").dispatchEvent(e); }));
+    } else await page.click('#leadForm button[type="submit"]');
+  }
+  await page.waitForTimeout(300);
+  await ctx.close();
+  return bodies[0] || {};
+}
+
 (async () => {
   const browser = await chromium.launch();
   let r = await run(browser, BASE + "/?utm_source=chatgpt.com", null, false);
@@ -58,6 +80,12 @@ async function run(browser, url, referer, prefillWebmcp) {
   r = await run(browser, BASE + "/?utm_source=google&utm_medium=cpc&gclid=abc", "https://chatgpt.com/", false);
   f = (r.calls[0] || {}).fields || {};
   check("paid click keeps its utm/gclid", f.utm_source === "google" && f.gclid === "abc", JSON.stringify(f));
+  let b = await intake(browser, BASE + "/", "https://chatgpt.com/", "agent");
+  check("intake: agent submit -> lead_source webmcp, ai_source chatgpt", b.lead_source === "webmcp" && b.ai_source === "chatgpt", JSON.stringify(b));
+  b = await intake(browser, BASE + "/?utm_source=perplexity", null, "chat");
+  check("intake: chat -> lead_source chatkit, ai_source perplexity", b.lead_source === "chatkit" && b.ai_source === "perplexity", JSON.stringify(b));
+  b = await intake(browser, BASE + "/", "https://www.google.com/", "human");
+  check("intake: plain human -> form, no ai_source", b.lead_source === "form" && b.ai_source === "", JSON.stringify(b));
   await browser.close();
   process.exit(fail ? 1 : 0);
 })();

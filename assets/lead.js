@@ -700,7 +700,12 @@
     // client-side path): channel, AI answer engine and the Roistat visit id,
     // which the server cannot read itself because credentials are omitted.
     p.lead_source = /^(form|webmcp|chatkit)$/.test(data.lead_source || "") ? data.lead_source : leadSourceFor(data, "");
-    p.ai_source = aiSource();
+    p.ai_source = /^[a-z0-9-]{1,20}$/.test(data.ai_source || "") ? data.ai_source : aiSource();
+    // The visit id captured at submit time wins (it survives replay); the cookie is only a fallback.
+    if (!p.roistat_visit) {
+      var rv = /(?:^|;\s*)roistat_visit=([A-Za-z0-9_-]{1,64})/.exec(document.cookie || "");
+      p.roistat_visit = rv ? rv[1] : "";
+    }
     return p;
   }
 
@@ -741,6 +746,9 @@
   }
 
   function submitIntake(data, endpoint, origin) {
+    // Fix the channel label now: an agent-invoked submit has origin "agent" but
+    // no WebMCP prefill tag, and the stored/retried payload has no origin.
+    if (!/^(form|webmcp|chatkit)$/.test(data.lead_source || "")) data.lead_source = leadSourceFor(data, origin);
     var url = intakeUrl(endpoint);
     if (!Object.prototype.hasOwnProperty.call(data, "roistat_visit")) data.roistat_visit = readRoistatVisit();
     if (!url || data.consent !== true || !data.contact) return Promise.resolve(notConnectedResult());
