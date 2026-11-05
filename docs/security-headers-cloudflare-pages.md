@@ -59,3 +59,10 @@ GitHub. Instead `.github/workflows/deploy-cloudflare-pages.yml` pushes the site 
    (check the `pages.dev` URL) before touching DNS.
 
 GitHub Actions in the org must be working for this (the gates currently fail within seconds).
+
+## Lead Worker (added 2026-11-05)
+`workers/anima-lead` (PR #102) posts leads from the browser to `https://<worker-host>/api/anima/lead`.
+`_headers` allows `https://*.workers.dev` (CSP `connect-src`) and `https://anima-lead.*.workers.dev/*`
+(Connection-Allowlist) in report-only mode. Once the Worker is deployed, put its exact host in both
+places before switching to enforcing mode; otherwise a blocked lead POST would be silent for visitors.
+Do the same for a custom domain if one is added.
