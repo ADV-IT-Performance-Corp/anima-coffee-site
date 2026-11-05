@@ -2,6 +2,7 @@
 import functools
 import http.server
 import json
+import os
 from pathlib import Path
 import threading
 import unittest
@@ -22,7 +23,7 @@ class DurableLeads(unittest.TestCase):
         threading.Thread(target=cls.server.serve_forever, daemon=True).start()
         cls.base = "http://127.0.0.1:" + str(cls.server.server_port)
         cls.pw = sync_playwright().start()
-        cls.browser = cls.pw.chromium.launch()
+        cls.browser = cls.pw.chromium.launch(executable_path=os.environ.get("ANIMA_TEST_CHROMIUM"))
 
     @classmethod
     def tearDownClass(cls):
