@@ -5,15 +5,18 @@
 # CSP and Connection-Allowlist ship in REPORT-ONLY mode first: nothing is blocked,
 # violations show in DevTools (Console / Issues). Enforce only after a clean week.
 # Allowed destinations = what assets/analytics.js, lead.js, chat.js load today
-# (GTM, Google Analytics, Yandex Metrica, Roistat EU, Telegram links).
+# (GTM, Google Analytics, Yandex Metrica, Roistat EU, Telegram links) plus the
+# anima-lead Worker (workers/anima-lead, a workers.dev host until a custom domain
+# exists). After the Worker is deployed, replace the workers.dev wildcards with its
+# exact host before enforcing.
 
 /*
   X-Content-Type-Options: nosniff
   X-Frame-Options: SAMEORIGIN
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
-  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://mc.yandex.ru https://mc.yandex.com https://yastatic.net https://cloud-eu.roistat.com; connect-src 'self' https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://mc.yandex.ru https://mc.yandex.com https://cloud-eu.roistat.com wss:; img-src 'self' data: https://www.googletagmanager.com https://*.google-analytics.com https://mc.yandex.ru https://mc.yandex.com https://cloud-eu.roistat.com; style-src 'self' 'unsafe-inline'; frame-src https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; form-action 'self' mailto:
-  Connection-Allowlist-Report-Only: ("https://www.googletagmanager.com/*" "https://*.google-analytics.com/*" "https://*.analytics.google.com/*" "https://mc.yandex.ru/*" "https://mc.yandex.com/*" "https://cloud-eu.roistat.com/*" response-origin)
+  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://mc.yandex.ru https://mc.yandex.com https://yastatic.net https://cloud-eu.roistat.com; connect-src 'self' https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://mc.yandex.ru https://mc.yandex.com https://cloud-eu.roistat.com https://*.workers.dev wss:; img-src 'self' data: https://www.googletagmanager.com https://*.google-analytics.com https://mc.yandex.ru https://mc.yandex.com https://cloud-eu.roistat.com; style-src 'self' 'unsafe-inline'; frame-src https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; form-action 'self' mailto:
+  Connection-Allowlist-Report-Only: ("https://www.googletagmanager.com/*" "https://*.google-analytics.com/*" "https://*.analytics.google.com/*" "https://mc.yandex.ru/*" "https://mc.yandex.com/*" "https://cloud-eu.roistat.com/*" "https://anima-lead.*.workers.dev/*" response-origin)
 
 /assets/*
   Cache-Control: public, max-age=3600
