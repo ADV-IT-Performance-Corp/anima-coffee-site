@@ -1,31 +1,53 @@
-# anima-lead — server-side lead backup on Cloudflare Workers + D1 (Anima's account)
+# Anima lead: Workers Free + D1 hardened candidate
 
-Free-tier replacement for the Cloud SQL plan. Everything lives in **Anima's** Cloudflare account;
-nothing of Anima's runs in ADV's GCP. Contract is the one `assets/lead.js` already speaks:
-`POST /api/anima/lead` -> `200 {"status":"accepted","lead_id":"<uuid>"}` (a **stored** receipt),
-`503` when storage fails, same idempotency key -> same `lead_id`.
+Production delivery OFF. Replaces the hosting/storage part of the planned backend, preserving the existing Roistat-to-Kommo integration. Never enable a competing direct-CRM sender. Browser fallback remains unchanged except capturing the original Roistat visit.
 
-Flow: browser -> Worker (validate, honeypot, per-IP rate limit, origin allowlist) -> **D1 commit** -> answer ->
-Roistat server request (creates the lead in Anima's Kommo) -> on failure retry with backoff from a
-**cron trigger every 5 min** (no visitor needed), dead-letter after 8 attempts (row kept, never deleted).
-A Roistat 2xx is transport acceptance, not proof a manager saw it in Kommo.
+## Contract and limits
 
-## One-time setup (needs ONE login on the PC: `npx wrangler login`, Anima's Cloudflare account)
-```
-cd workers/anima-lead
-npx wrangler d1 create anima-leads                      # copy database_id into wrangler.toml
-npx wrangler d1 execute anima-leads --remote --file=schema.sql
-npx wrangler secret put ROISTAT_INTEGRATION_KEY         # Roistat CRM-integration key, typed on the PC, never in chat/git
-# optional: npx wrangler secret put ROISTAT_LEAD_URL     # defaults to https://cloud.roistat.com/api/proxy/1.0/leads/add
-npx wrangler secret put IP_SALT
-npx wrangler deploy                                     # prints https://anima-lead.<sub>.workers.dev
-```
-Until `ROISTAT_INTEGRATION_KEY` is set the Worker still stores every lead (status `pending`) and delivers once they appear.
-Request format follows Roistat's documented proxylead API (GET `/api/proxy/1.0/leads/add`: `roistat` visit id, `key`, `title`, `name`, `phone`, `email`, `comment`, `sync=1`); the docs name only `cloud.roistat.com`, no EU host. Not exercised against the live Roistat: no test leads are sent from the live site, so the first real enquiry is the first live proof; watch the outbox `last_error`.
+POST `/api/anima/lead` matches the merged site adapter. Fixed tenant `anima-coffee`, exact site origin, bounded payload, explicit consent. Origin checks are not authentication: non-browser clients can forge them. A required edge limiter uses ephemeral keyed IP identifiers (10 requests/minute per location); no raw IP is retained. Verify namespace 1001 is unused in the Anima account before deploying. Missing binding or trusted CF IP fails closed. Distributed abuse remains possible; the 500-new-leads/day atomic cap is a final circuit breaker, not complete bot protection. Validate abuse controls before activation.
 
-## Activation (after deploy and a manual OPTIONS/health check, no real leads)
-1. Add the Worker origin to `connect-src` in `_headers` and the meta CSP.
-2. Set every form's `data-endpoint` to `https://<worker-host>/api/anima/lead` (and optionally a custom domain).
-3. Rollback: empty `data-endpoint`; stored rows stay and the cron keeps delivering them.
+D1 commits AES-GCM encrypted contact data before returning accepted + UUID + receipt: stored. This is not a CRM receipt. A keyed fingerprint detects idempotency-key reuse with changed content. One physical database and Worker per Anima environment. No account IDs, real credentials, IPs or raw bodies in this package or logs. Platform observability disabled by default. Payload key must remain available; rotation needs migration.
 
-## Local tests (no network, no wrangler): `cd workers/anima-lead && npm test` (Node >= 22, uses node:sqlite).
+Cron processes up to three queued records every five minutes independently of browser visits. Missing delivery configuration leaves them queued. Atomic claim prevents concurrent sends. Original roistat_visit persists through replay. Only the fixed HTTPS Roistat URL is called, with callback disabled and sync=1. No direct Kommo token or alternate CRM path.
+
+Payload retention is seven days; cron erases payloads, keeping opaque key/hash tombstones to reject stale replay. D1 backups/Time Travel may retain historical ciphertext; deletion and key lifecycle require review. Tombstone growth needs monitoring. Free quota exhaustion must reject intake and preserve browser fallback, never trigger a paid upgrade.
+
+Provider response parser accepts an illustrative fixture shape only; verify it against an authorized, redacted response before enabling. Both proxy and CRM IDs are required for kommo_confirmed. Roistat acceptance is separate. HTTP errors, timeout, malformed responses and interrupted claims become unknown: a receiver may have committed. Do not blindly resend. Roistat's contact-based duplicate checks are heuristics, not idempotency. Authenticated automated reconciliation/polling is NOT implemented. Existing unknown/accepted records require authoritative readback before retry/state change. End-to-end automatic recovery is incomplete.
+
+## Local verification
+
+Node 24: `npm test` runs real SQLite on disk with synthetic receivers. `node runtime-test.mjs` exercises local Miniflare/workerd+D1. From repo root: `python tools/test_durable_leads.py` exercises headless browser fallback, with non-local requests blocked. A TEST-labelled enquiry in real CRM is prohibited.
+
+## Deployment gates / next safe operation
+
+1. Verify signed-in Anima account and Workers Free plan. Do not inherit user-global Wrangler credentials, another tenant's CLI identity, or upgrade billing. Official Free D1 limits: 5M reads/day, 100k writes/day, 5GB/account, 500MB/database. Workers request/CPU limits also apply. These are documented quotas, not load-test results.
+2. Create Anima-only staging Worker + D1; bind DB and apply schema. Configure a generated PAYLOAD_KEY via approved secret entry, not chat/Git/printed shell. Keep DELIVERY_ENABLED=false. No secret is supplied by this code.
+3. Existing Anima Roistat project and Kommo account were identified privately. Install that specific integration key through approved secret reference. Never use public counter hash, foreign/global REST key or direct CRM fallback. No production secret has been retrieved or installed here.
+4. Verify response schema and stable-reference mapping with a non-production receiver/account; implement authenticated receipt reconciliation for unknown/accepted records. Test outage, restart, lost response after commit, duplicate requests, tenant mismatch, recovery, quota limits, and read back deployed cron/binding + synthetic storage receipts with real destinations blocked.
+5. Independent exact-head review and CI precede activation. Set ROUTING_VERIFIED=true and DELIVERY_ENABLED=true only after those gates. Configure the site's endpoint only after safe server validation. Preserve browser outbox and original UUIDs. A merge/test/accepted HTTP response is not production CRM delivery.
+
+References:
+- https://developers.cloudflare.com/d1/platform/pricing/
+- https://developers.cloudflare.com/d1/platform/limits/
+- https://developers.cloudflare.com/workers/platform/limits/
+- https://developers.cloudflare.com/d1/best-practices/local-development/
+- https://help-en.roistat.com/integrations/additional_settings/proxylead/
+- https://help-en.roistat.com/API/methods/proxy-leads/
+
+Evidence: direct development, not an admitted Anima OpenClaw run or GBrain ingestion. Production deployment URL, D1 binding/cron readback and real Roistat/Kommo receipts remain unobserved. No customer enquiries generated.
+
+## Validation record (2026-11-04)
+
+15 Node/SQLite tests passed; 18 isolated Chromium browser tests passed; local workerd+D1 restart/receipt/synthetic downstream round trip passed. The runtime test exposed Workers' unsupported redirect:error setting; changed to manual and non-200 remains unknown. Current Wrangler 4.157.0 uses Miniflare 5.20261103.0-beta; the test pins that exact harness and uses its exported v4 option converter. npm audit reported zero vulnerabilities after removing the old test harness. Local runtime tests do not enforce production CPU/quota limits and are not deployment evidence.
+
+Independent read-only review found the intake abuse gap (required keyed edge limiter added), unverified provider wire/receipt schema (activation remains gated), and missing automated reconciliation (still open). No production Cloudflare resources, billing setting, Roistat or Kommo record was changed. The Anima browser window is minimized and the available UI interface could not restore it; owner was asked only to restore that existing window. No ADV/AMC identity was substituted.
+
+Active sends are excluded from retention cleanup until their bounded lease ends, so cleanup cannot discard an in-flight receipt. Expired unresolved records lose their contact payload under the seven-day policy; opaque IDs/state tombstones remain. The added retention/send race test passes.
+
+## Continuation of merged component
+
+This hardens the existing `workers/anima-lead` from PRs #102/#103. It is the only server intake implementation in this candidate; the temporary parallel prototype has been removed. The provider request retains the documented GET query format from #103, while changing unsupported redirect:error to manual and forbidding arbitrary provider hosts. Disable logging of outbound URLs since the documented API places the integration key in the query.
+
+Schema changes are NOT a migration for an existing deployed database. Deployment has not been verified. If an older D1 already exists, stop before schema application, preserve its data, and supply a reviewed migration to the new tenant/key/encrypted-payload schema. Do not overwrite an existing database or apply CREATE IF NOT EXISTS as if it migrated columns. Existing old outbox records must be reconciled before switching senders.
+
+Prior tests that treated arbitrary 2xx as delivered and blindly retried ambiguous errors are replaced by explicit negative receipt/lost-response tests. The replacement suite covers the same persistence, origin, tenant, consent, contact, body-size, capacity, missing-config and rate-limit paths plus encryption, process restart, concurrency and retention. Historical "success" stub tests are not production proof.

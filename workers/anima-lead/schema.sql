@@ -1,24 +1,12 @@
--- D1 schema for the Anima lead intake Worker. Apply once:
---   npx wrangler d1 execute anima-leads --remote --file=schema.sql
+-- One physical database per tenant/environment. No customer data in logs.
 CREATE TABLE IF NOT EXISTS leads (
-  lead_id TEXT PRIMARY KEY,
-  idempotency_key TEXT NOT NULL UNIQUE,
-  created_at INTEGER NOT NULL,
-  payload TEXT NOT NULL
+ tenant TEXT NOT NULL CHECK(tenant = 'anima-coffee'),
+ idem TEXT NOT NULL, id TEXT NOT NULL UNIQUE, fingerprint TEXT NOT NULL,
+ payload TEXT, state TEXT NOT NULL DEFAULT 'queued'
+ CHECK(state IN ('queued','sending','unknown','roistat_accepted','kommo_confirmed','expired')),
+ created INTEGER NOT NULL, expires INTEGER NOT NULL, next_attempt INTEGER NOT NULL,
+ attempts INTEGER NOT NULL DEFAULT 0, proxy_id TEXT, kommo_id TEXT,
+ PRIMARY KEY(tenant, idem)
 );
-CREATE TABLE IF NOT EXISTS outbox (
-  lead_id TEXT PRIMARY KEY REFERENCES leads(lead_id),
-  status TEXT NOT NULL DEFAULT 'pending',   -- pending | sending | delivered | dead
-  attempts INTEGER NOT NULL DEFAULT 0,
-  next_attempt_at INTEGER NOT NULL,
-  claimed_at INTEGER,
-  last_error TEXT,
-  delivered_at INTEGER
-);
-CREATE INDEX IF NOT EXISTS outbox_due ON outbox(status, next_attempt_at);
-CREATE TABLE IF NOT EXISTS rate (
-  bucket TEXT NOT NULL,
-  window INTEGER NOT NULL,
-  n INTEGER NOT NULL,
-  PRIMARY KEY (bucket, window)
-);
+CREATE INDEX IF NOT EXISTS leads_due ON leads(state,next_attempt);
+CREATE INDEX IF NOT EXISTS leads_expiry ON leads(expires);

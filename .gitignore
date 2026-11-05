@@ -2,3 +2,7 @@ __pycache__/
 *.pyc
 
 .claude/settings.local.json
+
+# Local Anima development/runtime state
+.anima-gstack/
+.wrangler/
