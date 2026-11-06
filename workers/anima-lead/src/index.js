@@ -2,7 +2,8 @@
 const TENANT = 'anima-coffee';
 const PROVIDER = 'https://cloud.roistat.com/api/proxy/1.0/leads/add';
 const ORIGINS = new Set(['https://aeo.animacoffee.com.ua','https://animacoffee.com.ua']);
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Accept existing browser outbox keys verbatim; never rewrite a pending key.
+const IDEMPOTENCY_KEY = /^(?:anima_)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 const sevenDays = 7 * 86400000;
@@ -22,7 +23,7 @@ async function open(payload, id, env) {
   return JSON.parse(dec.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:unhex(iv),additionalData:enc.encode(TENANT + ':' + id)},await key(env),unhex(bytes))));
 }
 export function validate(raw) {
-  if (!raw || raw.company_url || raw.client_slug !== TENANT || raw.consent !== true || !UUID.test(raw.idempotency_key || '')) throw new Error('invalid');
+  if (!raw || raw.company_url || raw.client_slug !== TENANT || raw.consent !== true || !IDEMPOTENCY_KEY.test(raw.idempotency_key || '')) throw new Error('invalid');
   const data = {client_slug:TENANT,consent:true};
   const limits = {name:160,business:240,city:120,machines:80,email:254,phone:40,details:2000,page_slug:300,referrer:500,roistat_visit:32,utm_source:200,utm_medium:200,utm_campaign:200,utm_term:200,utm_content:200,gclid:200,lead_source:20,ai_source:20};
   for (const [field, limit] of Object.entries(limits)) {

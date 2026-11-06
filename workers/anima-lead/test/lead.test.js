@@ -82,3 +82,14 @@ test('retention sweep preserves an active send until its receipt can commit',asy
  await sweep({...e,DELIVERY_ENABLED:'false'},success,now+300000);
  assert.equal(row(e).payload,null);assert.equal(row(e).kommo_id,'34');
 });
+
+test('browser-prefixed keys preserve receipts; malformed or foreign prefixes are refused',async()=>{
+ const e=env();const input={...data,idempotency_key:'anima_'+data.idempotency_key};
+ const first=await intake(req(input),e,now);assert.equal(first.status,200);
+ const receipt=await first.json();const again=await intake(req(input),e,now+1);
+ assert.equal((await again.json()).lead_id,receipt.lead_id);
+ for(const value of ['adv_'+data.idempotency_key,'anima_bad','anima_anima_'+data.idempotency_key]) {
+  assert.equal((await intake(req({...input,idempotency_key:value}),e,now+2)).status,400);
+ }
+ assert.equal(e.DB.sql.prepare('SELECT count(*) n FROM leads').get().n,1);
+});
